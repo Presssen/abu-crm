@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/auth/client'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Command } from 'lucide-react'
 
 export default function SignupPage() {
     const [email, setEmail] = useState('')
@@ -31,50 +31,60 @@ export default function SignupPage() {
             setError(error.message)
             setLoading(false)
         } else {
-            // Check if session established (auto-confirm enabled?) or verify email needed
-            // Ideally show "Check your email" message
             router.push('/dashboard')
             router.refresh()
         }
     }
 
     return (
-        <div className="w-full max-w-md space-y-8">
-            <div>
-                <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-                    Create account ABU CRM
+        <div className="bg-white py-8 px-4 shadow-2xl sm:rounded-xl sm:px-10 border border-gray-100">
+            <div className="sm:mx-auto sm:w-full sm:max-w-md mb-6">
+                <div className="flex justify-center">
+                    <div className="h-12 w-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
+                        <Command className="text-white w-7 h-7" />
+                    </div>
+                </div>
+                <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 tracking-tight">
+                    Create your account
                 </h2>
+                <p className="mt-2 text-center text-sm text-gray-600">
+                    Get started with <span className="font-medium text-indigo-600">ABU CRM</span> today
+                </p>
             </div>
-            <form className="mt-8 space-y-6" onSubmit={handleSignup}>
-                <div className="-space-y-px rounded-md shadow-sm">
-                    <div>
-                        <label htmlFor="email-address" className="sr-only">
-                            Email address
-                        </label>
+
+            <form className="space-y-6" onSubmit={handleSignup}>
+                <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        Email address
+                    </label>
+                    <div className="mt-1">
                         <input
-                            id="email-address"
+                            id="email"
                             name="email"
                             type="email"
                             autoComplete="email"
                             required
-                            className="relative block w-full rounded-t-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 pl-3"
-                            placeholder="Email address"
+                            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out"
+                            placeholder="you@example.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                         />
                     </div>
-                    <div>
-                        <label htmlFor="password" className="sr-only">
-                            Password
-                        </label>
+                </div>
+
+                <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                        Password
+                    </label>
+                    <div className="mt-1">
                         <input
                             id="password"
                             name="password"
                             type="password"
                             autoComplete="new-password"
                             required
-                            className="relative block w-full rounded-b-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 pl-3"
-                            placeholder="Password"
+                            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out"
+                            placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                         />
@@ -82,25 +92,23 @@ export default function SignupPage() {
                 </div>
 
                 {error && (
-                    <div className="text-sm text-red-500 text-center">{error}</div>
-                )}
-
-                <div className="flex items-center justify-end">
-                    <div className="text-sm">
-                        <Link
-                            href="/login"
-                            className="font-medium text-indigo-600 hover:text-indigo-500"
-                        >
-                            Already have an account? Sign in
-                        </Link>
+                    <div className="rounded-md bg-red-50 p-4">
+                        <div className="flex">
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-red-800">Registration failed</h3>
+                                <div className="mt-2 text-sm text-red-700">
+                                    <p>{error}</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="group relative flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
+                        className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-in-out transform hover:-translate-y-0.5"
                     >
                         {loading ? (
                             <Loader2 className="animate-spin h-5 w-5 text-white" />
@@ -110,6 +118,28 @@ export default function SignupPage() {
                     </button>
                 </div>
             </form>
+
+            <div className="mt-6">
+                <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white text-gray-500">
+                            Already have an account?
+                        </span>
+                    </div>
+                </div>
+
+                <div className="mt-6">
+                    <Link
+                        href="/login"
+                        className="w-full flex justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                    >
+                        Sign in instead
+                    </Link>
+                </div>
+            </div>
         </div>
     )
 }

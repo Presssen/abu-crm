@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/auth/client'
-import { Loader2 } from 'lucide-react'
+import { Loader2, KeyRound } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('')
@@ -31,29 +31,35 @@ export default function ForgotPasswordPage() {
     }
 
     return (
-        <div className="w-full max-w-md space-y-8">
-            <div>
-                <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+        <div className="bg-white py-8 px-4 shadow-2xl sm:rounded-xl sm:px-10 border border-gray-100">
+            <div className="sm:mx-auto sm:w-full sm:max-w-md mb-6">
+                <div className="flex justify-center">
+                    <div className="h-12 w-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4">
+                        <KeyRound className="text-indigo-600 w-6 h-6" />
+                    </div>
+                </div>
+                <h2 className="text-center text-3xl font-extrabold text-gray-900 tracking-tight">
                     Reset Password
                 </h2>
                 <p className="mt-2 text-center text-sm text-gray-600">
-                    Enter your email address and we'll send you a link to reset your password.
+                    Enter your email to receive a reset link
                 </p>
             </div>
-            <form className="mt-8 space-y-6" onSubmit={handleResetPassword}>
-                <div className="rounded-md shadow-sm -space-y-px">
-                    <div>
-                        <label htmlFor="email-address" className="sr-only">
-                            Email address
-                        </label>
+
+            <form className="space-y-6" onSubmit={handleResetPassword}>
+                <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        Email address
+                    </label>
+                    <div className="mt-1">
                         <input
-                            id="email-address"
+                            id="email"
                             name="email"
                             type="email"
                             autoComplete="email"
                             required
-                            className="relative block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 pl-3"
-                            placeholder="Email address"
+                            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out"
+                            placeholder="you@example.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                         />
@@ -61,28 +67,35 @@ export default function ForgotPasswordPage() {
                 </div>
 
                 {error && (
-                    <div className="text-sm text-red-500 text-center">{error}</div>
+                    <div className="rounded-md bg-red-50 p-4">
+                        <div className="flex">
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-red-800">Error</h3>
+                                <div className="mt-2 text-sm text-red-700">
+                                    <p>{error}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 )}
                 {message && (
-                    <div className="text-sm text-green-500 text-center">{message}</div>
-                )}
-
-                <div className="flex items-center justify-end">
-                    <div className="text-sm">
-                        <Link
-                            href="/login"
-                            className="font-medium text-indigo-600 hover:text-indigo-500"
-                        >
-                            Back to Sign in
-                        </Link>
+                    <div className="rounded-md bg-green-50 p-4">
+                        <div className="flex">
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-green-800">Link sent!</h3>
+                                <div className="mt-2 text-sm text-green-700">
+                                    <p>{message}</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="group relative flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
+                        className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-in-out transform hover:-translate-y-0.5"
                     >
                         {loading ? (
                             <Loader2 className="animate-spin h-5 w-5 text-white" />
@@ -92,6 +105,27 @@ export default function ForgotPasswordPage() {
                     </button>
                 </div>
             </form>
+
+            <div className="mt-6">
+                <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white text-gray-500">
+                            Or return to
+                        </span>
+                    </div>
+                </div>
+                <div className="mt-6 flex justify-center">
+                    <Link
+                        href="/login"
+                        className="font-medium text-indigo-600 hover:text-indigo-500 flex items-center gap-2"
+                    >
+                        Back to Login
+                    </Link>
+                </div>
+            </div>
         </div>
     )
 }
