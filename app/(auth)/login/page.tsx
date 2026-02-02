@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/auth/client'
 import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
