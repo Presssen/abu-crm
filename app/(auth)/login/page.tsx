@@ -37,8 +37,12 @@ export default function LoginPage() {
         <div className="bg-white py-8 px-4 shadow-2xl sm:rounded-xl sm:px-10 border border-gray-100">
             <div className="sm:mx-auto sm:w-full sm:max-w-md mb-6">
                 <div className="flex justify-center">
-                    <div className="h-12 w-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
-                        <Command className="text-white w-7 h-7" />
+                    <div className="h-16 w-auto flex items-center justify-center">
+                        <img
+                            src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"
+                            alt="ABU Logo"
+                            className="h-12 w-auto object-contain"
+                        />
                     </div>
                 </div>
                 <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 tracking-tight">

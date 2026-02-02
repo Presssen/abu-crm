@@ -34,8 +34,12 @@ export default function ForgotPasswordPage() {
         <div className="bg-white py-8 px-4 shadow-2xl sm:rounded-xl sm:px-10 border border-gray-100">
             <div className="sm:mx-auto sm:w-full sm:max-w-md mb-6">
                 <div className="flex justify-center">
-                    <div className="h-12 w-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4">
-                        <KeyRound className="text-indigo-600 w-6 h-6" />
+                    <div className="h-16 w-auto flex items-center justify-center mb-4">
+                        <img
+                            src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"
+                            alt="ABU Logo"
+                            className="h-12 w-auto object-contain"
+                        />
                     </div>
                 </div>
                 <h2 className="text-center text-3xl font-extrabold text-gray-900 tracking-tight">

@@ -36,8 +36,13 @@ export default function ProtectedLayout({
             {/* Sidebar */}
             <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r border-gray-200 bg-white">
                 <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
-                    <div className="flex flex-shrink-0 items-center px-4">
-                        <h1 className="text-xl font-bold text-indigo-600">ABU CRM</h1>
+                    <div className="flex flex-shrink-0 items-center px-4 mb-2">
+                        <img
+                            src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"
+                            alt="ABU Logo"
+                            className="h-8 w-auto object-contain mr-2"
+                        />
+                        <h1 className="text-xl font-bold text-gray-900">CRM</h1>
                     </div>
                     <nav className="mt-5 flex-1 space-y-1 px-2">
                         {navigation.map((item) => {
