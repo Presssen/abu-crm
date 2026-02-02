@@ -15,10 +15,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ABU CRM",
   description: "Modern CRM for ABU Management",
-  icons: {
-    icon: "https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866",
-    apple: "https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866",
-  },
   openGraph: {
     title: "ABU CRM",
     description: "Modern CRM for ABU Management",
