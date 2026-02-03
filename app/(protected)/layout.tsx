@@ -18,7 +18,7 @@ import {
     X
 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function ProtectedLayout({
     children,
@@ -30,6 +30,25 @@ export default function ProtectedLayout({
     const supabase = createClient()
     const [loading, setLoading] = useState(false)
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [userRole, setUserRole] = useState<string | null>(null)
+
+    // Fetch user role
+    useEffect(() => {
+        const fetchUserRole = async () => {
+            const { data: userData } = await supabase.auth.getUser()
+            if (userData.user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', userData.user.id)
+                    .single()
+                if (profile) {
+                    setUserRole(profile.role)
+                }
+            }
+        }
+        fetchUserRole()
+    }, [])
 
     const handleLogout = async () => {
         setLoading(true)
@@ -47,8 +66,12 @@ export default function ProtectedLayout({
         { name: 'Meetings', href: '/meetings', icon: Calendar },
         { name: 'Emails', href: '/emails', icon: Mail },
         { name: 'Settings', href: '/settings', icon: Settings },
-        { name: 'Admin', href: '/admin', icon: Shield },
     ]
+
+    // Add Admin tab only for admin users
+    const fullNavigation = userRole === 'admin'
+        ? [...navigation, { name: 'Admin', href: '/admin', icon: Shield }]
+        : navigation
 
     return (
         <div className="flex min-h-screen bg-white">
@@ -80,7 +103,7 @@ export default function ProtectedLayout({
                     </div>
 
                     <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-                        {navigation.map((item) => {
+                        {fullNavigation.map((item) => {
                             const isActive = pathname === item.href
                             return (
                                 <Link

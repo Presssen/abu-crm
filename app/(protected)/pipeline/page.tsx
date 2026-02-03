@@ -11,6 +11,7 @@ import {
     ChevronRight
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import CreateLeadModal from '../components/CreateLeadModal'
 
 const STAGES = [
     { id: 'new', label: 'Nuevos', color: 'bg-blue-500' },
@@ -33,6 +34,7 @@ export default function PipelinePage() {
     const supabase = createClient()
     const [leads, setLeads] = useState<Lead[]>([])
     const [loading, setLoading] = useState(true)
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
     const fetchLeads = async () => {
         setLoading(true)
@@ -56,17 +58,26 @@ export default function PipelinePage() {
     const getLeadsByStatus = (status: string) => leads.filter(l => l.status === status)
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col space-y-6">
+        <div className="h-[calc(100vh-8rem)] flex flex-col space-y-6 max-w-full overflow-hidden">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Pipeline de Ventas</h1>
                     <p className="text-sm text-gray-500">Visualiza y gestiona el flujo de tus oportunidades.</p>
                 </div>
-                <button className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200">
+                <button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+                >
                     <Plus className="h-4 w-4 mr-2" />
                     Nuevo Lead
                 </button>
             </div>
+
+            <CreateLeadModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={fetchLeads}
+            />
 
             <div className="flex-1 overflow-x-auto pb-4">
                 <div className="flex h-full space-x-4 min-w-max">{STAGES.map((stage) => (

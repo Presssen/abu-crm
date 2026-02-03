@@ -12,6 +12,7 @@ import {
     ArrowDownRight
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import Link from 'next/link'
 
 export default function DashboardPage() {
     const supabase = createClient()
@@ -35,16 +36,27 @@ export default function DashboardPage() {
                     .select('*', { count: 'exact', head: true })
                     .eq('status', 'open')
 
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                const tomorrow = new Date(today)
+                tomorrow.setDate(tomorrow.getDate() + 1)
+
                 const { count: meetingsCount } = await supabase
                     .from('meetings')
                     .select('*', { count: 'exact', head: true })
-                // Basic today filter could be added here
+                    .gte('start_time', today.toISOString())
+                    .lt('start_time', tomorrow.toISOString())
+
+                const { count: dealsWonCount } = await supabase
+                    .from('leads')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('status', 'won')
 
                 setStats({
                     totalLeads: leadsCount || 0,
                     pendingTasks: tasksCount || 0,
                     meetingsToday: meetingsCount || 0,
-                    dealsWon: 0 // Placeholder for now
+                    dealsWon: dealsWonCount || 0
                 })
             } catch (error) {
                 console.error('Error fetching stats:', error)
@@ -137,7 +149,7 @@ export default function DashboardPage() {
                 <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-lg font-bold text-gray-900">Actividad Reciente</h2>
-                        <button className="text-sm font-medium text-indigo-600 hover:text-indigo-700">Ver todo</button>
+                        <Link href="/leads" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">Ver todo</Link>
                     </div>
                     <div className="space-y-6">
                         {[1, 2, 3].map((i) => (
@@ -156,7 +168,7 @@ export default function DashboardPage() {
                 <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-lg font-bold text-gray-900">Estado del Pipeline</h2>
-                        <button className="text-sm font-medium text-indigo-600 hover:text-indigo-700">Ver Kanban</button>
+                        <Link href="/pipeline" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">Ver Kanban</Link>
                     </div>
                     <div className="space-y-4">
                         {[
