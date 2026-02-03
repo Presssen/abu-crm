@@ -13,6 +13,7 @@ import {
     Search
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import CreateTaskModal from '../components/CreateTaskModal'
 
 interface Task {
     id: string
@@ -30,6 +31,7 @@ export default function TasksPage() {
     const [tasks, setTasks] = useState<Task[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'open' | 'done'>('open')
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
     const fetchTasks = async () => {
         setLoading(true)
@@ -87,11 +89,20 @@ export default function TasksPage() {
                     <h1 className="text-3xl font-bold text-gray-900">Tareas</h1>
                     <p className="mt-1 text-gray-500">Gestiona tu lista de pendientes y compromisos.</p>
                 </div>
-                <button className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+                <button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                >
                     <Plus className="h-5 w-5 mr-2" />
                     Nueva Tarea
                 </button>
             </div>
+
+            <CreateTaskModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={fetchTasks}
+            />
 
             {/* Quick Stats & Tabs */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

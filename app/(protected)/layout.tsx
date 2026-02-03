@@ -46,11 +46,12 @@ export default function ProtectedLayout({
         { name: 'Tasks', href: '/tasks', icon: CheckSquare },
         { name: 'Meetings', href: '/meetings', icon: Calendar },
         { name: 'Emails', href: '/emails', icon: Mail },
+        { name: 'Settings', href: '/settings', icon: Settings },
         { name: 'Admin', href: '/admin', icon: Shield },
     ]
 
     return (
-        <div className="flex min-h-screen bg-gray-50/50">
+        <div className="flex min-h-screen bg-white">
             {/* Mobile Menu Button */}
             <div className="md:hidden fixed top-4 right-4 z-50">
                 <button
