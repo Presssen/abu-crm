@@ -20,28 +20,29 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json()
-        const { title, start_time, end_time, description, location } = body
+        const { title, start_time, end_time, description, location, attendees } = body
 
-        // Validation
-        if (!title || !start_time || !end_time) {
+        // Validation - Basic existence check
+        if (!title || !start_time) {
             return NextResponse.json({
-                error: 'Missing required fields: title, start_time, and end_time are required.'
+                error: 'Missing required fields: title and start_time are required.'
             }, { status: 400 })
         }
 
         const startDate = new Date(start_time)
-        const endDate = new Date(end_time)
+        let endDate = new Date(end_time)
 
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        if (isNaN(startDate.getTime())) {
             return NextResponse.json({
-                error: 'Invalid date format provided.'
+                error: 'Invalid start date format provided.'
             }, { status: 400 })
         }
 
-        if (endDate <= startDate) {
-            return NextResponse.json({
-                error: 'The end time must be after the start time.'
-            }, { status: 400 })
+        // Auto-correct end time if invalid or before start time
+        if (!end_time || isNaN(endDate.getTime()) || endDate <= startDate) {
+            console.warn('⚠️ Invalid or missing end_time, defaulting to start_time + 1 hour')
+            // Clone start date to avoid mutating it
+            endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
         }
 
         console.log('📅 Creating calendar event for user:', userData.user.email)
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
             }, { status: 400 })
         }
 
-        if (!integration.credentials) {
+        if (integration.credentials === null) {
             console.error('❌ Integration found but credentials are null')
             return NextResponse.json({
                 error: 'Google Calendar credentials missing. Please reconnect.'
@@ -84,6 +85,15 @@ export async function POST(request: Request) {
 
         // 2. Create Event Function
         const createEvent = async (token: string) => {
+            // Process attendees if present
+            let processedAttendees: { email: string }[] = []
+            if (Array.isArray(attendees)) {
+                processedAttendees = attendees.map((a: any) => {
+                    if (typeof a === 'string') return { email: a }
+                    return { email: a.email } // simplified handling, assuming object has email
+                }).filter(a => a.email) // Filter out empty
+            }
+
             const event = {
                 summary: title || 'Nueva Reunión',
                 location: location || '',
@@ -94,12 +104,14 @@ export async function POST(request: Request) {
                 end: {
                     dateTime: endDate.toISOString(),
                 },
+                attendees: processedAttendees,
                 reminders: {
                     useDefault: true,
                 },
             }
 
             console.log('📤 Sending event to Google Calendar API:', JSON.stringify(event, null, 2))
+
             const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
                 method: 'POST',
                 headers: {
