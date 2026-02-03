@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import CreateLeadModal from '../components/CreateLeadModal'
+import LeadDetailModal from '../components/LeadDetailModal'
 
 const STAGES = [
     { id: 'new', label: 'Nuevos', color: 'bg-blue-500' },
@@ -39,6 +40,7 @@ export default function PipelinePage() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
     const [dragOverStage, setDragOverStage] = useState<string | null>(null)
+    const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
     const fetchLeads = async () => {
         setLoading(true)
@@ -176,8 +178,14 @@ export default function PipelinePage() {
                                             key={lead.id}
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, lead)}
+                                            onClick={(e) => {
+                                                // Only open modal if not clicking the action button
+                                                if (!(e.target as HTMLElement).closest('button')) {
+                                                    setSelectedLeadId(lead.id)
+                                                }
+                                            }}
                                             className={clsx(
-                                                "group bg-white p-4 rounded-xl border transition-all cursor-grab active:cursor-grabbing",
+                                                "group bg-white p-4 rounded-xl border transition-all cursor-pointer",
                                                 lead.status === 'won' ? "border-emerald-200 shadow-sm shadow-emerald-50" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200",
                                                 draggedLead?.id === lead.id ? "opacity-50 ring-2 ring-indigo-400" : ""
                                             )}
@@ -260,6 +268,14 @@ export default function PipelinePage() {
                     background: #cbd5e1;
                 }
             `}</style>
+
+            {selectedLeadId && (
+                <LeadDetailModal
+                    isOpen={!!selectedLeadId}
+                    onClose={() => setSelectedLeadId(null)}
+                    leadId={selectedLeadId}
+                />
+            )}
         </div>
     )
 }

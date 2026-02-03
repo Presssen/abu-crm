@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import CreateMeetingModal from '../components/CreateMeetingModal'
+import EventDetailModal from '../components/EventDetailModal'
 
 interface Meeting {
     id: string
@@ -43,6 +44,7 @@ export default function MeetingsPage() {
     const [currentDate, setCurrentDate] = useState(new Date())
     const [view, setView] = useState<ViewType>('month')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
 
     useEffect(() => {
         fetchMeetings()
@@ -151,9 +153,13 @@ export default function MeetingsPage() {
                             </div>
                             <div className="mt-2 space-y-1">
                                 {dayMeetings.map(m => (
-                                    <div key={m.id} className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 truncate cursor-pointer font-medium hover:bg-indigo-100">
+                                    <button
+                                        key={m.id}
+                                        onClick={() => setSelectedEventId(m.id)}
+                                        className="w-full text-left text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 truncate font-medium hover:bg-indigo-100 transition-colors"
+                                    >
                                         {new Date(m.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} {m.leads?.company_name}
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         </div>
@@ -302,6 +308,18 @@ export default function MeetingsPage() {
                 onClose={() => setIsCreateModalOpen(false)}
                 onSuccess={fetchMeetings}
             />
+
+            {selectedEventId && (
+                <EventDetailModal
+                    isOpen={!!selectedEventId}
+                    onClose={() => setSelectedEventId(null)}
+                    eventId={selectedEventId}
+                    onDelete={() => {
+                        setSelectedEventId(null)
+                        fetchMeetings()
+                    }}
+                />
+            )}
         </div>
     )
 }

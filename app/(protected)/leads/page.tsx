@@ -20,6 +20,7 @@ import { Upload } from 'lucide-react'
 import SendEmailModal from '../components/SendEmailModal'
 import CreateMeetingModal from '../components/CreateMeetingModal'
 import CreateTaskModal from '../components/CreateTaskModal'
+import LeadDetailModal from '../components/LeadDetailModal'
 
 interface Lead {
     id: string
@@ -66,6 +67,7 @@ export default function LeadsPage() {
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
+    const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
     const fetchLeads = async () => {
         setLoading(true)
@@ -196,7 +198,11 @@ export default function LeadsPage() {
                                 </tr>
                             ) : (
                                 leads.map((lead) => (
-                                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                                    <tr
+                                        key={lead.id}
+                                        onClick={() => setSelectedLeadId(lead.id)}
+                                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                    >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center">
                                                 <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold mr-3">
@@ -354,6 +360,14 @@ export default function LeadsPage() {
                 onClose={() => setIsTaskModalOpen(false)}
                 onSuccess={fetchLeads}
             />
+
+            {selectedLeadId && (
+                <LeadDetailModal
+                    isOpen={!!selectedLeadId}
+                    onClose={() => setSelectedLeadId(null)}
+                    leadId={selectedLeadId}
+                />
+            )}
         </div>
     )
 }
