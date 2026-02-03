@@ -38,7 +38,7 @@ export async function updateSession(request: NextRequest) {
     const path = request.nextUrl.pathname
 
     // Public routes
-    if (['/login', '/signup', '/forgot-password'].includes(path)) {
+    if (['/login', '/signup', '/forgot-password', '/auth/callback'].includes(path)) {
         if (user) {
             return NextResponse.redirect(new URL('/dashboard', request.url))
         }
