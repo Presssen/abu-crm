@@ -5,9 +5,21 @@ A modern, minimalist CRM built with Next.js 14+, TypeScript, Tailwind CSS, and S
 ## Features
 
 - **Authentication**: Email/Password login, Signup, Forgot Password using Supabase Auth.
-- **Role-Based Access Control (RBAC)**: secure `/admin` routes accessible only by users with 'admin' role.
-- **Protected Routes**: Middleware protection for `/dashboard` and `/admin`.
-- **Minimalist UI**: Clean interface built with Tailwind CSS.
+- **Lead Management**: Complete leads table with search, filtering, and status management.
+- **Pipeline Kanban**: Visual sales pipeline to track opportunities through stages.
+- **Excel/CSV Import**: Multi-step wizard to import leads from files with column mapping and deduplication.
+- **Activities & Meetings**: Task management and a weekly calendar view for scheduling.
+- **Emails**: Email logging and template management system.
+- **Role-Based Access Control (RBAC)**: Secure `/admin` routes and owner-based RLS for data privacy.
+- **Premium UI**: Modern, responsive interface built with Tailwind CSS and Lucide icons.
+
+## Architecture
+
+- **Frontend**: Next.js 14+ (App Router), React 19, Tailwind CSS.
+- **Database**: Supabase (PostgreSQL) with RLS for security.
+- **Storage**: Supabase Storage for storing imported files.
+- **State Management**: React Hooks (useState, useEffect) for component-level state.
+- **File Parsing**: `xlsx` and `papaparse` for handling Excel/CSV imports.
 
 ## Prerequisites
 
