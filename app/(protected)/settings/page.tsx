@@ -14,7 +14,6 @@ import {
     Loader2,
     Laptop,
     LogOut,
-    LogOut,
     Zap,
     RefreshCw
 } from 'lucide-react'
@@ -129,6 +128,24 @@ export default function SettingsPage() {
             console.error('Error disconnecting:', error)
         } finally {
             setIsConnectLoading(false)
+        }
+    }
+
+    const handleSyncCalendar = async () => {
+        setIsSyncing(true)
+        try {
+            const res = await fetch('/api/calendar/sync-events')
+            const data = await res.json()
+
+            if (!res.ok) throw new Error(data.error)
+
+            alert(`Sincronización completada: ${data.imported} importados, ${data.updated} actualizados`)
+            fetchSettings() // Refresh status
+        } catch (error: any) {
+            console.error('Sync error:', error)
+            alert('Error al sincronizar: ' + error.message)
+        } finally {
+            setIsSyncing(false)
         }
     }
 
