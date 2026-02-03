@@ -15,7 +15,8 @@ import {
     Mail,
     Shield,
     Menu,
-    X
+    X,
+    Zap
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -59,6 +60,7 @@ export default function ProtectedLayout({
 
     const navigation = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Marathon', href: '/marathon', icon: Zap },
         { name: 'Leads', href: '/leads', icon: Users },
         { name: 'Pipeline', href: '/pipeline', icon: Trello },
         { name: 'Imports', href: '/imports', icon: Upload },
