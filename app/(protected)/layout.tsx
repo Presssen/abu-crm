@@ -95,9 +95,9 @@ export default function ProtectedLayout({
                 <div className="flex flex-col h-full">
                     <div className="flex items-center px-6 py-6 border-b border-gray-100">
                         <img
-                            src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"
+                            src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/NEW_ABU_CRM.png?v=1770130167"
                             alt="ABU Logo"
-                            className="h-8 w-auto object-contain mr-2"
+                            className="h-10 w-auto object-contain mr-2"
                         />
                         <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
                             ABU CRM
