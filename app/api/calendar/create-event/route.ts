@@ -22,6 +22,28 @@ export async function POST(request: Request) {
         const body = await request.json()
         const { title, start_time, end_time, description, location } = body
 
+        // Validation
+        if (!title || !start_time || !end_time) {
+            return NextResponse.json({
+                error: 'Missing required fields: title, start_time, and end_time are required.'
+            }, { status: 400 })
+        }
+
+        const startDate = new Date(start_time)
+        const endDate = new Date(end_time)
+
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            return NextResponse.json({
+                error: 'Invalid date format provided.'
+            }, { status: 400 })
+        }
+
+        if (endDate <= startDate) {
+            return NextResponse.json({
+                error: 'The end time must be after the start time.'
+            }, { status: 400 })
+        }
+
         console.log('📅 Creating calendar event for user:', userData.user.email)
 
         // 1. Get Integration Tokens
@@ -39,7 +61,6 @@ export async function POST(request: Request) {
 
         if (!integration) {
             console.warn(`⚠️ No integration found for user ${userData.user.id}`)
-            console.warn('Checks: owner_id match?, integration_type=google_calendar?')
             return NextResponse.json({
                 error: 'Google Calendar not connected. Please connect your calendar in Settings → Integrations.'
             }, { status: 400 })
@@ -64,27 +85,21 @@ export async function POST(request: Request) {
         // 2. Create Event Function
         const createEvent = async (token: string) => {
             const event = {
-                summary: title,
+                summary: title || 'Nueva Reunión',
                 location: location || '',
                 description: description || '',
                 start: {
-                    dateTime: new Date(start_time).toISOString(),
-                    timeZone: 'Europe/Madrid',
+                    dateTime: startDate.toISOString(),
                 },
                 end: {
-                    dateTime: new Date(end_time).toISOString(),
-                    timeZone: 'Europe/Madrid',
+                    dateTime: endDate.toISOString(),
                 },
                 reminders: {
-                    useDefault: false,
-                    overrides: [
-                        { method: 'email', minutes: 24 * 60 },
-                        { method: 'popup', minutes: 10 },
-                    ],
+                    useDefault: true,
                 },
             }
 
-            console.log('📤 Sending event to Google Calendar API...')
+            console.log('📤 Sending event to Google Calendar API:', JSON.stringify(event, null, 2))
             const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
                 method: 'POST',
                 headers: {
@@ -108,12 +123,11 @@ export async function POST(request: Request) {
             if (!refreshToken) {
                 console.error('❌ Refresh token missing')
                 return NextResponse.json({
-                    error: 'Calendar session expired. Please reconnect your calendar in Settings → Integrations.'
+                    error: 'Calendar session expired. Please reconnect your calendar in Settings'
                 }, { status: 401 })
             }
 
             // Refresh Token
-            console.log('🔄 Refreshing access token...')
             const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -135,10 +149,9 @@ export async function POST(request: Request) {
             }
 
             const newAccessToken = refreshData.access_token
-            console.log('✅ Token refreshed successfully')
 
             // Update DB
-            const { error: updateError } = await supabase
+            await supabase
                 .from('integrations')
                 .update({
                     credentials: {
@@ -150,20 +163,19 @@ export async function POST(request: Request) {
                 })
                 .eq('id', integration.id)
 
-            if (updateError) {
-                console.error('Warning: Failed to update tokens in DB:', updateError)
-            }
-
             // Retry Create Event
-            console.log('🔄 Retrying event creation with new token...')
             response = await createEvent(newAccessToken)
         }
 
         if (!response.ok) {
-            const errorText = await response.text()
-            console.error('❌ Google Calendar API Error:', response.status, errorText)
+            const errorData = await response.json().catch(() => ({}));
+            console.error('❌ Google Calendar API Error:', response.status, errorData)
+
+            // Extract the descriptive error message if available
+            const googleMessage = errorData.error?.message || response.statusText;
+
             return NextResponse.json({
-                error: `Failed to create event in Google Calendar: ${response.statusText}`
+                error: `Failed to create event in Google Calendar: ${googleMessage}`
             }, { status: response.status })
         }
 
