@@ -255,8 +255,8 @@ export default function MeetingsPage() {
     }
 
     return (
-        <div className="h-full overflow-y-auto p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="h-full flex flex-col p-8 space-y-6 overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
                 </div>
@@ -284,7 +284,7 @@ export default function MeetingsPage() {
                 </div>
             </div>
 
-            <div className="flex flex-col">
+            <div className="flex flex-col flex-1 min-h-0">
                 {/* Header Navigation */}
                 <div className="flex items-center justify-between bg-white px-6 py-4 rounded-t-3xl border-x border-t border-gray-200">
                     <h2 className="text-lg font-bold text-gray-900 capitalize">

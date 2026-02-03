@@ -48,13 +48,23 @@ export default function EmailsPage() {
     const [formData, setFormData] = useState({ name: '', subject: '', body: '', is_global: false })
     const [user, setUser] = useState<any>(null)
 
-    const fetchLogs = async () => {
+    const fetchLogs = async (role?: string, userId?: string, selectedFilterId?: string) => {
         setLoading(true)
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('emails')
                 .select('*, leads(company_name)')
                 .order('sent_at', { ascending: false })
+
+            // Filter by owner if not admin
+            if (role !== 'admin') {
+                query = query.eq('owner_id', userId)
+            } else if (selectedFilterId) {
+                // If admin and a specific user is filtered
+                query = query.eq('owner_id', selectedFilterId)
+            }
+
+            const { data, error } = await query
             if (error) throw error
             setLogs(data || [])
         } catch (error) {
@@ -80,18 +90,39 @@ export default function EmailsPage() {
         }
     }
 
+    const [profile, setProfile] = useState<any>(null)
+    const [users, setUsers] = useState<any[]>([])
+    const [selectedUserId, setSelectedUserId] = useState<string>('')
+
     useEffect(() => {
         const checkUser = async () => {
-            const { data } = await supabase.auth.getUser()
-            setUser(data.user)
+            const { data: { user } } = await supabase.auth.getUser()
+            setUser(user)
+
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single()
+                setProfile(profile)
+
+                if (profile?.role === 'admin') {
+                    const { data: allUsers } = await supabase
+                        .from('profiles')
+                        .select('id, email, first_name, last_name')
+                        .order('email')
+                    setUsers(allUsers || [])
+                }
+            }
         }
         checkUser()
     }, [])
 
     useEffect(() => {
-        if (activeTab === 'sent') fetchLogs()
+        if (activeTab === 'sent' && user) fetchLogs(profile?.role, user.id, selectedUserId)
         if (activeTab === 'templates') fetchTemplates()
-    }, [activeTab])
+    }, [activeTab, user, profile, selectedUserId])
 
     const handleSaveTemplate = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -173,26 +204,46 @@ export default function EmailsPage() {
                 </button>
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-gray-100 flex space-x-8">
-                <button
-                    onClick={() => setActiveTab('sent')}
-                    className={clsx(
-                        "pb-4 text-sm font-bold transition-all border-b-2",
-                        activeTab === 'sent' ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-400 hover:text-gray-600"
-                    )}
-                >
-                    Enviados
-                </button>
-                <button
-                    onClick={() => setActiveTab('templates')}
-                    className={clsx(
-                        "pb-4 text-sm font-bold transition-all border-b-2",
-                        activeTab === 'templates' ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-400 hover:text-gray-600"
-                    )}
-                >
-                    Plantillas
-                </button>
+            {/* Tabs & Filtering */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-100 gap-4">
+                <div className="flex space-x-8">
+                    <button
+                        onClick={() => setActiveTab('sent')}
+                        className={clsx(
+                            "pb-4 text-sm font-bold transition-all border-b-2",
+                            activeTab === 'sent' ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-400 hover:text-gray-600"
+                        )}
+                    >
+                        Enviados
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('templates')}
+                        className={clsx(
+                            "pb-4 text-sm font-bold transition-all border-b-2",
+                            activeTab === 'templates' ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-400 hover:text-gray-600"
+                        )}
+                    >
+                        Plantillas
+                    </button>
+                </div>
+
+                {profile?.role === 'admin' && activeTab === 'sent' && (
+                    <div className="pb-4 flex items-center space-x-2">
+                        <label className="text-xs font-bold text-gray-400">Filtrar por usuario:</label>
+                        <select
+                            value={selectedUserId}
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                            <option value="">Todos los usuarios</option>
+                            {users.map(u => (
+                                <option key={u.id} value={u.id}>
+                                    {u.first_name || u.email} {u.last_name || ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
             </div>
 
             {/* Content */}
