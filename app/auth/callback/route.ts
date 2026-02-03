@@ -34,7 +34,7 @@ export async function GET(request: Request) {
                             access_token: provider_token,
                             refresh_token: provider_refresh_token,
                             email: user.email,
-                            last_sync: new Date().toISOString()
+                            last_synced: new Date().toISOString()
                         },
                         is_active: true,
                         updated_at: new Date().toISOString()

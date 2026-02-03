@@ -145,7 +145,7 @@ export async function POST(request: Request) {
                         ...integration.credentials,
                         access_token: newAccessToken,
                         refresh_token: refreshData.refresh_token || refreshToken,
-                        last_sync: new Date().toISOString()
+                        last_synced: new Date().toISOString()
                     }
                 })
                 .eq('id', integration.id)
