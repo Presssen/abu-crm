@@ -14,6 +14,7 @@ import {
     Check
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import SendEmailModal from '../components/SendEmailModal'
 
 interface EmailLog {
     id: string
@@ -42,6 +43,7 @@ export default function EmailsPage() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<'sent' | 'templates'>('sent')
     const [showTemplateModal, setShowTemplateModal] = useState(false)
+    const [showSendModal, setShowSendModal] = useState(false)
     const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
     const [formData, setFormData] = useState({ name: '', subject: '', body: '', is_global: false })
     const [user, setUser] = useState<any>(null)
@@ -162,7 +164,10 @@ export default function EmailsPage() {
                     <h1 className="text-3xl font-bold text-gray-900">Comunicaciones</h1>
                     <p className="mt-1 text-gray-500">Gestiona tus correos y plantillas de seguimiento.</p>
                 </div>
-                <button className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+                <button
+                    onClick={() => setShowSendModal(true)}
+                    className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                >
                     <Send className="h-5 w-5 mr-2" />
                     Redactar Email
                 </button>
@@ -378,6 +383,12 @@ export default function EmailsPage() {
                     </div>
                 </div>
             )}
+            {/* Send Email Modal */}
+            <SendEmailModal
+                isOpen={showSendModal}
+                onClose={() => setShowSendModal(false)}
+                onSuccess={fetchLogs}
+            />
         </div>
     )
 }

@@ -14,10 +14,12 @@ import {
     User
 } from 'lucide-react'
 import { clsx } from 'clsx'
-import Link from 'next/link'
 import CreateLeadModal from '../components/CreateLeadModal'
 import ImportLeadsModal from '../components/ImportLeadsModal'
 import { Upload } from 'lucide-react'
+import SendEmailModal from '../components/SendEmailModal'
+import CreateMeetingModal from '../components/CreateMeetingModal'
+import CreateTaskModal from '../components/CreateTaskModal'
 
 interface Lead {
     id: string
@@ -56,6 +58,13 @@ export default function LeadsPage() {
     const [statusFilter, setStatusFilter] = useState('all')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+
+    // Action Modals State
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
+    const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false)
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+    const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+    const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
 
     const fetchLeads = async () => {
         setLoading(true)
@@ -227,10 +236,57 @@ export default function LeadsPage() {
                                                 {new Date(lead.created_at).toLocaleDateString()}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                                        <td className="px-6 py-4 text-right relative">
+                                            <button
+                                                onClick={() => setActiveMenuId(activeMenuId === lead.id ? null : lead.id)}
+                                                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                                            >
                                                 <MoreHorizontal className="h-5 w-5" />
                                             </button>
+
+                                            {activeMenuId === lead.id && (
+                                                <>
+                                                    <div
+                                                        className="fixed inset-0 z-10"
+                                                        onClick={() => setActiveMenuId(null)}
+                                                    />
+                                                    <div className="absolute right-6 top-12 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedLead(lead)
+                                                                setIsEmailModalOpen(true)
+                                                                setActiveMenuId(null)
+                                                            }}
+                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center transition-colors"
+                                                        >
+                                                            <Mail size={14} className="mr-2" />
+                                                            Redactar Email
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedLead(lead)
+                                                                setIsMeetingModalOpen(true)
+                                                                setActiveMenuId(null)
+                                                            }}
+                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center transition-colors"
+                                                        >
+                                                            <Clock size={14} className="mr-2" />
+                                                            Agendar Reunión
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedLead(lead)
+                                                                setIsTaskModalOpen(true)
+                                                                setActiveMenuId(null)
+                                                            }}
+                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center transition-colors"
+                                                        >
+                                                            <Plus size={14} className="mr-2" />
+                                                            Nueva Tarea
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -239,6 +295,42 @@ export default function LeadsPage() {
                     </table>
                 </div>
             </div>
+            <CreateLeadModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={fetchLeads}
+            />
+
+            <ImportLeadsModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onSuccess={() => {
+                    fetchLeads()
+                    setIsImportModalOpen(false)
+                }}
+            />
+
+            {/* Action Modals */}
+            <SendEmailModal
+                isOpen={isEmailModalOpen}
+                onClose={() => setIsEmailModalOpen(false)}
+                onSuccess={fetchLeads}
+                initialLeadId={selectedLead?.id}
+                initialTo={selectedLead?.email}
+            />
+
+            <CreateMeetingModal
+                isOpen={isMeetingModalOpen}
+                onClose={() => setIsMeetingModalOpen(false)}
+                onSuccess={fetchLeads}
+            />
+
+            <CreateTaskModal
+                isOpen={isTaskModalOpen}
+                onClose={() => setIsTaskModalOpen(false)}
+                onSuccess={fetchLeads}
+            />
         </div>
     )
 }
+

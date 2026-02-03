@@ -59,7 +59,7 @@ export default function SettingsPage() {
                     .select('*')
                     .eq('owner_id', user.id)
                     .eq('integration_type', 'google_calendar')
-                    .single()
+                    .maybeSingle()
 
                 setIsCalendarConnected(!!integration)
             }

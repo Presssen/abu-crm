@@ -43,16 +43,8 @@ export default function PipelinePage() {
         try {
             const { data, error } = await supabase
                 .from('leads')
-                .select(`
-                    id, 
-                    company_name, 
-                    contact_name, 
-                    email, 
-                    status,
-                    won_by,
-                    won_at,
-                    profiles:won_by (first_name, last_name)
-                `)
+                .select('*')
+
             if (error) throw error
             setLeads(data || [])
         } catch (error) {

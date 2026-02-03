@@ -13,6 +13,7 @@ import {
     MoreHorizontal
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import CreateMeetingModal from '../components/CreateMeetingModal'
 
 interface Meeting {
     id: string
@@ -41,6 +42,7 @@ export default function MeetingsPage() {
     const [loading, setLoading] = useState(true)
     const [currentDate, setCurrentDate] = useState(new Date())
     const [view, setView] = useState<ViewType>('month')
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
     useEffect(() => {
         fetchMeetings()
@@ -267,7 +269,10 @@ export default function MeetingsPage() {
                             </button>
                         ))}
                     </div>
-                    <button className="flex items-center justify-center h-10 w-10 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100">
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="flex items-center justify-center h-10 w-10 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100"
+                    >
                         <Plus size={20} />
                     </button>
                 </div>
@@ -291,6 +296,12 @@ export default function MeetingsPage() {
                 {view === 'week' && renderWeekView()}
                 {view === 'day' && renderDayView()}
             </div>
+
+            <CreateMeetingModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={fetchMeetings}
+            />
         </div>
     )
 }

@@ -18,19 +18,38 @@ export async function GET(request: Request) {
                 const { user, provider_token, provider_refresh_token } = data.session
 
                 if (provider_token) {
-                    await supabase
+                    // Check if exists first (more robust than upsert if constraint is missing)
+                    const { data: existing } = await supabase
                         .from('integrations')
-                        .upsert({
-                            owner_id: user.id,
-                            integration_type: 'google_calendar',
-                            provider: 'google',
-                            credentials: {
-                                access_token: provider_token,
-                                refresh_token: provider_refresh_token,
-                                email: user.email,
-                                last_sync: new Date().toISOString()
-                            }
-                        }, { onConflict: 'owner_id,integration_type' })
+                        .select('id')
+                        .eq('owner_id', user.id)
+                        .eq('integration_type', 'google_calendar')
+                        .single()
+
+                    const payload = {
+                        owner_id: user.id,
+                        integration_type: 'google_calendar',
+                        provider: 'google',
+                        credentials: {
+                            access_token: provider_token,
+                            refresh_token: provider_refresh_token,
+                            email: user.email,
+                            last_sync: new Date().toISOString()
+                        },
+                        is_active: true,
+                        updated_at: new Date().toISOString()
+                    }
+
+                    if (existing) {
+                        await supabase
+                            .from('integrations')
+                            .update(payload)
+                            .eq('id', existing.id)
+                    } else {
+                        await supabase
+                            .from('integrations')
+                            .insert([payload])
+                    }
                 }
 
                 // For calendar, redirect back to settings
