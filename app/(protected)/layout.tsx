@@ -31,24 +31,31 @@ export default function ProtectedLayout({
     const supabase = createClient()
     const [loading, setLoading] = useState(false)
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [user, setUser] = useState<any>(null)
     const [userRole, setUserRole] = useState<string | null>(null)
 
-    // Fetch user role
+    // Fetch user and profile
     useEffect(() => {
-        const fetchUserRole = async () => {
+        const fetchUserAndProfile = async () => {
             const { data: userData } = await supabase.auth.getUser()
             if (userData.user) {
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('role')
+                    .select('*')
                     .eq('id', userData.user.id)
                     .single()
+
+                setUser({
+                    ...userData.user,
+                    profile: profile
+                })
+
                 if (profile) {
                     setUserRole(profile.role)
                 }
             }
         }
-        fetchUserRole()
+        fetchUserAndProfile()
     }, [])
 
     const handleLogout = async () => {
@@ -130,7 +137,20 @@ export default function ProtectedLayout({
                         })}
                     </nav>
 
-                    <div className="p-4 border-t border-gray-100">
+                    <div className="p-4 border-t border-gray-100 flex flex-col space-y-4">
+                        {user && (
+                            <div className="px-4 py-2 bg-gray-50 rounded-xl">
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Iniciado sesión como</p>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-gray-900 truncate">
+                                        {user.profile?.first_name ? `${user.profile.first_name} ${user.profile.last_name || ''}` : user.email}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
+                                        {userRole === 'admin' ? 'Administrador' : 'Usuario'}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                         <button
                             onClick={handleLogout}
                             disabled={loading}
