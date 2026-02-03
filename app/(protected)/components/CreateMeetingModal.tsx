@@ -56,7 +56,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
 
             if (!ownerId) throw new Error('No se pudo encontrar al usuario.')
 
-            // 1. Create Meeting
+            // 1. Create Meeting in DB
             const { data: meeting, error: meetingError } = await supabase.from('meetings').insert([{
                 lead_id: formData.lead_id || null,
                 owner_id: ownerId,
@@ -69,7 +69,34 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
 
             if (meetingError) throw meetingError
 
-            // 2. Send Confirmation Email (if requested)
+            // 2. Sync with Google Calendar
+            try {
+                const calendarRes = await fetch('/api/calendar/create-event', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: meeting.lead_id
+                            ? `Reunión con ${(leads.find(l => l.id === meeting.lead_id) || {}).company_name || 'Lead'}`
+                            : 'Reunión CRM',
+                        start_time: formData.start_time,
+                        end_time: formData.end_time,
+                        location: formData.location,
+                        description: formData.notes
+                    })
+                })
+
+                const calendarData = await calendarRes.json()
+                if (!calendarRes.ok) {
+                    console.warn('Google Calendar Sync Failed:', calendarData.error)
+                    // Optional: Notify user but don't fail the whole process
+                } else {
+                    console.log('Google Calendar Event Created:', calendarData.link)
+                }
+            } catch (calError) {
+                console.error('Calendar Sync Error:', calError)
+            }
+
+            // 3. Send Confirmation Email (if requested)
             if (formData.send_confirmation && formData.lead_id) {
                 const lead = leads.find(l => l.id === formData.lead_id)
                 if (lead?.email) {
@@ -85,7 +112,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                 }
             }
 
-            alert('Reunión creada correctamente')
+            alert('Reunión creada y sincronizada correctamente')
             onSuccess()
             onClose()
         } catch (error: any) {

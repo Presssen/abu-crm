@@ -65,6 +65,7 @@ export default function LeadsPage() {
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
+    const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
 
     const fetchLeads = async () => {
         setLoading(true)
@@ -236,57 +237,24 @@ export default function LeadsPage() {
                                                 {new Date(lead.created_at).toLocaleDateString()}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-right relative">
+                                        <td className="px-6 py-4 text-right">
                                             <button
-                                                onClick={() => setActiveMenuId(activeMenuId === lead.id ? null : lead.id)}
-                                                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    const rect = e.currentTarget.getBoundingClientRect()
+                                                    setMenuPosition({
+                                                        top: rect.bottom + window.scrollY,
+                                                        left: rect.left + window.scrollX - 150 // Adjust offset
+                                                    })
+                                                    setActiveMenuId(activeMenuId === lead.id ? null : lead.id)
+                                                }}
+                                                className={clsx(
+                                                    "p-2 rounded-lg transition-colors",
+                                                    activeMenuId === lead.id ? "bg-indigo-50 text-indigo-600" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                                                )}
                                             >
                                                 <MoreHorizontal className="h-5 w-5" />
                                             </button>
-
-                                            {activeMenuId === lead.id && (
-                                                <>
-                                                    <div
-                                                        className="fixed inset-0 z-10"
-                                                        onClick={() => setActiveMenuId(null)}
-                                                    />
-                                                    <div className="absolute right-6 top-12 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 animate-in fade-in slide-in-from-top-2 duration-200">
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedLead(lead)
-                                                                setIsEmailModalOpen(true)
-                                                                setActiveMenuId(null)
-                                                            }}
-                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center transition-colors"
-                                                        >
-                                                            <Mail size={14} className="mr-2" />
-                                                            Redactar Email
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedLead(lead)
-                                                                setIsMeetingModalOpen(true)
-                                                                setActiveMenuId(null)
-                                                            }}
-                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center transition-colors"
-                                                        >
-                                                            <Clock size={14} className="mr-2" />
-                                                            Agendar Reunión
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedLead(lead)
-                                                                setIsTaskModalOpen(true)
-                                                                setActiveMenuId(null)
-                                                            }}
-                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center transition-colors"
-                                                        >
-                                                            <Plus size={14} className="mr-2" />
-                                                            Nueva Tarea
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -306,9 +274,65 @@ export default function LeadsPage() {
                 onClose={() => setIsImportModalOpen(false)}
                 onSuccess={() => {
                     fetchLeads()
-                    setIsImportModalOpen(false)
                 }}
             />
+
+            {/* Global Fixed Actions Menu */}
+            {activeMenuId && (
+                <>
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setActiveMenuId(null)}
+                    />
+                    <div
+                        className="fixed z-50 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 animate-in fade-in zoom-in-95 duration-200"
+                        style={{ top: menuPosition.top, left: menuPosition.left }}
+                    >
+                        <button
+                            onClick={() => {
+                                const lead = leads.find(l => l.id === activeMenuId)
+                                if (lead) {
+                                    setSelectedLead(lead)
+                                    setIsEmailModalOpen(true)
+                                }
+                                setActiveMenuId(null)
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center transition-colors"
+                        >
+                            <Mail size={14} className="mr-2" />
+                            Redactar Email
+                        </button>
+                        <button
+                            onClick={() => {
+                                const lead = leads.find(l => l.id === activeMenuId)
+                                if (lead) {
+                                    setSelectedLead(lead)
+                                    setIsMeetingModalOpen(true)
+                                }
+                                setActiveMenuId(null)
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center transition-colors"
+                        >
+                            <Clock size={14} className="mr-2" />
+                            Agendar Reunión
+                        </button>
+                        <button
+                            onClick={() => {
+                                const lead = leads.find(l => l.id === activeMenuId)
+                                if (lead) {
+                                    setSelectedLead(lead)
+                                    setIsTaskModalOpen(true)
+                                }
+                                setActiveMenuId(null)
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center transition-colors"
+                        >
+                            <Plus size={14} className="mr-2" />
+                            Nueva Tarea
+                        </button>
+                    </div>
+                </>
+            )}
 
             {/* Action Modals */}
             <SendEmailModal

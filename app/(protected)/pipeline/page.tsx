@@ -37,6 +37,8 @@ export default function PipelinePage() {
     const [leads, setLeads] = useState<Lead[]>([])
     const [loading, setLoading] = useState(true)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
+    const [dragOverStage, setDragOverStage] = useState<string | null>(null)
 
     const fetchLeads = async () => {
         setLoading(true)
@@ -87,6 +89,33 @@ export default function PipelinePage() {
 
     const getLeadsByStatus = (status: string) => leads.filter(l => l.status === status)
 
+    const handleDragStart = (e: React.DragEvent, lead: Lead) => {
+        setDraggedLead(lead)
+        e.dataTransfer.effectAllowed = 'move'
+    }
+
+    const handleDragOver = (e: React.DragEvent, stageId: string) => {
+        e.preventDefault()
+        setDragOverStage(stageId)
+    }
+
+    const handleDrop = async (e: React.DragEvent, stageId: string) => {
+        e.preventDefault()
+        setDragOverStage(null)
+
+        if (draggedLead && draggedLead.status !== stageId) {
+            // Optimistic update
+            const updatedLeads = leads.map(l =>
+                l.id === draggedLead.id ? { ...l, status: stageId } : l
+            )
+            setLeads(updatedLeads)
+
+            // Real update
+            await handleUpdateStatus(draggedLead.id, stageId)
+            setDraggedLead(null)
+        }
+    }
+
     return (
         <div className="flex flex-col h-full p-6 space-y-6">
             {/* Fixed Header */}
@@ -114,7 +143,15 @@ export default function PipelinePage() {
             <div className="flex-1 overflow-x-auto overflow-y-hidden -mx-6 px-6">
                 <div className="flex h-full space-x-4 pb-2" style={{ minWidth: 'min-content' }}>
                     {STAGES.map((stage) => (
-                        <div key={stage.id} className="w-80 flex-shrink-0 flex flex-col bg-gray-50/50 rounded-2xl border border-gray-100 overflow-hidden h-full max-h-full">
+                        <div
+                            key={stage.id}
+                            className={clsx(
+                                "w-80 flex-shrink-0 flex flex-col rounded-2xl border overflow-hidden h-full max-h-full transition-colors",
+                                dragOverStage === stage.id ? "bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200" : "bg-gray-50/50 border-gray-100"
+                            )}
+                            onDragOver={(e) => handleDragOver(e, stage.id)}
+                            onDrop={(e) => handleDrop(e, stage.id)}
+                        >
                             <div className="p-4 border-b border-gray-100 bg-white flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center space-x-2">
                                     <div className={clsx("h-2.5 w-2.5 rounded-full", stage.color)} />
@@ -137,9 +174,12 @@ export default function PipelinePage() {
                                     getLeadsByStatus(stage.id).map((lead) => (
                                         <div
                                             key={lead.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, lead)}
                                             className={clsx(
-                                                "group bg-white p-4 rounded-xl border transition-all cursor-move",
-                                                lead.status === 'won' ? "border-emerald-200 shadow-sm shadow-emerald-50" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200"
+                                                "group bg-white p-4 rounded-xl border transition-all cursor-grab active:cursor-grabbing",
+                                                lead.status === 'won' ? "border-emerald-200 shadow-sm shadow-emerald-50" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200",
+                                                draggedLead?.id === lead.id ? "opacity-50 ring-2 ring-indigo-400" : ""
                                             )}
                                         >
                                             <div className="flex items-start justify-between mb-3">
