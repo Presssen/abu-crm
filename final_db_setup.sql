@@ -14,14 +14,18 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Policies for profiles
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
 CREATE POLICY "Public profiles are viewable by everyone" 
 ON public.profiles FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile" 
 ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" 
 ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
 
 -- Function to handle new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -182,6 +186,17 @@ DROP POLICY IF EXISTS "Users can manage their own meetings" ON meetings;
 CREATE POLICY "Users can manage their own meetings" ON meetings
     FOR ALL USING (auth.uid() = owner_id OR is_admin());
 
+-- Imports
+DROP POLICY IF EXISTS "Users can manage their own imports" ON imports;
+CREATE POLICY "Users can manage their own imports" ON imports
+    FOR ALL USING (auth.uid() = owner_id OR is_admin());
+
+-- Emails
+DROP POLICY IF EXISTS "Users can manage their own emails" ON emails;
+CREATE POLICY "Users can manage their own emails" ON emails
+    FOR ALL USING (auth.uid() = owner_id OR is_admin());
+
+
 -- Integrations
 DROP POLICY IF EXISTS "Users can manage own integrations" ON integrations;
 CREATE POLICY "Users can manage own integrations" ON integrations
@@ -212,3 +227,8 @@ DROP TRIGGER IF EXISTS update_leads_updated_at ON leads;
 CREATE TRIGGER update_leads_updated_at
     BEFORE UPDATE ON leads
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- ENSURE NEW COLUMNS EXIST (Migration support within the main script)
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS won_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS won_at TIMESTAMPTZ;
+
