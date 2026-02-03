@@ -47,9 +47,14 @@ export default function SettingsPage() {
             if (params.get('action') === 'sync') {
                 // Remove param to prevent loop
                 window.history.replaceState({}, '', window.location.pathname + '?tab=integrations')
-                handleSyncCalendar()
+
+                // Small delay to ensure DB has updated before syncing
+                setTimeout(() => {
+                    handleSyncCalendar()
+                }, 1000)
             }
         }
+
     }, [])
 
     const fetchSettings = async () => {

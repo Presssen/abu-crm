@@ -17,15 +17,11 @@ export async function GET(request: Request) {
             if (isCalendar) {
                 const { user, provider_token, provider_refresh_token } = data.session
 
-                if (provider_token) {
-                    // Check if exists first (more robust than upsert if constraint is missing)
-                    const { data: existing } = await supabase
-                        .from('integrations')
-                        .select('id')
-                        .eq('owner_id', user.id)
-                        .eq('integration_type', 'google_calendar')
-                        .single()
+                console.log('📅 Handling calendar integration for user:', user.email)
+                console.log('🔑 Provider token present:', !!provider_token)
+                console.log('🔄 Refresh token present:', !!provider_refresh_token)
 
+                if (provider_token) {
                     const payload = {
                         owner_id: user.id,
                         integration_type: 'google_calendar',
@@ -40,22 +36,30 @@ export async function GET(request: Request) {
                         updated_at: new Date().toISOString()
                     }
 
-                    if (existing) {
-                        await supabase
-                            .from('integrations')
-                            .update(payload)
-                            .eq('id', existing.id)
+                    console.log('💾 Saving integration to database...')
+
+                    // Use upsert with onConflict to handle unique constraint
+                    const { error: upsertError } = await supabase
+                        .from('integrations')
+                        .upsert(payload, {
+                            onConflict: 'owner_id,integration_type',
+                            ignoreDuplicates: false
+                        })
+
+                    if (upsertError) {
+                        console.error('❌ Error saving integration:', upsertError)
                     } else {
-                        await supabase
-                            .from('integrations')
-                            .insert([payload])
+                        console.log('✅ Integration saved successfully')
                     }
+                } else {
+                    console.warn('⚠️ No provider_token found in session. Google Calendar integration might fail.')
                 }
 
                 // For calendar, redirect back to settings
                 const forwardedHost = request.headers.get('x-forwarded-host')
                 const isLocalEnv = process.env.NODE_ENV === 'development'
                 const settingsPath = '/settings?tab=integrations&action=sync'
+
 
                 if (isLocalEnv) {
                     return NextResponse.redirect(`${origin}${settingsPath}`)

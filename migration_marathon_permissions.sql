@@ -1,5 +1,9 @@
 -- 1. Restrict DELETE on leads to Admins only
 DROP POLICY IF EXISTS "Users can manage their own leads" ON leads;
+DROP POLICY IF EXISTS "Users can view and update own leads" ON leads;
+DROP POLICY IF EXISTS "Users can insert own leads" ON leads;
+DROP POLICY IF EXISTS "Users can update own leads" ON leads;
+DROP POLICY IF EXISTS "Admins can delete leads" ON leads;
 
 -- Allow SELECT, INSERT, UPDATE for owners and admins
 CREATE POLICY "Users can view and update own leads" ON leads
