@@ -55,6 +55,30 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onDelete }:
 
         setDeleting(true)
         try {
+            // 1. Delete from Google Calendar if event ID exists
+            if (event.google_event_id) {
+                try {
+                    console.log('🗑️ Deleting from Google Calendar...')
+                    const deleteRes = await fetch('/api/calendar/delete-event', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ google_event_id: event.google_event_id })
+                    })
+
+                    if (!deleteRes.ok) {
+                        const errorData = await deleteRes.json().catch(() => ({}))
+                        console.warn('Google Calendar Delete Warning:', errorData.error)
+                        // Verify if we should stop or continue. Usually we continue but warn the user.
+                        // For now we continue to ensure CRM data is clean.
+                    } else {
+                        console.log('✅ Deleted from Google Calendar')
+                    }
+                } catch (apiError) {
+                    console.error('API Error deleting from Google:', apiError)
+                }
+            }
+
+            // 2. Delete from Supabase
             const { error } = await supabase
                 .from('meetings')
                 .delete()

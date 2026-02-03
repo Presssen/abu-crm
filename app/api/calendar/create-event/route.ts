@@ -105,6 +105,12 @@ export async function POST(request: Request) {
                     dateTime: endDate.toISOString(),
                 },
                 attendees: processedAttendees,
+                conferenceData: {
+                    createRequest: {
+                        requestId: Math.random().toString(36).substring(7),
+                        conferenceSolutionKey: { type: 'hangoutsMeet' },
+                    },
+                },
                 reminders: {
                     useDefault: true,
                 },
@@ -112,7 +118,7 @@ export async function POST(request: Request) {
 
             console.log('📤 Sending event to Google Calendar API:', JSON.stringify(event, null, 2))
 
-            const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+            const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -198,7 +204,8 @@ export async function POST(request: Request) {
             success: true,
             eventId: data.id,
             link: data.htmlLink,
-            googleEventId: data.id  // Return the Google Calendar event ID
+            meetLink: data.hangoutLink, // Return the Google Meet link
+            googleEventId: data.id
         })
 
     } catch (error: any) {

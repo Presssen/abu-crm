@@ -123,21 +123,21 @@ export default function MeetingsPage() {
         })
 
         return (
-            <div className="grid grid-cols-7 border-l border-t border-gray-200 bg-white rounded-b-3xl overflow-hidden">
+            <div className="grid grid-cols-7 h-full border-l border-t border-gray-200 bg-white rounded-b-3xl overflow-hidden">
                 {DAYS.map(d => (
-                    <div key={d} className="p-2 text-center text-xs font-bold text-gray-500 bg-gray-50 border-r border-b border-gray-200">
+                    <div key={d} className="p-2 text-center text-xs font-bold text-gray-500 bg-gray-50 border-r border-b border-gray-200 h-10 flex items-center justify-center">
                         {d}
                     </div>
                 ))}
                 {slots.map((date, i) => {
-                    if (!date) return <div key={i} className="bg-gray-50/50 border-r border-b border-gray-200 min-h-[100px]" />
+                    if (!date) return <div key={i} className="bg-gray-50/50 border-r border-b border-gray-200" />
 
                     const dayMeetings = meetings.filter(m => isSameDate(new Date(m.start_time), date))
                     const isToday = isSameDate(date, new Date())
 
                     return (
                         <div key={i} className={clsx(
-                            "p-2 border-r border-b border-gray-200 min-h-[100px] flex flex-col hover:bg-gray-50 transition-colors group",
+                            "p-2 border-r border-b border-gray-200 flex flex-col hover:bg-gray-50 transition-colors group overflow-hidden",
                             isToday ? "bg-indigo-50/10" : "bg-white"
                         )}>
                             <div className="flex justify-between items-start">
@@ -173,7 +173,7 @@ export default function MeetingsPage() {
         const weekDays = getWeekDays(currentDate)
         return (
             <div className="flex flex-col bg-white rounded-b-3xl overflow-hidden border border-gray-200">
-                <div className="grid grid-cols-7 divide-x divide-gray-200 border-b border-gray-200 bg-gray-50">
+                <div className="grid grid-cols-7 divide-x divide-gray-200 border-b border-gray-200 bg-gray-50 shrink-0">
                     {weekDays.map((d, i) => (
                         <div key={i} className="p-3 text-center">
                             <div className="text-xs font-bold text-gray-500 mb-1">{DAYS[d.getDay() === 0 ? 6 : d.getDay() - 1]}</div>
@@ -186,7 +186,7 @@ export default function MeetingsPage() {
                         </div>
                     ))}
                 </div>
-                <div className="grid grid-cols-7 divide-x divide-gray-200 min-h-[500px]">
+                <div className="grid grid-cols-7 divide-x divide-gray-200 flex-1 min-h-0 overflow-y-auto">
                     {weekDays.map((d, i) => (
                         <div key={i} className="p-2 space-y-2 hover:bg-gray-50/50 transition-colors">
                             {meetings
@@ -213,7 +213,7 @@ export default function MeetingsPage() {
             .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 
         return (
-            <div className="bg-white rounded-b-3xl border border-gray-200 min-h-[500px] p-6">
+            <div className="bg-white rounded-b-3xl border border-gray-200 h-full p-6 overflow-y-auto">
                 <div className="flex items-center space-x-4 mb-6">
                     <div className="text-4xl font-black text-gray-900">{currentDate.getDate()}</div>
                     <div>
@@ -284,7 +284,7 @@ export default function MeetingsPage() {
                 </div>
             </div>
 
-            <div className="flex flex-col flex-1 min-h-0 px-6 pt-2">
+            <div className="flex flex-col flex-1 min-h-0 px-6">
                 {/* Header Navigation */}
                 <div className="flex items-center justify-between bg-white px-6 py-4 rounded-t-3xl border border-gray-200 shadow-sm z-10">
                     <h2 className="text-xl font-bold text-gray-900 capitalize flex items-center gap-2">
@@ -299,7 +299,7 @@ export default function MeetingsPage() {
                 </div>
 
                 {/* Grid */}
-                <div className="flex-1 min-h-0 bg-white border-x border-b border-gray-200 rounded-b-3xl overflow-y-auto mb-6 mx-6 shadow-sm">
+                <div className="flex-1 min-h-0 bg-white border-x border-b border-gray-200 rounded-b-3xl overflow-y-auto mb-4 shadow-sm">
                     {view === 'month' && renderMonthView()}
                     {view === 'week' && renderWeekView()}
                     {view === 'day' && renderDayView()}
