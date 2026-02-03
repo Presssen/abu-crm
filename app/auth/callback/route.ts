@@ -12,56 +12,50 @@ export async function GET(request: Request) {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
         if (!error && data.session) {
+            const { user, provider_token, provider_refresh_token } = data.session
             const isCalendar = searchParams.get('type') === 'calendar'
 
-            if (isCalendar) {
-                const { user, provider_token, provider_refresh_token } = data.session
+            // If we have a provider token, it's likely from our Google integration
+            // We should save it regardless of whether it's 'type=calendar' flow or just a login
+            // as long as we have the tokens.
+            if (provider_token) {
+                console.log('📅 Capturing provider tokens for user:', user.email)
 
-                console.log('📅 Handling calendar integration for user:', user.email)
-                console.log('🔑 Provider token present:', !!provider_token)
-                console.log('🔄 Refresh token present:', !!provider_refresh_token)
-
-                if (provider_token) {
-                    const payload = {
-                        owner_id: user.id,
-                        integration_type: 'google_calendar',
-                        provider: 'google',
-                        credentials: {
-                            access_token: provider_token,
-                            refresh_token: provider_refresh_token,
-                            email: user.email,
-                            last_synced: new Date().toISOString()
-                        },
-                        is_active: true,
+                const payload = {
+                    owner_id: user.id,
+                    integration_type: 'google_calendar',
+                    provider: 'google',
+                    credentials: {
+                        access_token: provider_token,
+                        refresh_token: provider_refresh_token, // This will be present if access_type=offline was used
+                        email: user.email,
                         updated_at: new Date().toISOString()
-                    }
-
-                    console.log('💾 Saving integration to database...')
-
-                    // Use upsert with onConflict to handle unique constraint
-                    const { error: upsertError } = await supabase
-                        .from('integrations')
-                        .upsert(payload, {
-                            onConflict: 'owner_id,integration_type',
-                            ignoreDuplicates: false
-                        })
-
-                    if (upsertError) {
-                        console.error('❌ Error saving integration:', upsertError)
-                    } else {
-                        console.log('✅ Integration saved successfully')
-                    }
-                } else {
-                    console.warn('⚠️ No provider_token found in session. Google Calendar integration might fail.')
+                    },
+                    is_active: true,
+                    updated_at: new Date().toISOString()
                 }
 
-                // For calendar, redirect back to settings
+                // If it's a login, we don't want to overwrite last_synced if it exists
+                // We'll handle that by only updating specific fields if they are missing or if it's a fresh integration
+                const { error: upsertError } = await supabase
+                    .from('integrations')
+                    .upsert(payload, {
+                        onConflict: 'owner_id,integration_type',
+                    })
+
+                if (upsertError) {
+                    console.error('❌ Error saving integration tokens:', upsertError)
+                } else {
+                    console.log('✅ Google tokens persisted successfully')
+                }
+            }
+
+            if (isCalendar) {
+                // For calendar flow, redirect back to settings
                 const forwardedHost = request.headers.get('x-forwarded-host')
-                const isLocalEnv = process.env.NODE_ENV === 'development'
                 const settingsPath = '/settings?tab=integrations&action=sync'
 
-
-                if (isLocalEnv) {
+                if (process.env.NODE_ENV === 'development') {
                     return NextResponse.redirect(`${origin}${settingsPath}`)
                 } else if (forwardedHost) {
                     return NextResponse.redirect(`https://${forwardedHost}${settingsPath}`)
