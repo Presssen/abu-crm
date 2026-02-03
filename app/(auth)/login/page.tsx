@@ -34,8 +34,8 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="bg-white py-8 px-4 shadow-2xl sm:rounded-xl sm:px-10 border border-gray-100">
-            <div className="sm:mx-auto sm:w-full sm:max-w-md mb-6">
+        <div className="bg-white py-8 px-4 shadow-2xl rounded-3xl sm:px-10 border border-gray-100 w-full max-w-lg mx-auto">
+            <div className="sm:mx-auto sm:w-full mb-6">
                 <div className="flex justify-center">
                     <div className="h-16 w-auto flex items-center justify-center">
                         <img

@@ -58,8 +58,8 @@ export default function PipelinePage() {
     const getLeadsByStatus = (status: string) => leads.filter(l => l.status === status)
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col space-y-6 max-w-full overflow-hidden">
-            <div className="flex items-center justify-between">
+        <div className="h-[calc(100vh-8rem)] flex flex-col space-y-6 w-full min-w-0 pr-6">
+            <div className="flex items-center justify-between w-full">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Pipeline de Ventas</h1>
                     <p className="text-sm text-gray-500">Visualiza y gestiona el flujo de tus oportunidades.</p>
