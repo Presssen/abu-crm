@@ -123,12 +123,14 @@ export default function MeetingsPage() {
         })
 
         return (
-            <div className="grid grid-cols-7 h-full border-l border-t border-gray-200 bg-white rounded-b-3xl overflow-hidden">
-                {DAYS.map(d => (
-                    <div key={d} className="p-2 text-center text-xs font-bold text-gray-500 bg-gray-50 border-r border-b border-gray-200 h-10 flex items-center justify-center">
-                        {d}
-                    </div>
-                ))}
+            <div className="grid grid-cols-7 h-full border-l border-gray-200 bg-white rounded-b-3xl overflow-hidden relative">
+                <div className="contents sticky top-0 z-10">
+                    {DAYS.map(d => (
+                        <div key={d} className="p-2 text-center text-[10px] font-black uppercase tracking-wider text-gray-400 bg-gray-50 border-r border-b border-gray-200 h-10 flex items-center justify-center sticky top-0 z-10">
+                            {d}
+                        </div>
+                    ))}
+                </div>
                 {slots.map((date, i) => {
                     if (!date) return <div key={i} className="bg-gray-50/50 border-r border-b border-gray-200" />
 

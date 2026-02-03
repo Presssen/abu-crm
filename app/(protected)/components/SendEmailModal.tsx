@@ -36,8 +36,15 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
         if (isOpen) {
             fetchTemplates()
             if (!initialLeadId) fetchLeads()
+
+            // Update formData if props change
+            setFormData(prev => ({
+                ...prev,
+                lead_id: initialLeadId || prev.lead_id,
+                to_email: initialTo || prev.to_email
+            }))
         }
-    }, [isOpen])
+    }, [isOpen, initialLeadId, initialTo])
 
     const fetchTemplates = async () => {
         const { data } = await supabase.from('email_templates').select('*')
@@ -60,10 +67,11 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
     const handleLeadChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const leadId = e.target.value
         const lead = leads.find(l => l.id === leadId)
+        const emails = lead?.email ? lead.email.split(':').map((e: string) => e.trim()).filter(Boolean) : []
         setFormData({
             ...formData,
             lead_id: leadId,
-            to_email: lead?.email || ''
+            to_email: emails[0] || ''
         })
     }
 
@@ -99,28 +107,43 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
 
     if (!isOpen) return null
 
+    const selectedLead = leads.find(l => l.id === formData.lead_id) || (initialLeadId ? { id: initialLeadId } : null)
+    // If we're searching for email options from a lead that's passed as prop but not in 'leads' yet
+    const availableEmails = selectedLead?.email ? selectedLead.email.split(':').map((e: string) => e.trim()).filter(Boolean) : []
+
     return (
-        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                    <h2 className="text-2xl font-bold text-gray-900">Redactar Email</h2>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-                        <X size={24} className="text-gray-400" />
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all animate-in fade-in duration-300">
+            <div className="bg-white rounded-[40px] shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-white/20">
+                <div className="p-8 border-b border-gray-100/50 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+                    <div className="flex items-center space-x-4">
+                        <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100">
+                            <Mail className="text-white" size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Redactar Email</h2>
+                            <p className="text-sm text-gray-500 font-medium">Personaliza tu comunicación con el lead</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors group">
+                        <X size={24} className="text-gray-400 group-hover:text-gray-900" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto">
+                <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto custom-scrollbar flex-1">
                     {/* Templates Selector */}
                     {templates.length > 0 && (
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">Usar Plantilla</label>
+                        <div className="space-y-3">
+                            <label className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center">
+                                <ChevronDown size={14} className="mr-1" />
+                                Plantillas Disponibles
+                            </label>
                             <div className="flex flex-wrap gap-2">
                                 {templates.map(t => (
                                     <button
                                         key={t.id}
                                         type="button"
                                         onClick={() => handleApplyTemplate(t)}
-                                        className="px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-lg hover:bg-indigo-100 transition-colors"
+                                        className="px-4 py-2 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95"
                                     >
                                         {t.name}
                                     </button>
@@ -129,35 +152,55 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {!initialLeadId && (
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Lead</label>
-                                <select
-                                    value={formData.lead_id}
-                                    onChange={handleLeadChange}
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                                >
-                                    <option value="">Seleccionar Lead...</option>
-                                    {leads.map(l => (
-                                        <option key={l.id} value={l.id}>{l.company_name} ({l.contact_name})</option>
-                                    ))}
-                                </select>
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Destinatario</label>
+                                <div className="relative group">
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                                    <select
+                                        value={formData.lead_id}
+                                        onChange={handleLeadChange}
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 focus:bg-white rounded-2xl outline-none transition-all font-bold text-gray-900 appearance-none"
+                                    >
+                                        <option value="">Seleccionar Lead...</option>
+                                        {leads.map(l => (
+                                            <option key={l.id} value={l.id}>{l.company_name} ({l.contact_name})</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+                                </div>
                             </div>
                         )}
 
-                        <div className={clsx(!initialLeadId ? "" : "md:col-span-2")}>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">Para</label>
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                <input
-                                    type="email"
-                                    required
-                                    value={formData.to_email}
-                                    onChange={(e) => setFormData({ ...formData, to_email: e.target.value })}
-                                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                                    placeholder="ejemplo@correo.com"
-                                />
+                        <div className={clsx(!initialLeadId ? "space-y-2" : "md:col-span-2 space-y-2")}>
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Enviar a</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                                {availableEmails.length > 1 ? (
+                                    <div className="relative">
+                                        <select
+                                            required
+                                            value={formData.to_email}
+                                            onChange={(e) => setFormData({ ...formData, to_email: e.target.value })}
+                                            className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 focus:bg-white rounded-2xl outline-none transition-all font-bold text-indigo-600 appearance-none"
+                                        >
+                                            {availableEmails.map((email: string, idx: number) => (
+                                                <option key={idx} value={email}>{email}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+                                    </div>
+                                ) : (
+                                    <input
+                                        type="email"
+                                        required
+                                        value={formData.to_email}
+                                        onChange={(e) => setFormData({ ...formData, to_email: e.target.value })}
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 focus:bg-white rounded-2xl outline-none transition-all font-bold text-gray-900"
+                                        placeholder="ejemplo@correo.com"
+                                    />
+                                )}
                             </div>
                         </div>
                     </div>

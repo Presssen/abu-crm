@@ -356,13 +356,12 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                                                 type="button"
                                                 onClick={() => handleDateSelect(day)}
                                                 className={clsx(
-                                                    "h-10 w-10 flex items-center justify-center rounded-xl text-sm font-bold transition-all relative",
-                                                    isSelected ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-110" :
+                                                    "h-10 w-full flex items-center justify-center rounded-xl text-sm font-bold transition-all relative",
+                                                    isSelected ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-105" :
                                                         isToday ? "text-indigo-600 bg-white shadow-sm border border-indigo-100" : "text-gray-700 hover:bg-white hover:shadow-sm"
                                                 )}
                                             >
                                                 {day}
-                                                {isSelected && <span className="absolute -bottom-1 w-1 h-1 bg-white rounded-full" />}
                                             </button>
                                         )
                                     })}
@@ -375,27 +374,49 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                                 <Clock className="mr-2 text-indigo-600" size={20} />
                                 Selecciona la hora
                             </label>
-                            <div className="bg-gray-50 rounded-[32px] border border-gray-100 p-6 flex flex-col h-[280px] shadow-inner">
-                                <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-                                    {Array.from({ length: 24 }).map((_, h) => (
-                                        [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => {
-                                            const isSelected = selectedDate.getHours() === h && selectedDate.getMinutes() === m
+                            <div className="bg-gray-50 rounded-[32px] border border-gray-100 p-6 flex flex-col h-[320px] shadow-inner">
+                                <div className="flex gap-4 h-full overflow-hidden">
+                                    {/* Hours Column */}
+                                    <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+                                        <div className="text-[10px] font-black text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Hora</div>
+                                        {Array.from({ length: 24 }).map((_, h) => {
+                                            const isSelected = selectedDate.getHours() === h
                                             return (
                                                 <button
-                                                    key={`${h}-${m}`}
+                                                    key={`h-${h}`}
                                                     type="button"
-                                                    onClick={() => handleTimeSelect(h, m)}
+                                                    onClick={() => handleTimeSelect(h, selectedDate.getMinutes())}
                                                     className={clsx(
-                                                        "w-full py-3 px-6 rounded-2xl flex items-center justify-between font-bold transition-all shrink-0",
+                                                        "w-full py-2 px-3 rounded-xl flex items-center justify-center font-bold transition-all",
                                                         isSelected ? "bg-white text-indigo-600 shadow-md border border-indigo-100" : "text-gray-500 hover:text-gray-900 hover:bg-white/50"
                                                     )}
                                                 >
-                                                    <span>{h.toString().padStart(2, '0')}:{m.toString().padStart(2, '0')}</span>
-                                                    {isSelected && <div className="h-2 w-2 rounded-full bg-indigo-600" />}
+                                                    {h.toString().padStart(2, '0')}
                                                 </button>
                                             )
-                                        })
-                                    ))}
+                                        })}
+                                    </div>
+
+                                    {/* Minutes Column */}
+                                    <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+                                        <div className="text-[10px] font-black text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Minutos</div>
+                                        {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => {
+                                            const isSelected = selectedDate.getMinutes() === m
+                                            return (
+                                                <button
+                                                    key={`m-${m}`}
+                                                    type="button"
+                                                    onClick={() => handleTimeSelect(selectedDate.getHours(), m)}
+                                                    className={clsx(
+                                                        "w-full py-2 px-3 rounded-xl flex items-center justify-center font-bold transition-all",
+                                                        isSelected ? "bg-white text-indigo-600 shadow-md border border-indigo-100" : "text-gray-500 hover:text-gray-900 hover:bg-white/50"
+                                                    )}
+                                                >
+                                                    {m.toString().padStart(2, '0')}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
                                 </div>
                                 <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between text-indigo-900 bg-indigo-50/50 p-4 rounded-2xl">
                                     <span className="text-xs font-black uppercase text-indigo-400">Seleccionado</span>
