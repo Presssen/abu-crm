@@ -13,7 +13,8 @@ import {
     ChevronRight,
     Loader2,
     Laptop,
-    LogOut
+    LogOut,
+    Zap
 } from 'lucide-react'
 import { clsx } from 'clsx'
 

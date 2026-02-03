@@ -9,7 +9,7 @@ export async function enrichLead(leadId: string, websiteUrl: string) {
         return { success: false, error: 'Missing website URL' }
     }
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     try {
         // 1. Get OpenAI API Key from Database (Global Integration)
