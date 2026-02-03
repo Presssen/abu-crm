@@ -22,7 +22,13 @@ type Tab = 'profile' | 'integrations' | 'notifications' | 'security'
 
 export default function SettingsPage() {
     const supabase = createClient()
-    const [activeTab, setActiveTab] = useState<Tab>('profile')
+    const [activeTab, setActiveTab] = useState<Tab>(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search)
+            return (params.get('tab') as Tab) || 'profile'
+        }
+        return 'profile'
+    })
     const [loading, setLoading] = useState(true)
     const [user, setUser] = useState<any>(null)
     const [profile, setProfile] = useState<any>(null)
@@ -47,12 +53,12 @@ export default function SettingsPage() {
                     .single()
                 setProfile(profile)
 
-                // Check calendar connection (mock check in integrations table)
+                // Check calendar connection
                 const { data: integration } = await supabase
                     .from('integrations')
                     .select('*')
-                    .eq('user_id', user.id)
-                    .eq('type', 'google_calendar')
+                    .eq('owner_id', user.id)
+                    .eq('integration_type', 'google_calendar')
                     .single()
 
                 setIsCalendarConnected(!!integration)
@@ -67,26 +73,22 @@ export default function SettingsPage() {
     const handleConnectCalendar = async () => {
         setIsConnectLoading(true)
         try {
-            // Mock connection: Insert into integrations table
-            if (!user) return
-
-            // 1. Simulate popup delay
-            await new Promise(resolve => setTimeout(resolve, 1500))
-
-            // 2. Save mock token
-            const { error } = await supabase
-                .from('integrations')
-                .insert({
-                    user_id: user.id,
-                    type: 'google_calendar',
-                    access_token: 'mock_token_' + Date.now(),
-                    settings: { email: user.email }
-                })
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback?type=calendar`,
+                    scopes: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly',
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                    },
+                },
+            })
 
             if (error) throw error
-            setIsCalendarConnected(true)
         } catch (error) {
             console.error('Error connecting calendar:', error)
+            alert('Error al iniciar la conexión con Google')
         } finally {
             setIsConnectLoading(false)
         }
@@ -94,13 +96,14 @@ export default function SettingsPage() {
 
     // Function to disconnect (optional, but good for testing)
     const handleDisconnectCalendar = async () => {
+        if (!confirm('¿Estás seguro de que quieres desconectar Google Calendar?')) return
         setIsConnectLoading(true)
         try {
             await supabase
                 .from('integrations')
                 .delete()
-                .eq('user_id', user.id)
-                .eq('type', 'google_calendar')
+                .eq('owner_id', user.id)
+                .eq('integration_type', 'google_calendar')
 
             setIsCalendarConnected(false)
         } catch (error) {

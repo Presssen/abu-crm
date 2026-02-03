@@ -9,10 +9,46 @@ export async function GET(request: Request) {
 
     if (code) {
         const supabase = await createClient()
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-        if (!error) {
-            const forwardedHost = request.headers.get('x-forwarded-host') // i.e. vercel.app
+        if (!error && data.session) {
+            const isCalendar = searchParams.get('type') === 'calendar'
+
+            if (isCalendar) {
+                const { user, provider_token, provider_refresh_token } = data.session
+
+                if (provider_token) {
+                    await supabase
+                        .from('integrations')
+                        .upsert({
+                            owner_id: user.id,
+                            integration_type: 'google_calendar',
+                            provider: 'google',
+                            credentials: {
+                                access_token: provider_token,
+                                refresh_token: provider_refresh_token,
+                                email: user.email,
+                                last_sync: new Date().toISOString()
+                            }
+                        }, { onConflict: 'owner_id,integration_type' })
+                }
+
+                // For calendar, redirect back to settings
+                const forwardedHost = request.headers.get('x-forwarded-host')
+                const isLocalEnv = process.env.NODE_ENV === 'development'
+                const settingsPath = '/settings?tab=integrations'
+
+                if (isLocalEnv) {
+                    return NextResponse.redirect(`${origin}${settingsPath}`)
+                } else if (forwardedHost) {
+                    return NextResponse.redirect(`https://${forwardedHost}${settingsPath}`)
+                } else {
+                    return NextResponse.redirect(`${origin}${settingsPath}`)
+                }
+            }
+
+            // Standard login redirect
+            const forwardedHost = request.headers.get('x-forwarded-host')
             const isLocalEnv = process.env.NODE_ENV === 'development'
 
             if (isLocalEnv) {
