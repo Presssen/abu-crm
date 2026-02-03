@@ -83,7 +83,7 @@ export default function TasksPage() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="h-full overflow-y-auto p-6 space-y-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Tareas</h1>

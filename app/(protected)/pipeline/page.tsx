@@ -96,7 +96,7 @@ export default function PipelinePage() {
     const getLeadsByStatus = (status: string) => leads.filter(l => l.status === status)
 
     return (
-        <div className="flex flex-col h-[calc(100vh-12rem)] space-y-6">
+        <div className="flex flex-col h-full p-6 space-y-6">
             {/* Fixed Header */}
             <div className="flex-shrink-0 flex items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
@@ -119,11 +119,11 @@ export default function PipelinePage() {
             />
 
             {/* Scrollable Pipeline Container */}
-            <div className="flex-1 overflow-x-auto overflow-y-hidden">
-                <div className="flex h-full space-x-4 pb-4" style={{ minWidth: 'min-content' }}>
+            <div className="flex-1 overflow-x-auto overflow-y-hidden -mx-6 px-6">
+                <div className="flex h-full space-x-4 pb-2" style={{ minWidth: 'min-content' }}>
                     {STAGES.map((stage) => (
-                        <div key={stage.id} className="w-80 flex-shrink-0 flex flex-col bg-gray-50/50 rounded-2xl border border-gray-100 overflow-hidden">
-                            <div className="p-4 border-b border-gray-100 bg-white flex items-center justify-between">
+                        <div key={stage.id} className="w-80 flex-shrink-0 flex flex-col bg-gray-50/50 rounded-2xl border border-gray-100 overflow-hidden h-full max-h-full">
+                            <div className="p-4 border-b border-gray-100 bg-white flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center space-x-2">
                                     <div className={clsx("h-2.5 w-2.5 rounded-full", stage.color)} />
                                     <h3 className="text-sm font-bold text-gray-900">{stage.label}</h3>
@@ -136,7 +136,7 @@ export default function PipelinePage() {
                                 </button>
                             </div>
 
-                            <div className="flex-1 p-3 space-y-3 overflow-y-auto">
+                            <div className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
                                 {loading ? (
                                     Array.from({ length: 2 }).map((_, i) => (
                                         <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 animate-pulse h-28" />
@@ -212,6 +212,22 @@ export default function PipelinePage() {
                     ))}
                 </div>
             </div>
+
+            <style jsx>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #e2e8f0;
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #cbd5e1;
+                }
+            `}</style>
         </div>
     )
 }

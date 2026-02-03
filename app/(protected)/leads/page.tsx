@@ -16,6 +16,8 @@ import {
 import { clsx } from 'clsx'
 import Link from 'next/link'
 import CreateLeadModal from '../components/CreateLeadModal'
+import ImportLeadsModal from '../components/ImportLeadsModal'
+import { Upload } from 'lucide-react'
 
 interface Lead {
     id: string
@@ -53,6 +55,7 @@ export default function LeadsPage() {
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
     const fetchLeads = async () => {
         setLoading(true)
@@ -82,25 +85,43 @@ export default function LeadsPage() {
     }, [statusFilter, search])
 
     return (
-        <div className="space-y-6">
+        <div className="h-full overflow-y-auto p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
                     <p className="text-sm text-gray-500">Gestiona tus prospectos y oportunidades de venta.</p>
                 </div>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
-                >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Lead
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="inline-flex items-center justify-center px-4 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Importar Excel
+                    </button>
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nuevo Lead
+                    </button>
+                </div>
             </div>
 
             <CreateLeadModal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
                 onSuccess={fetchLeads}
+            />
+
+            <ImportLeadsModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onSuccess={() => {
+                    fetchLeads()
+                    setIsImportModalOpen(false)
+                }}
             />
 
             {/* Filters & Search */}

@@ -8,12 +8,12 @@ import {
     Calendar,
     Key,
     Save,
-    Plus,
     Trash2,
     Users,
     Shield,
     CheckCircle,
-    AlertCircle
+    Zap,
+    Target
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -35,27 +35,15 @@ interface Profile {
 
 export default function AdminPage() {
     const supabase = createClient()
-    const [activeTab, setActiveTab] = useState<'integrations' | 'users'>('integrations')
+    const [activeTab, setActiveTab] = useState<'integrations' | 'users' | 'marathon'>('integrations')
     const [integrations, setIntegrations] = useState<Integration[]>([])
     const [profiles, setProfiles] = useState<Profile[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
-    // Email integration form
-    const [emailProvider, setEmailProvider] = useState('gmail')
-    const [emailCredentials, setEmailCredentials] = useState({
-        api_key: '',
-        client_id: '',
-        client_secret: ''
-    })
-
-    // Calendar integration form
-    const [calendarProvider, setCalendarProvider] = useState('google_calendar')
-    const [calendarCredentials, setCalendarCredentials] = useState({
-        api_key: '',
-        client_id: '',
-        client_secret: ''
-    })
+    // Forms
+    const [openaiKey, setOpenaiKey] = useState('')
+    const [marathonGoal, setMarathonGoal] = useState('20')
 
     useEffect(() => {
         fetchData()
@@ -71,7 +59,7 @@ export default function AdminPage() {
                     .eq('is_global', true)
                 if (error) throw error
                 setIntegrations(data || [])
-            } else {
+            } else if (activeTab === 'users') {
                 const { data, error } = await supabase
                     .from('profiles')
                     .select('*')
@@ -86,23 +74,31 @@ export default function AdminPage() {
         }
     }
 
-    const saveEmailIntegration = async () => {
+    const saveOpenAIIntegration = async () => {
         setSaving(true)
         try {
             const { data: userData } = await supabase.auth.getUser()
             const ownerId = userData.user?.id
 
-            const { error } = await supabase.from('integrations').insert([{
-                owner_id: ownerId,
-                integration_type: 'global_email',
-                provider: emailProvider,
-                credentials: emailCredentials,
-                is_global: true,
-                is_active: true
-            }])
+            // Check if exists update, else insert
+            const existing = integrations.find(i => i.integration_type === 'openai_api')
 
-            if (error) throw error
-            alert('Integración de email guardada correctamente')
+            if (existing) {
+                await supabase.from('integrations').update({
+                    credentials: { api_key: openaiKey },
+                    is_active: true
+                }).eq('id', existing.id)
+            } else {
+                await supabase.from('integrations').insert([{
+                    owner_id: ownerId,
+                    integration_type: 'openai_api',
+                    provider: 'openai',
+                    credentials: { api_key: openaiKey },
+                    is_global: true,
+                    is_active: true
+                }])
+            }
+            alert('API Key de OpenAI guardada correctamente')
             fetchData()
         } catch (error: any) {
             alert('Error al guardar: ' + error.message)
@@ -111,38 +107,20 @@ export default function AdminPage() {
         }
     }
 
-    const saveCalendarIntegration = async () => {
-        setSaving(true)
+    const deleteIntegration = async (id: string) => {
+        if (!confirm('¿Estás seguro de eliminar esta integración?')) return
         try {
-            const { data: userData } = await supabase.auth.getUser()
-            const ownerId = userData.user?.id
-
-            const { error } = await supabase.from('integrations').insert([{
-                owner_id: ownerId,
-                integration_type: 'global_calendar',
-                provider: calendarProvider,
-                credentials: calendarCredentials,
-                is_global: true,
-                is_active: true
-            }])
-
+            const { error } = await supabase.from('integrations').delete().eq('id', id)
             if (error) throw error
-            alert('Integración de calendario guardada correctamente')
             fetchData()
         } catch (error: any) {
-            alert('Error al guardar: ' + error.message)
-        } finally {
-            setSaving(false)
+            alert('Error al eliminar: ' + error.message)
         }
     }
 
     const updateUserRole = async (userId: string, newRole: string) => {
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ role: newRole })
-                .eq('id', userId)
-
+            const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
             if (error) throw error
             alert('Rol actualizado correctamente')
             fetchData()
@@ -151,26 +129,11 @@ export default function AdminPage() {
         }
     }
 
-    const deleteIntegration = async (id: string) => {
-        if (!confirm('¿Estás seguro de eliminar esta integración?')) return
-        try {
-            const { error } = await supabase
-                .from('integrations')
-                .delete()
-                .eq('id', id)
-
-            if (error) throw error
-            fetchData()
-        } catch (error: any) {
-            alert('Error al eliminar: ' + error.message)
-        }
-    }
-
     return (
-        <div className="space-y-8">
+        <div className="h-full overflow-y-auto p-8 space-y-8">
             <div>
                 <h1 className="text-3xl font-bold text-gray-900">Panel de Administración</h1>
-                <p className="mt-1 text-gray-500">Gestiona integraciones globales y usuarios del CRM.</p>
+                <p className="mt-1 text-gray-500">Gestión global del sistema y usuarios.</p>
             </div>
 
             {/* Tabs */}
@@ -183,7 +146,17 @@ export default function AdminPage() {
                     )}
                 >
                     <Settings size={18} />
-                    <span>Integraciones API</span>
+                    <span>Integraciones & IA</span>
+                </button>
+                <button
+                    onClick={() => setActiveTab('marathon')}
+                    className={clsx(
+                        "pb-4 text-sm font-bold transition-all border-b-2 flex items-center space-x-2",
+                        activeTab === 'marathon' ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-400 hover:text-gray-600"
+                    )}
+                >
+                    <Zap size={18} />
+                    <span>Marathon Config</span>
                 </button>
                 <button
                     onClick={() => setActiveTab('users')}
@@ -193,260 +166,130 @@ export default function AdminPage() {
                     )}
                 >
                     <Users size={18} />
-                    <span>Gestión de Usuarios</span>
+                    <span>Usuarios</span>
                 </button>
             </div>
 
-            {/* Integrations Tab */}
+            {/* INTEGRATIONS TAB */}
             {activeTab === 'integrations' && (
-                <div className="space-y-8">
-                    {/* Email Integration */}
+                <div className="space-y-8 max-w-4xl">
+                    {/* OpenAI Card */}
                     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-teal-50">
                             <div className="flex items-center space-x-3">
                                 <div className="p-3 bg-white rounded-xl shadow-sm">
-                                    <Mail className="text-indigo-600" size={24} />
+                                    <Zap className="text-emerald-600" size={24} />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold text-gray-900">Integración de Email Global</h2>
-                                    <p className="text-sm text-gray-500">Configura las credenciales para envío de emails desde el CRM</p>
+                                    <h2 className="text-lg font-bold text-gray-900">Inteligencia Artificial (OpenAI)</h2>
+                                    <p className="text-sm text-gray-500">Configura la API Key para el enriquecimiento automático de leads.</p>
                                 </div>
                             </div>
                         </div>
-                        <div className="p-6 space-y-6">
+                        <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Proveedor</label>
-                                <select
-                                    value={emailProvider}
-                                    onChange={(e) => setEmailProvider(e.target.value)}
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                                >
-                                    <option value="gmail">Gmail / Google Workspace</option>
-                                    <option value="sendgrid">SendGrid</option>
-                                    <option value="mailgun">Mailgun</option>
-                                    <option value="outlook">Outlook / Microsoft 365</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">API Key</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">OpenAI API Key</label>
+                                <div className="relative">
+                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                     <input
                                         type="password"
-                                        value={emailCredentials.api_key}
-                                        onChange={(e) => setEmailCredentials({ ...emailCredentials, api_key: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="••••••••••••••••"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Client ID</label>
-                                    <input
-                                        type="text"
-                                        value={emailCredentials.client_id}
-                                        onChange={(e) => setEmailCredentials({ ...emailCredentials, client_id: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="client_id_here"
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Client Secret</label>
-                                    <input
-                                        type="password"
-                                        value={emailCredentials.client_secret}
-                                        onChange={(e) => setEmailCredentials({ ...emailCredentials, client_secret: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="••••••••••••••••"
+                                        value={openaiKey}
+                                        onChange={(e) => setOpenaiKey(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        placeholder="sk-..."
                                     />
                                 </div>
                             </div>
                             <button
-                                onClick={saveEmailIntegration}
+                                onClick={saveOpenAIIntegration}
                                 disabled={saving}
-                                className="w-full flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                                className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
                             >
                                 <Save size={18} className="mr-2" />
-                                {saving ? 'Guardando...' : 'Guardar Integración de Email'}
+                                {saving ? 'Guardando...' : 'Guardar API Key'}
                             </button>
                         </div>
                     </div>
 
-                    {/* Calendar Integration */}
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-pink-50">
-                            <div className="flex items-center space-x-3">
-                                <div className="p-3 bg-white rounded-xl shadow-sm">
-                                    <Calendar className="text-purple-600" size={24} />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-900">Integración de Calendario Global</h2>
-                                    <p className="text-sm text-gray-500">Configura las credenciales para sincronización de calendario</p>
-                                </div>
+                    {/* Active Integrations List (Simplified) */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+                        <h3 className="font-bold text-gray-900 mb-4">Integraciones Activas</h3>
+                        {loading ? <p>Cargando...</p> : integrations.length === 0 ? <p className="text-gray-500">No hay integraciones.</p> : (
+                            <div className="space-y-2">
+                                {integrations.map(i => (
+                                    <div key={i.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                                        <div className="font-medium">{i.provider} ({i.integration_type})</div>
+                                        <button onClick={() => deleteIntegration(i.id)} className="text-rose-500"><Trash2 size={16} /></button>
+                                    </div>
+                                ))}
                             </div>
-                        </div>
-                        <div className="p-6 space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Proveedor</label>
-                                <select
-                                    value={calendarProvider}
-                                    onChange={(e) => setCalendarProvider(e.target.value)}
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
-                                >
-                                    <option value="google_calendar">Google Calendar</option>
-                                    <option value="outlook_calendar">Outlook Calendar</option>
-                                    <option value="apple_calendar">Apple Calendar</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">API Key</label>
-                                    <input
-                                        type="password"
-                                        value={calendarCredentials.api_key}
-                                        onChange={(e) => setCalendarCredentials({ ...calendarCredentials, api_key: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
-                                        placeholder="••••••••••••••••"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Client ID</label>
-                                    <input
-                                        type="text"
-                                        value={calendarCredentials.client_id}
-                                        onChange={(e) => setCalendarCredentials({ ...calendarCredentials, client_id: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
-                                        placeholder="client_id_here"
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Client Secret</label>
-                                    <input
-                                        type="password"
-                                        value={calendarCredentials.client_secret}
-                                        onChange={(e) => setCalendarCredentials({ ...calendarCredentials, client_secret: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
-                                        placeholder="••••••••••••••••"
-                                    />
-                                </div>
-                            </div>
-                            <button
-                                onClick={saveCalendarIntegration}
-                                disabled={saving}
-                                className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-100"
-                            >
-                                <Save size={18} className="mr-2" />
-                                {saving ? 'Guardando...' : 'Guardar Integración de Calendario'}
-                            </button>
-                        </div>
+                        )}
                     </div>
+                </div>
+            )}
 
-                    {/* Active Integrations List */}
+            {/* MARATHON CONFIG TAB */}
+            {activeTab === 'marathon' && (
+                <div className="space-y-8 max-w-4xl">
                     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="p-6 border-b border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-900">Integraciones Activas</h3>
+                            <h2 className="text-lg font-bold text-gray-900 flex items-center">
+                                <Target className="mr-2 text-indigo-600" />
+                                Configuración de Objetivos
+                            </h2>
                         </div>
-                        <div className="divide-y divide-gray-50">
-                            {loading ? (
-                                <div className="p-6 text-center text-gray-500">Cargando...</div>
-                            ) : integrations.length === 0 ? (
-                                <div className="p-6 text-center text-gray-500">No hay integraciones configuradas</div>
-                            ) : (
-                                integrations.map((integration) => (
-                                    <div key={integration.id} className="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                                        <div className="flex items-center space-x-4">
-                                            <div className="p-2 bg-emerald-50 rounded-lg">
-                                                {integration.integration_type.includes('email') ? (
-                                                    <Mail className="text-emerald-600" size={20} />
-                                                ) : (
-                                                    <Calendar className="text-emerald-600" size={20} />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-gray-900">{integration.provider}</h4>
-                                                <p className="text-xs text-gray-500">{integration.integration_type}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center space-x-4">
-                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
-                                                <CheckCircle size={12} className="mr-1" />
-                                                Activa
-                                            </span>
-                                            <button
-                                                onClick={() => deleteIntegration(integration.id)}
-                                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Objetivo Diario de Leads (Default)</label>
+                                <input
+                                    type="number"
+                                    value={marathonGoal}
+                                    onChange={(e) => setMarathonGoal(e.target.value)}
+                                    className="w-32 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                                <p className="text-xs text-gray-400 mt-2">Este valor será el predeterminado para nuevos usuarios.</p>
+                            </div>
+                            <button className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">
+                                Guardar Configuración
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Users Tab */}
+            {/* USERS TAB */}
             {activeTab === 'users' && (
                 <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-gray-100">
-                        <h3 className="text-lg font-bold text-gray-900">Usuarios del Sistema</h3>
-                        <p className="text-sm text-gray-500 mt-1">Gestiona roles y permisos de usuarios</p>
+                    <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+                        <h3 className="font-bold text-gray-900">Usuarios del Sistema</h3>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 border-b border-gray-100">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Email</th>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Rol</th>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Fecha de Registro</th>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Acciones</th>
+                    <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-100">
+                            <tr>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Email</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Rol</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {profiles.map((profile) => (
+                                <tr key={profile.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4">{profile.email}</td>
+                                    <td className="px-6 py-4">
+                                        <select
+                                            value={profile.role}
+                                            onChange={(e) => updateUserRole(profile.id, e.target.value)}
+                                            className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-sm"
+                                        >
+                                            <option value="user">Usuario</option>
+                                            <option value="admin">Admin</option>
+                                        </select>
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-400">...</td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {loading ? (
-                                    <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">Cargando...</td></tr>
-                                ) : profiles.length === 0 ? (
-                                    <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">No hay usuarios</td></tr>
-                                ) : (
-                                    profiles.map((profile) => (
-                                        <tr key={profile.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4 text-sm text-gray-900">{profile.email}</td>
-                                            <td className="px-6 py-4">
-                                                <select
-                                                    value={profile.role}
-                                                    onChange={(e) => updateUserRole(profile.id, e.target.value)}
-                                                    className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500"
-                                                >
-                                                    <option value="user">Usuario</option>
-                                                    <option value="business_developer">Business Developer</option>
-                                                    <option value="admin">Admin</option>
-                                                </select>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">
-                                                {new Date(profile.created_at).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center space-x-2">
-                                                    {profile.role === 'admin' && (
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700">
-                                                            <Shield size={12} className="mr-1" />
-                                                            Admin
-                                                        </span>
-                                                    )}
-                                                    {profile.role === 'business_developer' && (
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
-                                                            <Users size={12} className="mr-1" />
-                                                            BD
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
         </div>

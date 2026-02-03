@@ -63,7 +63,6 @@ export default function ProtectedLayout({
         { name: 'Marathon', href: '/marathon', icon: Zap },
         { name: 'Leads', href: '/leads', icon: Users },
         { name: 'Pipeline', href: '/pipeline', icon: Trello },
-        { name: 'Imports', href: '/imports', icon: Upload },
         { name: 'Tasks', href: '/tasks', icon: CheckSquare },
         { name: 'Meetings', href: '/meetings', icon: Calendar },
         { name: 'Emails', href: '/emails', icon: Mail },
@@ -76,7 +75,7 @@ export default function ProtectedLayout({
         : navigation
 
     return (
-        <div className="flex min-h-screen bg-white">
+        <div className="flex h-screen overflow-hidden bg-white">
             {/* Mobile Menu Button */}
             <div className="md:hidden fixed top-4 right-4 z-50">
                 <button
@@ -145,8 +144,8 @@ export default function ProtectedLayout({
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 md:pl-64">
-                <main className="w-full px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex-1 flex flex-col min-w-0 md:pl-64 h-full">
+                <main className="flex-1 overflow-hidden flex flex-col">
                     {children}
                 </main>
             </div>

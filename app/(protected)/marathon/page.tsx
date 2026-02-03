@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
+import { enrichLead } from '@/app/actions/enrich-lead'
 
 interface Lead {
     id: string
@@ -33,7 +34,9 @@ export default function MarathonPage() {
     const [currentIndex, setCurrentIndex] = useState(0)
     const [loading, setLoading] = useState(true)
     const [dailyGoal, setDailyGoal] = useState(20)
+
     const [progress, setProgress] = useState(0)
+    const [enriching, setEnriching] = useState(false)
 
     useEffect(() => {
         fetchLeads()
@@ -101,6 +104,61 @@ export default function MarathonPage() {
 
         // Auto advance after action?
         // handleNext()
+    }
+
+    const handleEnrich = async () => {
+        if (!currentLead?.website) {
+            alert('Este lead no tiene sitio web para investigar.')
+            return
+        }
+
+        setEnriching(true)
+        try {
+            const result = await enrichLead(currentLead.id, currentLead.website)
+
+            if (result.success && result.data) {
+                const { contact_name, emails: newEmails, phones: newPhones } = result.data
+
+                // Construct new values
+                const updatedContact = contact_name || currentLead.contact_name
+
+                const currentEmails = currentLead.email ? currentLead.email.split(':').map(e => e.trim()) : []
+                const mergedEmails = Array.from(new Set([...currentEmails, ...(newEmails || [])])).join(' : ')
+
+                const currentPhones = currentLead.phone ? currentLead.phone.split(':').map(p => p.trim()) : []
+                const mergedPhones = Array.from(new Set([...currentPhones, ...(newPhones || [])])).join(' : ')
+
+                // Update DB
+                const { error } = await supabase
+                    .from('leads')
+                    .update({
+                        contact_name: updatedContact,
+                        email: mergedEmails,
+                        phone: mergedPhones
+                    })
+                    .eq('id', currentLead.id)
+
+                if (error) throw error
+
+                // Update Local State
+                const updatedLeads = [...leads]
+                updatedLeads[currentIndex] = {
+                    ...currentLead,
+                    contact_name: updatedContact,
+                    email: mergedEmails,
+                    phone: mergedPhones
+                }
+                setLeads(updatedLeads)
+                alert('¡Datos enriquecidos con éxito!')
+            } else {
+                alert('No se encontraron nuevos datos o hubo un error: ' + (result.error || 'Desconocido'))
+            }
+        } catch (error: any) {
+            console.error('Enrichment error:', error)
+            alert('Error al investigar: ' + error.message)
+        } finally {
+            setEnriching(false)
+        }
     }
 
     if (loading) {
@@ -246,9 +304,13 @@ export default function MarathonPage() {
 
                     {/* AI Enrichment Placeholder */}
                     <div className="mt-auto pt-6 border-t border-gray-100">
-                        <button className="w-full py-3 flex items-center justify-center bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95">
-                            <Sparkles className="h-5 w-5 mr-2" />
-                            Investigar con IA
+                        <button
+                            onClick={handleEnrich}
+                            disabled={enriching || !currentLead.website}
+                            className="w-full py-3 flex items-center justify-center bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {enriching ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Sparkles className="h-5 w-5 mr-2" />}
+                            {enriching ? 'Investigando...' : 'Investigar con IA'}
                         </button>
                         <p className="text-xs text-center text-gray-400 mt-2">
                             Busca CEO, E-commerce Manager y datos de contacto automáticamente.

@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     description: "Modern CRM for ABU Management",
     images: ["https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"],
   },
+  icons: {
+    icon: "https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866",
+  },
 };
 
 export default function RootLayout({

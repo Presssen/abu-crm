@@ -108,7 +108,7 @@ export default function DashboardPage() {
     ]
 
     return (
-        <div className="space-y-8">
+        <div className="h-full overflow-y-auto p-6 space-y-8">
             <div>
                 <h1 className="text-3xl font-bold text-gray-900">Bienvenido de nuevo</h1>
                 <p className="mt-2 text-gray-500">Aquí tienes un resumen de lo que está pasando hoy en ABU CRM.</p>
