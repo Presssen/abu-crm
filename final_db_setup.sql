@@ -231,4 +231,3 @@ CREATE TRIGGER update_leads_updated_at
 -- ENSURE NEW COLUMNS EXIST (Migration support within the main script)
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS won_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS won_at TIMESTAMPTZ;
-
