@@ -17,7 +17,9 @@ import {
     Edit2,
     Save,
     ExternalLink,
-    Send
+    Send,
+    Plus,
+    Trash2
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import SendEmailModal from './SendEmailModal'
@@ -64,8 +66,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const [editForm, setEditForm] = useState({
         company_name: '',
         contact_name: '',
-        email: '',
-        phone: '',
+        emails: [''],
+        phones: [''],
         website: ''
     })
 
@@ -89,8 +91,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 setEditForm({
                     company_name: leadData.company_name || '',
                     contact_name: leadData.contact_name || '',
-                    email: leadData.email || '',
-                    phone: leadData.phone || '',
+                    emails: leadData.email ? leadData.email.split(':').map((e: string) => e.trim()).filter(Boolean) : [''],
+                    phones: leadData.phone ? leadData.phone.split(':').map((p: string) => p.trim()).filter(Boolean) : [''],
                     website: leadData.website || ''
                 })
             }
@@ -134,8 +136,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 .update({
                     company_name: editForm.company_name,
                     contact_name: editForm.contact_name,
-                    email: editForm.email,
-                    phone: editForm.phone,
+                    email: editForm.emails.filter(Boolean).join(' : '),
+                    phone: editForm.phones.filter(Boolean).join(' : '),
                     website: editForm.website,
                 })
                 .eq('id', leadId)
@@ -257,13 +259,39 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                             </label>
                                             <div className="space-y-2">
                                                 {isEditing ? (
-                                                    <textarea
-                                                        className="w-full text-indigo-600 font-bold bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 rounded-xl px-3 py-2 outline-none resize-none"
-                                                        value={editForm.email}
-                                                        rows={2}
-                                                        placeholder="email1 : email2"
-                                                        onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                                                    />
+                                                    <div className="space-y-2">
+                                                        {editForm.emails.map((email, idx) => (
+                                                            <div key={idx} className="flex gap-2">
+                                                                <input
+                                                                    className="flex-1 text-indigo-600 font-bold bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 rounded-xl px-3 py-2 outline-none"
+                                                                    value={email}
+                                                                    onChange={e => {
+                                                                        const newEmails = [...editForm.emails]
+                                                                        newEmails[idx] = e.target.value
+                                                                        setEditForm({ ...editForm, emails: newEmails })
+                                                                    }}
+                                                                />
+                                                                {editForm.emails.length > 1 && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const newEmails = editForm.emails.filter((_, i) => i !== idx)
+                                                                            setEditForm({ ...editForm, emails: newEmails })
+                                                                        }}
+                                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                        <button
+                                                            onClick={() => setEditForm({ ...editForm, emails: [...editForm.emails, ''] })}
+                                                            className="w-full py-2 border-2 border-dashed border-indigo-100 rounded-xl text-indigo-400 font-bold text-xs hover:border-indigo-600 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                                                        >
+                                                            <Plus size={14} />
+                                                            <span>Añadir Email</span>
+                                                        </button>
+                                                    </div>
                                                 ) : (
                                                     emailsList.map((email: string, idx: number) => (
                                                         <div key={idx} className="flex items-center justify-between group/item">
@@ -287,13 +315,39 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                             </label>
                                             <div className="space-y-2">
                                                 {isEditing ? (
-                                                    <textarea
-                                                        className="w-full text-gray-900 font-bold bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 rounded-xl px-3 py-2 outline-none resize-none"
-                                                        value={editForm.phone}
-                                                        rows={2}
-                                                        placeholder="tel1 : tel2"
-                                                        onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                                                    />
+                                                    <div className="space-y-2">
+                                                        {editForm.phones.map((phone, idx) => (
+                                                            <div key={idx} className="flex gap-2">
+                                                                <input
+                                                                    className="flex-1 text-gray-900 font-bold bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 rounded-xl px-3 py-2 outline-none"
+                                                                    value={phone}
+                                                                    onChange={e => {
+                                                                        const newPhones = [...editForm.phones]
+                                                                        newPhones[idx] = e.target.value
+                                                                        setEditForm({ ...editForm, phones: newPhones })
+                                                                    }}
+                                                                />
+                                                                {editForm.phones.length > 1 && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const newPhones = editForm.phones.filter((_, i) => i !== idx)
+                                                                            setEditForm({ ...editForm, phones: newPhones })
+                                                                        }}
+                                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                        <button
+                                                            onClick={() => setEditForm({ ...editForm, phones: [...editForm.phones, ''] })}
+                                                            className="w-full py-2 border-2 border-dashed border-gray-100 rounded-xl text-gray-400 font-bold text-xs hover:border-gray-900 hover:text-gray-900 transition-all flex items-center justify-center gap-2"
+                                                        >
+                                                            <Plus size={14} />
+                                                            <span>Añadir Teléfono</span>
+                                                        </button>
+                                                    </div>
                                                 ) : (
                                                     phonesList.map((p: string, idx: number) => (
                                                         <div key={idx} className="flex items-center justify-between">

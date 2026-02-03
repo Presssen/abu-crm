@@ -11,7 +11,8 @@ import {
     Phone,
     Building2,
     Clock,
-    User
+    User,
+    Zap
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import CreateLeadModal from '../components/CreateLeadModal'
@@ -89,6 +90,20 @@ export default function LeadsPage() {
             console.error('Error fetching leads:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const sendToMarathon = async (leadId: string) => {
+        try {
+            const { error } = await supabase
+                .from('leads')
+                .update({ owner_id: null, status: 'new' })
+                .eq('id', leadId)
+            if (error) throw error
+            alert('Lead enviado a Marathon')
+            fetchLeads()
+        } catch (error: any) {
+            alert('Error al enviar a Marathon: ' + error.message)
         }
     }
 
@@ -335,6 +350,16 @@ export default function LeadsPage() {
                         >
                             <Plus size={14} className="mr-2" />
                             Nueva Tarea
+                        </button>
+                        <button
+                            onClick={() => {
+                                sendToMarathon(activeMenuId)
+                                setActiveMenuId(null)
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 flex items-center transition-colors border-t border-gray-50"
+                        >
+                            <Zap size={14} className="mr-2" />
+                            Enviar a Marathon
                         </button>
                     </div>
                 </>

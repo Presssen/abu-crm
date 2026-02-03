@@ -62,6 +62,13 @@ export default function AdminPage() {
                     .eq('is_global', true)
                 if (error) throw error
                 setIntegrations(data || [])
+            } else if (activeTab === 'marathon') {
+                const { data, error } = await supabase
+                    .from('app_settings')
+                    .select('*')
+                    .eq('key', 'marathon_default_goal')
+                    .single()
+                if (data) setMarathonGoal(data.value)
             } else if (activeTab === 'users') {
                 const { data, error } = await supabase
                     .from('profiles')
@@ -127,6 +134,23 @@ export default function AdminPage() {
             fetchData()
         } catch (error: any) {
             alert('Error al actualizar usuario: ' + error.message)
+        }
+    }
+
+    const saveMarathonConfig = async () => {
+        setSaving(true)
+        try {
+            const { error } = await supabase.from('app_settings').upsert({
+                key: 'marathon_default_goal',
+                value: marathonGoal,
+                updated_at: new Date().toISOString()
+            })
+            if (error) throw error
+            alert('Configuración de Marathon guardada')
+        } catch (error: any) {
+            alert('Error al guardar config: ' + error.message)
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -242,8 +266,12 @@ export default function AdminPage() {
                                     className="w-32 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                                 />
                             </div>
-                            <button className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">
-                                Guardar Configuración
+                            <button
+                                onClick={saveMarathonConfig}
+                                disabled={saving}
+                                className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                                {saving ? 'Guardando...' : 'Guardar Configuración'}
                             </button>
                         </div>
                     </div>

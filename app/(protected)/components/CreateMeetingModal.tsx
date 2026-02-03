@@ -46,6 +46,8 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
     })
 
     const searchRef = useRef<HTMLDivElement>(null)
+    const hoursRef = useRef<HTMLDivElement>(null)
+    const minutesRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         if (isOpen) {
@@ -67,6 +69,23 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
             })
         }
     }, [isOpen])
+
+    useEffect(() => {
+        if (isOpen && hoursRef.current && minutesRef.current) {
+            // Wait for render
+            setTimeout(() => {
+                const hourBtn = hoursRef.current?.querySelector(`[data-hour="${selectedDate.getHours()}"]`) as HTMLElement
+                const minuteBtn = minutesRef.current?.querySelector(`[data-minute="${selectedDate.getMinutes()}"]`) as HTMLElement
+
+                if (hourBtn) {
+                    hoursRef.current!.scrollTop = hourBtn.offsetTop - 100
+                }
+                if (minuteBtn) {
+                    minutesRef.current!.scrollTop = minuteBtn.offsetTop - 100
+                }
+            }, 100)
+        }
+    }, [isOpen, selectedDate.getHours(), selectedDate.getMinutes()])
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -377,13 +396,14 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                             <div className="bg-gray-50 rounded-[32px] border border-gray-100 p-6 flex flex-col h-[320px] shadow-inner">
                                 <div className="flex gap-4 h-full overflow-hidden">
                                     {/* Hours Column */}
-                                    <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+                                    <div ref={hoursRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
                                         <div className="text-[10px] font-black text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Hora</div>
                                         {Array.from({ length: 24 }).map((_, h) => {
                                             const isSelected = selectedDate.getHours() === h
                                             return (
                                                 <button
                                                     key={`h-${h}`}
+                                                    data-hour={h}
                                                     type="button"
                                                     onClick={() => handleTimeSelect(h, selectedDate.getMinutes())}
                                                     className={clsx(
@@ -398,13 +418,14 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                                     </div>
 
                                     {/* Minutes Column */}
-                                    <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+                                    <div ref={minutesRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
                                         <div className="text-[10px] font-black text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Minutos</div>
                                         {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => {
                                             const isSelected = selectedDate.getMinutes() === m
                                             return (
                                                 <button
                                                     key={`m-${m}`}
+                                                    data-minute={m}
                                                     type="button"
                                                     onClick={() => handleTimeSelect(selectedDate.getHours(), m)}
                                                     className={clsx(
