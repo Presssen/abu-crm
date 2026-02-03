@@ -18,10 +18,10 @@ export const metadata: Metadata = {
   openGraph: {
     title: "ABU CRM",
     description: "Modern CRM for ABU Management",
-    images: ["https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"],
+    images: ["https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"],
   },
   icons: {
-    icon: "https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866",
+    icon: "/abu_logo.png",
   },
 };
 

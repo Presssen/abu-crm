@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
                 <div className="flex justify-center">
                     <div className="h-16 w-auto flex items-center justify-center mb-4">
                         <img
-                            src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"
+                            src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"
                             alt="ABU Logo"
                             className="h-12 w-auto object-contain"
                         />
