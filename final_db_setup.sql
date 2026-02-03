@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS leads (
     status lead_status DEFAULT 'new',
     source TEXT,
     owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    won_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    won_at TIMESTAMPTZ,
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()

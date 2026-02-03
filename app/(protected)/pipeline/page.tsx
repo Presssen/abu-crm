@@ -28,6 +28,8 @@ interface Lead {
     contact_name: string
     email: string
     status: string
+    won_by?: string
+    won_at?: string
 }
 
 export default function PipelinePage() {
@@ -41,7 +43,16 @@ export default function PipelinePage() {
         try {
             const { data, error } = await supabase
                 .from('leads')
-                .select('id, company_name, contact_name, email, status')
+                .select(`
+                    id, 
+                    company_name, 
+                    contact_name, 
+                    email, 
+                    status,
+                    won_by,
+                    won_at,
+                    profiles:won_by (first_name, last_name)
+                `)
             if (error) throw error
             setLeads(data || [])
         } catch (error) {
@@ -55,10 +66,37 @@ export default function PipelinePage() {
         fetchLeads()
     }, [])
 
+    const handleUpdateStatus = async (leadId: string, newStatus: string) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const updates: any = { status: newStatus }
+
+            if (newStatus === 'won') {
+                updates.won_by = user.id
+                updates.won_at = new Date().toISOString()
+            } else {
+                updates.won_by = null
+                updates.won_at = null
+            }
+
+            const { error } = await supabase
+                .from('leads')
+                .update(updates)
+                .eq('id', leadId)
+
+            if (error) throw error
+            fetchLeads()
+        } catch (error) {
+            console.error('Error updating lead status:', error)
+        }
+    }
+
     const getLeadsByStatus = (status: string) => leads.filter(l => l.status === status)
 
     return (
-        <div className="flex flex-col h-full space-y-6">
+        <div className="flex flex-col h-[calc(100vh-12rem)] space-y-6">
             {/* Fixed Header */}
             <div className="flex-shrink-0 flex items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
@@ -107,13 +145,27 @@ export default function PipelinePage() {
                                     getLeadsByStatus(stage.id).map((lead) => (
                                         <div
                                             key={lead.id}
-                                            className="group bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-move"
+                                            className={clsx(
+                                                "group bg-white p-4 rounded-xl border transition-all cursor-move",
+                                                lead.status === 'won' ? "border-emerald-200 shadow-sm shadow-emerald-50" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200"
+                                            )}
                                         >
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
                                                     {lead.company_name}
                                                 </div>
-                                                <ChevronRight size={14} className="text-gray-300 group-hover:text-indigo-400" />
+                                                <div className="flex items-center space-x-1">
+                                                    {lead.status !== 'won' && (
+                                                        <button
+                                                            onClick={() => handleUpdateStatus(lead.id, 'won')}
+                                                            className="p-1 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 rounded"
+                                                            title="Marcar como éxito"
+                                                        >
+                                                            <Plus size={14} className="rotate-45" />
+                                                        </button>
+                                                    )}
+                                                    <ChevronRight size={14} className="text-gray-300 group-hover:text-indigo-400" />
+                                                </div>
                                             </div>
 
                                             <div className="space-y-2">
@@ -125,6 +177,11 @@ export default function PipelinePage() {
                                                     <Mail className="h-3 w-3 mr-1.5 text-gray-400" />
                                                     {lead.email}
                                                 </div>
+                                                {lead.status === 'won' && (lead as any).profiles && (
+                                                    <div className="mt-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg flex items-center">
+                                                        🏆 Éxito por: {(lead as any).profiles.first_name} {(lead as any).profiles.last_name}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
@@ -134,7 +191,9 @@ export default function PipelinePage() {
                                                     </div>
                                                 </div>
                                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                                                    Hace 1d
+                                                    {lead.status === 'won' && lead.won_at
+                                                        ? new Date(lead.won_at as string).toLocaleDateString()
+                                                        : 'Activo'}
                                                 </div>
                                             </div>
                                         </div>
