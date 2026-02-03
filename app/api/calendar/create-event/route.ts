@@ -161,7 +161,13 @@ export async function POST(request: Request) {
 
         const data = await response.json()
         console.log('✅ Event created successfully:', data.id)
-        return NextResponse.json({ success: true, eventId: data.id, link: data.htmlLink })
+
+        return NextResponse.json({
+            success: true,
+            eventId: data.id,
+            link: data.htmlLink,
+            googleEventId: data.id  // Return the Google Calendar event ID
+        })
 
     } catch (error: any) {
         console.error('❌ Calendar API Error:', error)

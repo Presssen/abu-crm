@@ -55,7 +55,7 @@ export async function GET(request: Request) {
                 // For calendar, redirect back to settings
                 const forwardedHost = request.headers.get('x-forwarded-host')
                 const isLocalEnv = process.env.NODE_ENV === 'development'
-                const settingsPath = '/settings?tab=integrations'
+                const settingsPath = '/settings?tab=integrations&action=sync'
 
                 if (isLocalEnv) {
                     return NextResponse.redirect(`${origin}${settingsPath}`)

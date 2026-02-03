@@ -15,6 +15,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
     const supabase = createClient()
     const [loading, setLoading] = useState(false)
     const [leads, setLeads] = useState<any[]>([])
+    const [searchQuery, setSearchQuery] = useState('')
     const [formData, setFormData] = useState({
         lead_id: '',
         start_time: '',
@@ -88,9 +89,17 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                 const calendarData = await calendarRes.json()
                 if (!calendarRes.ok) {
                     console.warn('Google Calendar Sync Failed:', calendarData.error)
-                    // Optional: Notify user but don't fail the whole process
+                    alert('Advertencia: La reunión se creó en el CRM pero no se pudo sincronizar con Google Calendar: ' + calendarData.error)
                 } else {
                     console.log('Google Calendar Event Created:', calendarData.link)
+
+                    // Update meeting with Google event ID
+                    if (calendarData.googleEventId) {
+                        await supabase
+                            .from('meetings')
+                            .update({ google_event_id: calendarData.googleEventId })
+                            .eq('id', meeting.id)
+                    }
                 }
             } catch (calError) {
                 console.error('Calendar Sync Error:', calError)
@@ -142,16 +151,53 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
                             <label className="block text-sm font-bold text-gray-700 mb-2">Lead / Empresa</label>
+
+                            {/* Search Input */}
+                            <input
+                                type="text"
+                                placeholder="Buscar lead por nombre, empresa o email..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+                            />
+
+                            {/* Dropdown with filtered results */}
                             <select
                                 value={formData.lead_id}
                                 onChange={(e) => setFormData({ ...formData, lead_id: e.target.value })}
                                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
                             >
                                 <option value="">Seleccionar Lead (Opcional)...</option>
-                                {leads.map(l => (
-                                    <option key={l.id} value={l.id}>{l.company_name} ({l.contact_name})</option>
-                                ))}
+                                {leads
+                                    .filter(lead => {
+                                        if (!searchQuery) return true
+                                        const query = searchQuery.toLowerCase()
+                                        return (
+                                            lead.company_name?.toLowerCase().includes(query) ||
+                                            lead.contact_name?.toLowerCase().includes(query) ||
+                                            lead.email?.toLowerCase().includes(query)
+                                        )
+                                    })
+                                    .map(lead => (
+                                        <option key={lead.id} value={lead.id}>
+                                            {lead.company_name} - {lead.contact_name}
+                                        </option>
+                                    ))
+                                }
                             </select>
+
+                            {searchQuery && (
+                                <p className="text-xs text-gray-500 mt-2">
+                                    {leads.filter(lead => {
+                                        const query = searchQuery.toLowerCase()
+                                        return (
+                                            lead.company_name?.toLowerCase().includes(query) ||
+                                            lead.contact_name?.toLowerCase().includes(query) ||
+                                            lead.email?.toLowerCase().includes(query)
+                                        )
+                                    }).length} leads encontrados
+                                </p>
+                            )}
                         </div>
 
                         <div>
