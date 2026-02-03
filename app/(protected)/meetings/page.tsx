@@ -255,8 +255,8 @@ export default function MeetingsPage() {
     }
 
     return (
-        <div className="h-full flex flex-col p-8 space-y-6 overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-shrink-0">
+        <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 pb-2">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
                 </div>
@@ -284,10 +284,11 @@ export default function MeetingsPage() {
                 </div>
             </div>
 
-            <div className="flex flex-col flex-1 min-h-0">
+            <div className="flex flex-col flex-1 min-h-0 px-6 pt-2">
                 {/* Header Navigation */}
-                <div className="flex items-center justify-between bg-white px-6 py-4 rounded-t-3xl border-x border-t border-gray-200">
-                    <h2 className="text-lg font-bold text-gray-900 capitalize">
+                <div className="flex items-center justify-between bg-white px-6 py-4 rounded-t-3xl border border-gray-200 shadow-sm z-10">
+                    <h2 className="text-xl font-bold text-gray-900 capitalize flex items-center gap-2">
+                        <CalendarIcon className="w-6 h-6 text-indigo-600" />
                         {currentDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
                     </h2>
                     <div className="flex items-center space-x-2">
@@ -298,9 +299,11 @@ export default function MeetingsPage() {
                 </div>
 
                 {/* Grid */}
-                {view === 'month' && renderMonthView()}
-                {view === 'week' && renderWeekView()}
-                {view === 'day' && renderDayView()}
+                <div className="flex-1 min-h-0 bg-white border-x border-b border-gray-200 rounded-b-3xl overflow-y-auto mb-6 mx-6 shadow-sm">
+                    {view === 'month' && renderMonthView()}
+                    {view === 'week' && renderWeekView()}
+                    {view === 'day' && renderDayView()}
+                </div>
             </div>
 
             <CreateMeetingModal

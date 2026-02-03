@@ -33,14 +33,22 @@ export async function POST(request: Request) {
             .maybeSingle()
 
         if (integrationError) {
-            console.error('Database error:', integrationError)
+            console.error('❌ Database error checking integration:', integrationError)
             return NextResponse.json({ error: 'Database error checking integration' }, { status: 500 })
         }
 
-        if (!integration || !integration.credentials) {
-            console.log('⚠️ No calendar integration found for user')
+        if (!integration) {
+            console.warn(`⚠️ No integration found for user ${userData.user.id}`)
+            console.warn('Checks: owner_id match?, integration_type=google_calendar?')
             return NextResponse.json({
                 error: 'Google Calendar not connected. Please connect your calendar in Settings → Integrations.'
+            }, { status: 400 })
+        }
+
+        if (!integration.credentials) {
+            console.error('❌ Integration found but credentials are null')
+            return NextResponse.json({
+                error: 'Google Calendar credentials missing. Please reconnect.'
             }, { status: 400 })
         }
 

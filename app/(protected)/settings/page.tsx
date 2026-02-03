@@ -276,7 +276,14 @@ export default function SettingsPage() {
                                                 <Calendar className="h-8 w-8 text-blue-600" />
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-gray-900 text-lg">Google Calendar</h3>
+                                                <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                                                    Google Calendar
+                                                    {isCalendarConnected && (
+                                                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] uppercase tracking-wider rounded-full font-bold border border-green-200">
+                                                            Conectado
+                                                        </span>
+                                                    )}
+                                                </h3>
                                                 <p className="text-sm text-gray-500 max-w-sm">
                                                     Sincroniza tus reuniones y eventos automáticamente. Nunca pierdas una llamada.
                                                 </p>
