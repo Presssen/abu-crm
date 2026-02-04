@@ -38,6 +38,7 @@ interface Lead {
     id: string
     company_name: string
     contact_name: string
+    contact_role?: string
     email: string
     phone: string
     domain?: string
@@ -78,6 +79,7 @@ export default function MarathonPage() {
     const [editForm, setEditForm] = useState({
         company_name: '',
         contact_name: '',
+        contact_role: '',
         domain: '',
         email: '',
         phone: '',
@@ -98,6 +100,7 @@ export default function MarathonPage() {
             setEditForm({
                 company_name: leads[currentIndex].company_name || '',
                 contact_name: leads[currentIndex].contact_name || '',
+                contact_role: leads[currentIndex].contact_role || '',
                 domain: leads[currentIndex].domain || '',
                 email: leads[currentIndex].email || '',
                 phone: leads[currentIndex].phone || '',
@@ -252,25 +255,27 @@ export default function MarathonPage() {
 
         setEnriching(true)
         try {
-            const result = await enrichLead(currentLead.id, currentLead.domain)
+            const result = await enrichLead(currentLead.id, currentLead.domain, currentLead.phone)
 
             if (result.success && result.data) {
-                const { contact_name, emails: newEmails, phones: newPhones } = result.data
+                const { responsible_name, responsible_role, emails: newEmails, phone: newPhone } = result.data
 
                 // Construct new values
-                const updatedContact = contact_name || currentLead.contact_name
+                // If we found a responsible person, we use them as contact_name
+                const updatedContact = responsible_name || currentLead.contact_name
 
                 const currentEmails = currentLead.email ? currentLead.email.split(':').map(e => e.trim()) : []
                 const mergedEmails = Array.from(new Set([...currentEmails, ...(newEmails || [])])).join(' : ')
 
-                const currentPhones = currentLead.phone ? currentLead.phone.split(':').map(p => p.trim()) : []
-                const mergedPhones = Array.from(new Set([...currentPhones, ...(newPhones || [])])).join(' : ')
+                // Only update phone if it was empty before
+                const mergedPhones = !currentLead.phone && newPhone ? newPhone : currentLead.phone
 
                 // Update DB
                 const { error } = await supabase
                     .from('leads')
                     .update({
                         contact_name: updatedContact,
+                        contact_role: responsible_role || currentLead.contact_role,
                         email: mergedEmails,
                         phone: mergedPhones
                     })
@@ -283,11 +288,12 @@ export default function MarathonPage() {
                 updatedLeads[currentIndex] = {
                     ...currentLead,
                     contact_name: updatedContact,
+                    contact_role: responsible_role || currentLead.contact_role,
                     email: mergedEmails,
                     phone: mergedPhones
                 }
                 setLeads(updatedLeads)
-                showSuccess('Datos de contacto actualizados')
+                showSuccess(`Datos actualizados: ${responsible_role || 'Contacto'} encontrado`)
             } else {
                 showSuccess('No se encontró información nueva')
             }
@@ -458,6 +464,11 @@ export default function MarathonPage() {
                                         <div className="flex items-center text-gray-500 font-medium text-sm">
                                             <User size={14} className="mr-1.5" />
                                             {currentLead.contact_name || 'Sin contacto'}
+                                            {currentLead.contact_role && (
+                                                <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold uppercase">
+                                                    {currentLead.contact_role}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="mt-3 grid grid-cols-2 gap-4">
                                             <div className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-tight">

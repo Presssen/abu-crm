@@ -67,7 +67,7 @@ function AdminContent() {
     const [saving, setSaving] = useState(false)
 
     // Forms
-    const [openaiKey, setOpenaiKey] = useState('')
+    const [geminiKey, setGeminiKey] = useState('')
     const [marathonGoal, setMarathonGoal] = useState('20')
 
     // Selection & Filters
@@ -108,6 +108,14 @@ function AdminContent() {
                 setIntegrations(data || [])
 
                 // Also fetch global marathon goal to use across tabs if needed
+                const { data: geminiKeyData } = await supabase
+                    .from('integrations')
+                    .select('*')
+                    .eq('integration_type', 'gemini_api')
+                    .eq('is_global', true)
+                    .single()
+                if (geminiKeyData) setGeminiKey(geminiKeyData.credentials?.api_key || '')
+
                 const { data: mGoal } = await supabase
                     .from('app_settings')
                     .select('*')
@@ -154,30 +162,30 @@ function AdminContent() {
         }
     }
 
-    const saveOpenAIIntegration = async () => {
+    const saveGeminiIntegration = async () => {
         setSaving(true)
         try {
             const { data: userData } = await supabase.auth.getUser()
             const ownerId = userData.user?.id
 
-            const existing = integrations.find(i => i.integration_type === 'openai_api')
+            const existing = integrations.find(i => i.integration_type === 'gemini_api')
 
             if (existing) {
                 await supabase.from('integrations').update({
-                    credentials: { api_key: openaiKey },
+                    credentials: { api_key: geminiKey },
                     is_active: true
                 }).eq('id', existing.id)
             } else {
                 await supabase.from('integrations').insert([{
                     owner_id: ownerId,
-                    integration_type: 'openai_api',
-                    provider: 'openai',
-                    credentials: { api_key: openaiKey },
+                    integration_type: 'gemini_api',
+                    provider: 'google',
+                    credentials: { api_key: geminiKey },
                     is_global: true,
                     is_active: true
                 }])
             }
-            alert('API Key de OpenAI guardada correctamente')
+            alert('API Key de Gemini guardada correctamente')
             fetchData()
         } catch (error: any) {
             alert('Error al guardar: ' + error.message)
@@ -388,27 +396,27 @@ function AdminContent() {
                                     <Zap className="text-emerald-600" size={24} />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold text-gray-900">Inteligencia Artificial (OpenAI)</h2>
-                                    <p className="text-sm text-gray-500">Configura la API Key para el enriquecimiento automático de leads.</p>
+                                    <h2 className="text-lg font-bold text-gray-900">Inteligencia Artificial (Gemini)</h2>
+                                    <p className="text-sm text-gray-500">Configura la API Key de Google Gemini para el enriquecimiento automático de leads.</p>
                                 </div>
                             </div>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">OpenAI API Key</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Gemini API Key</label>
                                 <div className="relative">
                                     <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                     <input
                                         type="password"
-                                        value={openaiKey}
-                                        onChange={(e) => setOpenaiKey(e.target.value)}
+                                        value={geminiKey}
+                                        onChange={(e) => setGeminiKey(e.target.value)}
                                         className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        placeholder="sk-..."
+                                        placeholder="AIza..."
                                     />
                                 </div>
                             </div>
                             <button
-                                onClick={saveOpenAIIntegration}
+                                onClick={saveGeminiIntegration}
                                 disabled={saving}
                                 className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
                             >

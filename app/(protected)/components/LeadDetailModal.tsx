@@ -19,12 +19,16 @@ import {
     ExternalLink,
     Send,
     Plus,
-    Trash2
+    Trash2,
+    Search,
+    Star,
+    ArrowUp
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import SendEmailModal from './SendEmailModal'
 import LogCallModal from './LogCallModal'
 import { useNotification } from './ui/NotificationProvider'
+import { enrichLead } from '@/app/actions/enrich-lead'
 
 interface LeadDetailModalProps {
     isOpen: boolean
@@ -72,6 +76,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const [editForm, setEditForm] = useState({
         company_name: '',
         contact_name: '',
+        contact_role: '',
         emails: [''],
         phones: [''],
         domain: '',
@@ -101,6 +106,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 setEditForm({
                     company_name: leadData.company_name || '',
                     contact_name: leadData.contact_name || '',
+                    contact_role: leadData.contact_role || '',
                     emails: leadData.email ? leadData.email.split(':').map((e: string) => e.trim()).filter(Boolean) : [''],
                     phones: leadData.phone ? leadData.phone.split(':').map((p: string) => p.trim()).filter(Boolean) : [''],
                     domain: leadData.domain || '',
@@ -150,10 +156,41 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 .limit(5)
             setCalls(callData || [])
 
-        } catch (error) {
-            console.error('Error fetching lead details:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleAutoEnrich = async () => {
+        if (!editForm.domain) {
+            showError('Se necesita una web para investigar')
+            return
+        }
+        setSaving(true)
+        try {
+            const result = await enrichLead(leadId, editForm.domain, lead?.phone)
+            if (result.success && result.data) {
+                const { responsible_name, responsible_role, emails: newEmails, phone: newPhone } = result.data
+
+                const updatedEmails = Array.from(new Set([...editForm.emails.filter(Boolean), ...(newEmails || [])]))
+                const updatedPhones = editForm.phones.filter(Boolean)
+                if (newPhone && !updatedPhones.length) updatedPhones.push(newPhone)
+
+                setEditForm(prev => ({
+                    ...prev,
+                    contact_name: responsible_name || prev.contact_name,
+                    contact_role: responsible_role || prev.contact_role,
+                    emails: updatedEmails.length ? updatedEmails : [''],
+                    phones: updatedPhones.length ? updatedPhones : ['']
+                }))
+                showSuccess(`Datos actualizados: ${responsible_role || 'Contacto'} encontrado`)
+            } else {
+                showError('No se encontró información nueva')
+            }
+        } catch (error) {
+            showError('Error al investigar')
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -165,6 +202,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 .update({
                     company_name: editForm.company_name,
                     contact_name: editForm.contact_name,
+                    contact_role: editForm.contact_role,
                     email: editForm.emails.filter(Boolean).join(' : '),
                     phone: editForm.phones.filter(Boolean).join(' : '),
                     domain: editForm.domain,
@@ -275,6 +313,15 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                 <span>{saving ? 'Guardando...' : 'Guardar'}</span>
                             </button>
                         )}
+                        <button
+                            onClick={handleAutoEnrich}
+                            disabled={saving}
+                            className="flex items-center space-x-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-all active:scale-95 disabled:opacity-50"
+                            title="Investigar datos de contacto con IA"
+                        >
+                            <Search size={14} />
+                            <span>{saving ? 'Investigando...' : 'IA Enrich'}</span>
+                        </button>
                         <div className="h-4 w-px bg-gray-200 mx-1" />
                         <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors group">
                             <X size={20} className="text-gray-400 group-hover:text-gray-900" />
@@ -311,13 +358,29 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                 <div className="flex items-center space-x-2">
                                                     <User size={14} className="text-gray-400" />
                                                     {isEditing ? (
-                                                        <input
-                                                            className="text-gray-600 font-semibold bg-white border border-gray-200 rounded-lg px-2 py-0.5 text-sm focus:border-gray-900 outline-none"
-                                                            value={editForm.contact_name}
-                                                            onChange={e => setEditForm({ ...editForm, contact_name: e.target.value })}
-                                                        />
+                                                        <div className="flex gap-2 w-full">
+                                                            <input
+                                                                className="flex-1 text-gray-600 font-semibold bg-white border border-gray-200 rounded-lg px-2 py-0.5 text-sm focus:border-gray-900 outline-none"
+                                                                value={editForm.contact_name}
+                                                                onChange={e => setEditForm({ ...editForm, contact_name: e.target.value })}
+                                                                placeholder="Nombre"
+                                                            />
+                                                            <input
+                                                                className="flex-1 text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-2 py-0.5 focus:border-gray-900 outline-none uppercase font-bold"
+                                                                value={editForm.contact_role}
+                                                                onChange={e => setEditForm({ ...editForm, contact_role: e.target.value })}
+                                                                placeholder="Cargo (e.g. CEO)"
+                                                            />
+                                                        </div>
                                                     ) : (
-                                                        <p className="text-gray-500 font-semibold text-sm">{lead.contact_name || 'Sin contacto'}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-gray-500 font-semibold text-sm">{lead.contact_name || 'Sin contacto'}</p>
+                                                            {lead.contact_role && (
+                                                                <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[8px] font-bold uppercase tracking-wider">
+                                                                    {lead.contact_role}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
@@ -345,36 +408,152 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                     </div>
 
                                     {/* Company Contact Info */}
-                                    <div className="mt-4 px-1 space-y-2 border-t border-gray-50 pt-4">
-                                        {emailsList.length > 0 && (
-                                            <div className="flex items-start space-x-2">
-                                                <Mail size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                                                <div className="flex flex-wrap gap-2">
-                                                    {emailsList.map((email: string, i: number) => (
-                                                        <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200">
-                                                            {email}
-                                                            <button
-                                                                onClick={() => openEmailComposer(email)}
-                                                                className="ml-1.5 p-0.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-900"
-                                                            >
-                                                                <Send size={10} />
-                                                            </button>
-                                                        </span>
+                                    <div className="mt-4 px-1 space-y-4 border-t border-gray-50 pt-4">
+                                        {isEditing ? (
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                                                        <Mail size={12} className="mr-2" />
+                                                        Emails de la Empresa
+                                                    </label>
+                                                    {editForm.emails.map((email, idx) => (
+                                                        <div key={idx} className="flex items-center gap-2">
+                                                            <input
+                                                                className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:border-gray-900 outline-none"
+                                                                value={email}
+                                                                onChange={e => {
+                                                                    const newEmails = [...editForm.emails]
+                                                                    newEmails[idx] = e.target.value
+                                                                    setEditForm({ ...editForm, emails: newEmails })
+                                                                }}
+                                                                placeholder="email@empresa.com"
+                                                            />
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const newEmails = [...editForm.emails]
+                                                                        const item = newEmails.splice(idx, 1)[0]
+                                                                        newEmails.unshift(item)
+                                                                        setEditForm({ ...editForm, emails: newEmails })
+                                                                    }}
+                                                                    disabled={idx === 0}
+                                                                    className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 hover:text-amber-500 disabled:opacity-30"
+                                                                    title="Marcar como Principal"
+                                                                >
+                                                                    <Star size={14} className={idx === 0 ? "fill-amber-500 text-amber-500" : ""} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const newEmails = editForm.emails.filter((_, i) => i !== idx)
+                                                                        setEditForm({ ...editForm, emails: newEmails.length ? newEmails : [''] })
+                                                                    }}
+                                                                    className="p-1.5 hover:bg-rose-50 rounded-md text-gray-400 hover:text-rose-500"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     ))}
+                                                    <button
+                                                        onClick={() => setEditForm({ ...editForm, emails: [...editForm.emails, ''] })}
+                                                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                                                    >
+                                                        <Plus size={12} /> Añadir Email
+                                                    </button>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                                                        <Phone size={12} className="mr-2" />
+                                                        Teléfonos de la Empresa
+                                                    </label>
+                                                    {editForm.phones.map((phone, idx) => (
+                                                        <div key={idx} className="flex items-center gap-2">
+                                                            <input
+                                                                className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:border-gray-900 outline-none"
+                                                                value={phone}
+                                                                onChange={e => {
+                                                                    const newPhones = [...editForm.phones]
+                                                                    newPhones[idx] = e.target.value
+                                                                    setEditForm({ ...editForm, phones: newPhones })
+                                                                }}
+                                                                placeholder="+34..."
+                                                            />
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const newPhones = [...editForm.phones]
+                                                                        const item = newPhones.splice(idx, 1)[0]
+                                                                        newPhones.unshift(item)
+                                                                        setEditForm({ ...editForm, phones: newPhones })
+                                                                    }}
+                                                                    disabled={idx === 0}
+                                                                    className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 hover:text-amber-500 disabled:opacity-30"
+                                                                    title="Marcar como Principal"
+                                                                >
+                                                                    <Star size={14} className={idx === 0 ? "fill-amber-500 text-amber-500" : ""} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const newPhones = editForm.phones.filter((_, i) => i !== idx)
+                                                                        setEditForm({ ...editForm, phones: newPhones.length ? newPhones : [''] })
+                                                                    }}
+                                                                    className="p-1.5 hover:bg-rose-50 rounded-md text-gray-400 hover:text-rose-500"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    <button
+                                                        onClick={() => setEditForm({ ...editForm, phones: [...editForm.phones, ''] })}
+                                                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                                                    >
+                                                        <Plus size={12} /> Añadir Teléfono
+                                                    </button>
                                                 </div>
                                             </div>
-                                        )}
-                                        {phonesList.length > 0 && (
-                                            <div className="flex items-start space-x-2">
-                                                <Phone size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                                                <div className="flex flex-wrap gap-2">
-                                                    {phonesList.map((phone: string, i: number) => (
-                                                        <a key={i} href={`tel:${phone}`} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-all">
-                                                            {phone}
-                                                        </a>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                        ) : (
+                                            <>
+                                                {emailsList.length > 0 && (
+                                                    <div className="flex items-start space-x-2">
+                                                        <Mail size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {emailsList.map((email: string, i: number) => (
+                                                                <span key={i} className={clsx(
+                                                                    "inline-flex items-center px-2 py-1 rounded text-xs font-semibold border transition-all",
+                                                                    i === 0 ? "bg-amber-50 text-amber-900 border-amber-200 shadow-sm" : "bg-gray-50 text-gray-700 border-gray-200"
+                                                                )}>
+                                                                    {i === 0 && <Star size={10} className="mr-1.5 fill-amber-500 text-amber-500" />}
+                                                                    {email}
+                                                                    <button
+                                                                        onClick={() => openEmailComposer(email)}
+                                                                        className="ml-1.5 p-0.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-900"
+                                                                    >
+                                                                        <Send size={10} />
+                                                                    </button>
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {phonesList.length > 0 && (
+                                                    <div className="flex items-start space-x-2">
+                                                        <Phone size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {phonesList.map((phone: string, i: number) => (
+                                                                <a key={i} href={`tel:${phone}`} className={clsx(
+                                                                    "inline-flex items-center px-2 py-1 rounded text-xs font-semibold border transition-all",
+                                                                    i === 0 ? "bg-amber-50 text-amber-900 border-amber-200 shadow-sm" : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+                                                                )}>
+                                                                    {i === 0 && <Star size={10} className="mr-1.5 fill-amber-500 text-amber-500" />}
+                                                                    {phone}
+                                                                </a>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                     </div>
 

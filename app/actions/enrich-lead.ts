@@ -1,10 +1,10 @@
 'use server'
 
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/auth/server'
 import * as cheerio from 'cheerio'
 
-export async function enrichLead(leadId: string, websiteUrl: string) {
+export async function enrichLead(leadId: string, websiteUrl: string, existingPhone?: string) {
     if (!websiteUrl) {
         return { success: false, error: 'Missing website URL' }
     }
@@ -12,18 +12,18 @@ export async function enrichLead(leadId: string, websiteUrl: string) {
     const supabase = await createClient()
 
     try {
-        // 1. Get OpenAI API Key from Database (Global Integration)
+        // 1. Get Gemini API Key from Database
         const { data: integration } = await supabase
             .from('integrations')
             .select('credentials')
-            .eq('integration_type', 'openai_api')
+            .eq('integration_type', 'gemini_api')
             .eq('is_active', true)
             .single()
 
         const apiKey = integration?.credentials?.api_key
 
         if (!apiKey) {
-            return { success: false, error: 'OpenAI API Key not configured in Admin panel.' }
+            return { success: false, error: 'Gemini API Key not configured in Admin panel.' }
         }
 
         // 2. Fetch website content (basic scrape)
@@ -33,31 +33,36 @@ export async function enrichLead(leadId: string, websiteUrl: string) {
 
         // 3. Parse text with Cheerio
         const $ = cheerio.load(html)
-        // Remove scripts, styles, etc.
         $('script, style, noscript, svg, img').remove()
-        const textContent = $('body').text().replace(/\s+/g, ' ').substring(0, 10000) // Limit context
+        const textContent = $('body').text().replace(/\s+/g, ' ').substring(0, 10000)
 
-        // 4. Call OpenAI
-        const openai = new OpenAI({ apiKey: apiKey })
-        const completion = await openai.chat.completions.create({
-            messages: [
-                {
-                    role: "system",
-                    content: "You are a lead enrichment assistant. Extract contact info: CEO name, E-commerce Manager name, Emails, and Phones from the text. Return VALID JSON only with keys: contact_name (CEO or Manager), emails (array), phones (array)."
-                },
-                {
-                    role: "user",
-                    content: `Analyze this text from ${websiteUrl}: ${textContent}`
-                }
-            ],
-            model: "gpt-3.5-turbo",
-            response_format: { type: "json_object" }
-        })
+        // 4. Call Gemini
+        const genAI = new GoogleGenerativeAI(apiKey)
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
-        const result = JSON.parse(completion.choices[0].message.content || '{}')
+        const prompt = `You are a lead enrichment assistant. 
+        Analyze this text from ${websiteUrl}: ${textContent}
+        
+        TASK:
+        1. Identify the person responsible for the eCommerce. 
+           - Look for "eCommerce Manager", "Marketing Manager", or "CEO".
+           - Prioritize eCommerce Manager, then Marketing, then CEO.
+        2. Extract all contact emails.
+        3. ${existingPhone ? 'DO NOT search for phone numbers.' : 'Extract the main business phone number.'}
+        
+        Return ONLY a JSON object with these keys:
+        - responsible_name: (string)
+        - responsible_role: (string)
+        - emails: (array of strings)
+        - phone: (string or null, only if requested)
+        `
 
-        // Optional: Update Lead in DB automatically?
-        // await supabase.from('leads').update({ ... }).eq('id', leadId)
+        const resultResponse = await model.generateContent(prompt)
+        const responseText = resultResponse.response.text()
+
+        // Clean markdown if Gemini returns it
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+        const result = JSON.parse(jsonMatch ? jsonMatch[0] : '{}')
 
         return { success: true, data: result }
 
