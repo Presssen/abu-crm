@@ -9,25 +9,32 @@ interface CreateTaskModalProps {
     isOpen: boolean
     onClose: () => void
     onSuccess: () => void
+    initialLeadId?: string
+    initialTitle?: string
 }
 
-export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTaskModalProps) {
+export default function CreateTaskModal({ isOpen, onClose, onSuccess, initialLeadId, initialTitle }: CreateTaskModalProps) {
     const supabase = createClient()
     const [loading, setLoading] = useState(false)
     const [leads, setLeads] = useState<any[]>([])
     const [formData, setFormData] = useState({
-        title: '',
+        title: initialTitle || '',
         due_date: '',
         priority: 'med',
-        lead_id: '',
+        lead_id: initialLeadId || '',
         status: 'open'
     })
 
     useEffect(() => {
         if (isOpen) {
             fetchLeads()
+            setFormData(prev => ({
+                ...prev,
+                title: initialTitle || '',
+                lead_id: initialLeadId || ''
+            }))
         }
-    }, [isOpen])
+    }, [isOpen, initialLeadId, initialTitle])
 
     const fetchLeads = async () => {
         try {

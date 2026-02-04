@@ -9,6 +9,7 @@ interface CreateMeetingModalProps {
     isOpen: boolean
     onClose: () => void
     onSuccess: () => void
+    initialLeadId?: string
 }
 
 const DURATIONS = [
@@ -20,7 +21,7 @@ const DURATIONS = [
     { label: '2 horas', value: 120 },
 ]
 
-export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeetingModalProps) {
+export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initialLeadId }: CreateMeetingModalProps) {
     const supabase = createClient()
     const [loading, setLoading] = useState(false)
     const [leads, setLeads] = useState<any[]>([])
@@ -39,7 +40,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
     const [guests, setGuests] = useState<string[]>([])
 
     const [formData, setFormData] = useState({
-        lead_id: '',
+        lead_id: initialLeadId || '',
         location: '',
         notes: '',
         send_confirmation: true
@@ -62,13 +63,22 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
             setSearchQuery('')
             setShowSuggestions(false)
             setFormData({
-                lead_id: '',
+                lead_id: initialLeadId || '',
                 location: '',
                 notes: '',
                 send_confirmation: true
             })
         }
-    }, [isOpen])
+    }, [isOpen, initialLeadId])
+
+    useEffect(() => {
+        if (isOpen && initialLeadId && leads.length > 0) {
+            const lead = leads.find(l => l.id === initialLeadId)
+            if (lead) {
+                setSearchQuery(`${lead.company_name} - ${lead.contact_name}`)
+            }
+        }
+    }, [isOpen, initialLeadId, leads])
 
     useEffect(() => {
         if (isOpen && hoursRef.current && minutesRef.current) {
@@ -242,15 +252,15 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-300">
-            <div className="bg-white/90 backdrop-blur-xl rounded-[40px] shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-white/20 animate-in fade-in zoom-in duration-300">
-                <div className="p-8 border-b border-gray-100/50 flex items-center justify-between">
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200">
+                <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
                     <div>
-                        <h2 className="text-3xl font-black text-gray-900 tracking-tight">Programar Reunión</h2>
-                        <p className="text-gray-500 font-medium">Define los detalles de tu próximo encuentro</p>
+                        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Programar Reunión</h2>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Corporate Scheduler</p>
                     </div>
-                    <button onClick={onClose} className="p-3 hover:bg-gray-100 rounded-full transition-all active:scale-95 group">
-                        <X size={24} className="text-gray-400 group-hover:text-gray-900" />
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-all group">
+                        <X size={20} className="text-gray-400 group-hover:text-gray-900" />
                     </button>
                 </div>
 
@@ -262,19 +272,33 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                             ¿Con quién es la reunión?
                         </label>
                         <div ref={searchRef} className="relative">
-                            <div className="relative group">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar lead por nombre o empresa..."
-                                    value={searchQuery}
-                                    onChange={(e) => {
-                                        setSearchQuery(e.target.value)
-                                        setShowSuggestions(true)
-                                    }}
-                                    className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600/20 focus:bg-white outline-none transition-all font-medium text-gray-900"
-                                />
-                            </div>
+                            {!initialLeadId ? (
+                                <div className="relative group">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar lead por nombre o empresa..."
+                                        value={searchQuery}
+                                        onChange={(e) => {
+                                            setSearchQuery(e.target.value)
+                                            setShowSuggestions(true)
+                                        }}
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all font-medium text-gray-900"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                                            {searchQuery.charAt(0) || 'L'}
+                                        </div>
+                                        <span className="font-bold text-gray-900">{searchQuery || 'Lead Seleccionado'}</span>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded uppercase tracking-wider border border-indigo-100">
+                                        Fijado
+                                    </span>
+                                </div>
+                            )}
 
                             {showSuggestions && filteredLeads.length > 0 && (
                                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 z-20 overflow-hidden animate-in slide-in-from-top-2 duration-200">
@@ -330,9 +354,9 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                                 <Calendar className="mr-2 text-indigo-600" size={20} />
                                 Selecciona el día
                             </label>
-                            <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100 shadow-inner">
+                            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-sm">
                                 <div className="flex items-center justify-between mb-6">
-                                    <span className="font-black text-gray-900 capitalize">
+                                    <span className="font-bold text-gray-900 capitalize">
                                         {currentMonthView.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
                                     </span>
                                     <div className="flex gap-2">
@@ -354,7 +378,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                                 </div>
                                 <div className="grid grid-cols-7 gap-1 text-center mb-2">
                                     {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
-                                        <span key={day} className="text-[10px] font-black text-gray-400 uppercase">{day}</span>
+                                        <span key={day} className="text-[10px] font-bold text-gray-400 uppercase">{day}</span>
                                     ))}
                                 </div>
                                 <div className="grid grid-cols-7 gap-2">
@@ -393,11 +417,11 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                                 <Clock className="mr-2 text-indigo-600" size={20} />
                                 Selecciona la hora
                             </label>
-                            <div className="bg-gray-50 rounded-[32px] border border-gray-100 p-6 flex flex-col h-[320px] shadow-inner">
+                            <div className="bg-gray-50 rounded-2xl border border-gray-200 p-6 flex flex-col h-[320px] shadow-sm">
                                 <div className="flex gap-4 h-full overflow-hidden">
                                     {/* Hours Column */}
                                     <div ref={hoursRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
-                                        <div className="text-[10px] font-black text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Hora</div>
+                                        <div className="text-[10px] font-bold text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Hora</div>
                                         {Array.from({ length: 24 }).map((_, h) => {
                                             const isSelected = selectedDate.getHours() === h
                                             return (
@@ -419,7 +443,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
 
                                     {/* Minutes Column */}
                                     <div ref={minutesRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
-                                        <div className="text-[10px] font-black text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Minutos</div>
+                                        <div className="text-[10px] font-bold text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Minutos</div>
                                         {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => {
                                             const isSelected = selectedDate.getMinutes() === m
                                             return (
@@ -483,7 +507,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                                     placeholder="Vacío para generar Google Meet automáticamente"
                                     value={formData.location}
                                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                    className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600/20 focus:bg-white outline-none transition-all font-medium text-gray-900"
+                                    className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all font-medium text-gray-900"
                                 />
                             </div>
                         </div>
@@ -538,21 +562,21 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                                 value={formData.notes}
                                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                                 rows={3}
-                                className="w-full px-5 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600/20 focus:bg-white outline-none transition-all font-medium resize-none shadow-inner"
+                                className="w-full px-5 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all font-medium resize-none shadow-sm"
                                 placeholder="Escribe aquí los temas a tratar..."
                             />
                         </div>
                     </div>
 
                     {/* Options */}
-                    <div className="p-6 bg-indigo-50/50 rounded-[32px] flex items-center justify-between border border-indigo-100">
+                    <div className="p-6 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-200">
                         <div className="flex items-center gap-4">
-                            <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-sm">
+                            <div className="h-12 w-12 rounded-xl bg-white flex items-center justify-center shadow-sm border border-gray-100">
                                 <Send className="text-indigo-600" size={24} />
                             </div>
                             <div>
-                                <p className="font-bold text-indigo-900">Email de Confirmación</p>
-                                <p className="text-sm text-indigo-600">Se enviará una invitación a todos los asistentes</p>
+                                <p className="font-bold text-gray-900">Email de Confirmación</p>
+                                <p className="text-xs font-medium text-gray-500">Se enviará una invitación a todos los asistentes</p>
                             </div>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
@@ -577,7 +601,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }: Creat
                         <button
                             type="submit"
                             disabled={loading || !formData.lead_id}
-                            className="bg-indigo-600 text-white px-10 py-5 rounded-[24px] font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-3"
+                            className="bg-gray-900 text-white px-8 py-4 rounded-xl font-bold shadow-lg hover:bg-black active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-3"
                         >
                             {loading ? (
                                 <>
