@@ -33,11 +33,11 @@ export function SuccessProvider({ children }: { children: ReactNode }) {
             {/* Overlay */}
             {isVisible && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-                    <div className="bg-white/90 backdrop-blur-xl shadow-2xl border border-gray-100 rounded-3xl p-8 flex flex-col items-center animate-in zoom-in-95 fade-in duration-300">
-                        <div className="h-20 w-20 bg-emerald-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-emerald-200 animate-bounce">
-                            <Check className="h-10 w-10 text-white" strokeWidth={4} />
+                    <div className="bg-gray-900/90 backdrop-blur-sm shadow-2xl rounded-2xl p-6 flex items-center gap-4 animate-in zoom-in-95 fade-in duration-300">
+                        <div className="h-10 w-10 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <Check className="h-6 w-6 text-white" strokeWidth={3} />
                         </div>
-                        <p className="text-lg font-black text-gray-800 uppercase tracking-widest">{message}</p>
+                        <p className="text-sm font-bold text-white uppercase tracking-widest">{message}</p>
                     </div>
                 </div>
             )}

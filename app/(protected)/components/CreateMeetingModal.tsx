@@ -227,7 +227,6 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
         }
     }
 
-    // Modern Date Picker Helpers
     const [currentMonthView, setCurrentMonthView] = useState(new Date())
     const daysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
     const firstDayOfMonth = (date: Date) => {
@@ -252,392 +251,344 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200">
-                <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col border border-gray-200">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Programar Reunión</h2>
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Corporate Scheduler</p>
+                        <h2 className="text-base font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                            <Calendar size={18} className="text-gray-400" />
+                            Agendar Reunión
+                        </h2>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-all group">
-                        <X size={20} className="text-gray-400 group-hover:text-gray-900" />
+                    <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded-lg transition-all group">
+                        <X size={16} className="text-gray-400 group-hover:text-gray-900" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-10">
-                    {/* Step 1: Lead Selection */}
-                    <div className="space-y-4">
-                        <label className="text-lg font-bold text-gray-900 flex items-center">
-                            <User className="mr-2 text-indigo-600" size={20} />
-                            ¿Con quién es la reunión?
-                        </label>
-                        <div ref={searchRef} className="relative">
-                            {!initialLeadId ? (
-                                <div className="relative group">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar lead por nombre o empresa..."
-                                        value={searchQuery}
-                                        onChange={(e) => {
-                                            setSearchQuery(e.target.value)
-                                            setShowSuggestions(true)
-                                        }}
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all font-medium text-gray-900"
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* Left Column: Lead & Date */}
+                        <div className="lg:col-span-5 space-y-6">
+                            {/* Lead Selection */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Cliente / Prospecto</label>
+                                <div ref={searchRef} className="relative">
+                                    {!initialLeadId ? (
+                                        <div className="relative group">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={16} />
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar..."
+                                                value={searchQuery}
+                                                onChange={(e) => {
+                                                    setSearchQuery(e.target.value)
+                                                    setShowSuggestions(true)
+                                                }}
+                                                className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-lg border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all text-sm font-medium text-gray-900"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="p-2 py-1.5 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center justify-between">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="h-6 w-6 rounded bg-indigo-600 flex items-center justify-center text-white font-bold text-[10px] shrink-0">
+                                                    {searchQuery.charAt(0) || 'L'}
+                                                </div>
+                                                <span className="font-bold text-gray-900 text-xs truncate">{searchQuery || 'Lead Seleccionado'}</span>
+                                            </div>
+                                            <span className="text-[8px] font-bold text-indigo-600 bg-white px-1.5 py-0.5 rounded uppercase tracking-wider border border-indigo-100 shrink-0">
+                                                Fijo
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {showSuggestions && filteredLeads.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+                                            {filteredLeads.map(lead => (
+                                                <button
+                                                    key={lead.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setFormData({ ...formData, lead_id: lead.id })
+                                                        setSearchQuery(`${lead.company_name} - ${lead.contact_name}`)
+                                                        setShowSuggestions(false)
+                                                    }}
+                                                    className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center justify-between group transition-colors border-b border-gray-50 last:border-0"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="font-bold text-xs text-gray-900 group-hover:text-indigo-600 truncate">{lead.company_name}</div>
+                                                        <div className="text-[10px] text-gray-500 truncate">{lead.contact_name}</div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {formData.lead_id && !initialLeadId && (
+                                        <div className="mt-2 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100 flex items-center gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] font-bold text-indigo-900 truncate">{searchQuery}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setFormData({ ...formData, lead_id: '' })
+                                                    setSearchQuery('')
+                                                }}
+                                                className="p-1 hover:bg-white rounded-md text-gray-400 hover:text-red-500 transition-all shrink-0"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Date Picker */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Fecha</label>
+                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-xs font-bold text-gray-900 capitalize">
+                                            {currentMonthView.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                                        </span>
+                                        <div className="flex gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentMonthView(new Date(currentMonthView.getFullYear(), currentMonthView.getMonth() - 1, 1))}
+                                                className="p-1 hover:bg-white rounded transition-all"
+                                            >
+                                                <ChevronLeft size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentMonthView(new Date(currentMonthView.getFullYear(), currentMonthView.getMonth() + 1, 1))}
+                                                className="p-1 hover:bg-white rounded transition-all"
+                                            >
+                                                <ChevronRight size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                                        {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
+                                            <span key={day} className="text-[8px] font-bold text-gray-400 uppercase">{day}</span>
+                                        ))}
+                                    </div>
+                                    <div className="grid grid-cols-7 gap-1">
+                                        {Array.from({ length: firstDayOfMonth(currentMonthView) }).map((_, i) => (
+                                            <div key={`empty-${i}`} />
+                                        ))}
+                                        {Array.from({ length: daysInMonth(currentMonthView) }).map((_, i) => {
+                                            const day = i + 1
+                                            const dateForDay = new Date(currentMonthView.getFullYear(), currentMonthView.getMonth(), day)
+                                            const isSelected = selectedDate.getDate() === day &&
+                                                selectedDate.getMonth() === currentMonthView.getMonth() &&
+                                                selectedDate.getFullYear() === currentMonthView.getFullYear()
+                                            const isToday = new Date().toDateString() === dateForDay.toDateString()
+
+                                            return (
+                                                <button
+                                                    key={day}
+                                                    type="button"
+                                                    onClick={() => handleDateSelect(day)}
+                                                    className={clsx(
+                                                        "h-7 w-full flex items-center justify-center rounded-md text-[10px] font-bold transition-all relative",
+                                                        isSelected ? "bg-indigo-600 text-white shadow-sm" :
+                                                            isToday ? "text-indigo-600 bg-white ring-1 ring-inset ring-indigo-100" : "text-gray-700 hover:bg-white hover:shadow-sm"
+                                                    )}
+                                                >
+                                                    {day}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column: Time & Details */}
+                        <div className="lg:col-span-7 space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                {/* Time Selector */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Hora</label>
+                                    <div className="bg-gray-50 rounded-xl border border-gray-200 p-2 flex flex-col h-[180px]">
+                                        <div className="flex gap-2 h-full overflow-hidden">
+                                            <div ref={hoursRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+                                                {Array.from({ length: 24 }).map((_, h) => {
+                                                    const isSelected = selectedDate.getHours() === h
+                                                    return (
+                                                        <button
+                                                            key={`h-${h}`}
+                                                            data-hour={h}
+                                                            type="button"
+                                                            onClick={() => handleTimeSelect(h, selectedDate.getMinutes())}
+                                                            className={clsx(
+                                                                "w-full py-1 px-2 rounded-md flex items-center justify-center text-[10px] font-bold transition-all",
+                                                                isSelected ? "bg-white text-indigo-600 shadow-sm ring-1 ring-inset ring-indigo-100" : "text-gray-500 hover:bg-white/50"
+                                                            )}
+                                                        >
+                                                            {h.toString().padStart(2, '0')}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                            <div ref={minutesRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+                                                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => {
+                                                    const isSelected = selectedDate.getMinutes() === m
+                                                    return (
+                                                        <button
+                                                            key={`m-${m}`}
+                                                            data-minute={m}
+                                                            type="button"
+                                                            onClick={() => handleTimeSelect(selectedDate.getHours(), m)}
+                                                            className={clsx(
+                                                                "w-full py-1 px-2 rounded-md flex items-center justify-center text-[10px] font-bold transition-all",
+                                                                isSelected ? "bg-white text-indigo-600 shadow-sm ring-1 ring-inset ring-indigo-100" : "text-gray-500 hover:bg-white/50"
+                                                            )}
+                                                        >
+                                                            {m.toString().padStart(2, '0')}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 text-center py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-black">
+                                            {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Duration & Location */}
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Duración</label>
+                                        <div className="grid grid-cols-3 gap-1.5">
+                                            {DURATIONS.map(d => (
+                                                <button
+                                                    key={d.value}
+                                                    type="button"
+                                                    onClick={() => setDuration(d.value)}
+                                                    className={clsx(
+                                                        "py-1.5 px-1 rounded-lg text-[9px] font-bold transition-all border",
+                                                        duration === d.value ? "bg-gray-900 border-gray-900 text-white" : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white"
+                                                    )}
+                                                >
+                                                    {d.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Ubicación / Link</label>
+                                        <div className="relative group">
+                                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                            <input
+                                                type="text"
+                                                placeholder="Link o lugar..."
+                                                value={formData.location}
+                                                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                                                className="w-full pl-9 pr-3 py-1.5 bg-gray-50 rounded-lg border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all text-xs font-medium"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Guests & Notes */}
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Invitados</label>
+                                    <div className="flex gap-1.5">
+                                        <input
+                                            type="email"
+                                            placeholder="Añadir email..."
+                                            value={newGuest}
+                                            onChange={(e) => setNewGuest(e.target.value)}
+                                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addGuest())}
+                                            className="flex-1 px-3 py-1.5 bg-gray-50 rounded-lg border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all text-xs font-medium"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={addGuest}
+                                            className="px-3 bg-gray-900 text-white rounded-lg text-xs font-bold hover:bg-black transition-all"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 max-h-[60px] overflow-y-auto custom-scrollbar">
+                                        {guests.map(email => (
+                                            <div key={email} className="bg-gray-100 flex items-center gap-1.5 px-2 py-0.5 rounded-md">
+                                                <span className="text-[9px] font-medium text-gray-700">{email}</span>
+                                                <button type="button" onClick={() => removeGuest(email)} className="text-gray-400 hover:text-red-500"><X size={10} /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Notas</label>
+                                    <textarea
+                                        value={formData.notes}
+                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                        rows={3}
+                                        className="w-full px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all text-xs font-medium resize-none"
+                                        placeholder="Temas a tratar..."
                                     />
                                 </div>
-                            ) : (
-                                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                                            {searchQuery.charAt(0) || 'L'}
-                                        </div>
-                                        <span className="font-bold text-gray-900">{searchQuery || 'Lead Seleccionado'}</span>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded uppercase tracking-wider border border-indigo-100">
-                                        Fijado
-                                    </span>
-                                </div>
-                            )}
+                            </div>
 
-                            {showSuggestions && filteredLeads.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 z-20 overflow-hidden animate-in slide-in-from-top-2 duration-200">
-                                    {filteredLeads.map(lead => (
-                                        <button
-                                            key={lead.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setFormData({ ...formData, lead_id: lead.id })
-                                                setSearchQuery(`${lead.company_name} - ${lead.contact_name}`)
-                                                setShowSuggestions(false)
-                                            }}
-                                            className="w-full px-6 py-4 text-left hover:bg-indigo-50 flex items-center justify-between group transition-colors border-b border-gray-50 last:border-0"
-                                        >
-                                            <div>
-                                                <div className="font-bold text-gray-900 group-hover:text-indigo-600">{lead.company_name}</div>
-                                                <div className="text-sm text-gray-500">{lead.contact_name}</div>
-                                            </div>
-                                            <div className="text-xs text-gray-400 font-mono">{lead.email}</div>
-                                        </button>
-                                    ))}
+                            {/* Options & Submit */}
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-6 w-6 rounded-md bg-white flex items-center justify-center shadow-sm border border-gray-100">
+                                        <Send className="text-indigo-600" size={12} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-gray-700">Enviar Confirmación</span>
+                                    <input
+                                        type="checkbox"
+                                        className="w-3.5 h-3.5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                        checked={formData.send_confirmation}
+                                        onChange={e => setFormData({ ...formData, send_confirmation: e.target.checked })}
+                                    />
                                 </div>
-                            )}
-
-                            {formData.lead_id && (
-                                <div className="mt-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex items-center gap-3 animate-in fade-in duration-300">
-                                    <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                                        {searchQuery.charAt(0)}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="font-bold text-indigo-900">Lead seleccionado</p>
-                                        <p className="text-sm text-indigo-600">{searchQuery}</p>
-                                    </div>
+                                <div className="flex items-center gap-3">
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setFormData({ ...formData, lead_id: '' })
-                                            setSearchQuery('')
-                                        }}
-                                        className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-red-500 transition-all"
+                                        onClick={onClose}
+                                        className="text-[10px] font-bold text-gray-400 hover:text-gray-900 uppercase tracking-widest px-2"
                                     >
-                                        <Trash2 size={18} />
+                                        Cancelar
                                     </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Step 2: Date and Time */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                        <div className="space-y-4">
-                            <label className="text-lg font-bold text-gray-900 flex items-center">
-                                <Calendar className="mr-2 text-indigo-600" size={20} />
-                                Selecciona el día
-                            </label>
-                            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-sm">
-                                <div className="flex items-center justify-between mb-6">
-                                    <span className="font-bold text-gray-900 capitalize">
-                                        {currentMonthView.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                                    </span>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setCurrentMonthView(new Date(currentMonthView.getFullYear(), currentMonthView.getMonth() - 1, 1))}
-                                            className="p-2 hover:bg-white rounded-xl shadow-sm transition-all"
-                                        >
-                                            <ChevronLeft size={18} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setCurrentMonthView(new Date(currentMonthView.getFullYear(), currentMonthView.getMonth() + 1, 1))}
-                                            className="p-2 hover:bg-white rounded-xl shadow-sm transition-all"
-                                        >
-                                            <ChevronRight size={18} />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
-                                        <span key={day} className="text-[10px] font-bold text-gray-400 uppercase">{day}</span>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-7 gap-2">
-                                    {Array.from({ length: firstDayOfMonth(currentMonthView) }).map((_, i) => (
-                                        <div key={`empty-${i}`} />
-                                    ))}
-                                    {Array.from({ length: daysInMonth(currentMonthView) }).map((_, i) => {
-                                        const day = i + 1
-                                        const dateForDay = new Date(currentMonthView.getFullYear(), currentMonthView.getMonth(), day)
-                                        const isSelected = selectedDate.getDate() === day &&
-                                            selectedDate.getMonth() === currentMonthView.getMonth() &&
-                                            selectedDate.getFullYear() === currentMonthView.getFullYear()
-                                        const isToday = new Date().toDateString() === dateForDay.toDateString()
-
-                                        return (
-                                            <button
-                                                key={day}
-                                                type="button"
-                                                onClick={() => handleDateSelect(day)}
-                                                className={clsx(
-                                                    "h-10 w-full flex items-center justify-center rounded-xl text-sm font-bold transition-all relative",
-                                                    isSelected ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-105" :
-                                                        isToday ? "text-indigo-600 bg-white shadow-sm border border-indigo-100" : "text-gray-700 hover:bg-white hover:shadow-sm"
-                                                )}
-                                            >
-                                                {day}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <label className="text-lg font-bold text-gray-900 flex items-center">
-                                <Clock className="mr-2 text-indigo-600" size={20} />
-                                Selecciona la hora
-                            </label>
-                            <div className="bg-gray-50 rounded-2xl border border-gray-200 p-6 flex flex-col h-[320px] shadow-sm">
-                                <div className="flex gap-4 h-full overflow-hidden">
-                                    {/* Hours Column */}
-                                    <div ref={hoursRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
-                                        <div className="text-[10px] font-bold text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Hora</div>
-                                        {Array.from({ length: 24 }).map((_, h) => {
-                                            const isSelected = selectedDate.getHours() === h
-                                            return (
-                                                <button
-                                                    key={`h-${h}`}
-                                                    data-hour={h}
-                                                    type="button"
-                                                    onClick={() => handleTimeSelect(h, selectedDate.getMinutes())}
-                                                    className={clsx(
-                                                        "w-full py-2 px-3 rounded-xl flex items-center justify-center font-bold transition-all",
-                                                        isSelected ? "bg-white text-indigo-600 shadow-md border border-indigo-100" : "text-gray-500 hover:text-gray-900 hover:bg-white/50"
-                                                    )}
-                                                >
-                                                    {h.toString().padStart(2, '0')}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-
-                                    {/* Minutes Column */}
-                                    <div ref={minutesRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
-                                        <div className="text-[10px] font-bold text-gray-400 uppercase mb-2 sticky top-0 bg-gray-50 py-1">Minutos</div>
-                                        {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => {
-                                            const isSelected = selectedDate.getMinutes() === m
-                                            return (
-                                                <button
-                                                    key={`m-${m}`}
-                                                    data-minute={m}
-                                                    type="button"
-                                                    onClick={() => handleTimeSelect(selectedDate.getHours(), m)}
-                                                    className={clsx(
-                                                        "w-full py-2 px-3 rounded-xl flex items-center justify-center font-bold transition-all",
-                                                        isSelected ? "bg-white text-indigo-600 shadow-md border border-indigo-100" : "text-gray-500 hover:text-gray-900 hover:bg-white/50"
-                                                    )}
-                                                >
-                                                    {m.toString().padStart(2, '0')}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                                <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between text-indigo-900 bg-indigo-50/50 p-4 rounded-2xl">
-                                    <span className="text-xs font-black uppercase text-indigo-400">Seleccionado</span>
-                                    <span className="font-bold">{selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Step 3: Duration & Location */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <div className="space-y-4">
-                            <label className="text-lg font-bold text-gray-900 flex items-center">
-                                <Timer className="mr-2 text-indigo-600" size={20} />
-                                Duración
-                            </label>
-                            <div className="grid grid-cols-3 gap-3">
-                                {DURATIONS.map(d => (
                                     <button
-                                        key={d.value}
-                                        type="button"
-                                        onClick={() => setDuration(d.value)}
-                                        className={clsx(
-                                            "py-3 px-2 rounded-2xl text-xs font-bold transition-all border-2",
-                                            duration === d.value ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100" : "bg-gray-50 border-transparent text-gray-600 hover:bg-white hover:border-gray-200"
+                                        type="submit"
+                                        disabled={loading || !formData.lead_id}
+                                        className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-xs font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-2 uppercase tracking-tight"
+                                    >
+                                        {loading ? (
+                                            <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <Clock size={14} />
                                         )}
-                                    >
-                                        {d.label}
+                                        {loading ? 'Programando...' : 'Agendar'}
                                     </button>
-                                ))}
+                                </div>
                             </div>
                         </div>
-
-                        <div className="space-y-4">
-                            <label className="text-lg font-bold text-gray-900 flex items-center">
-                                <MapPin className="mr-2 text-indigo-600" size={20} />
-                                Ubicación / Link
-                            </label>
-                            <div className="relative group">
-                                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
-                                <input
-                                    type="text"
-                                    placeholder="Vacío para generar Google Meet automáticamente"
-                                    value={formData.location}
-                                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                    className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all font-medium text-gray-900"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Step 4: Guests & Notes */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                        <div className="space-y-4">
-                            <label className="text-lg font-bold text-gray-900 flex items-center">
-                                <Plus className="mr-2 text-indigo-600" size={20} />
-                                Invitar a otros (emails)
-                            </label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="email"
-                                    placeholder="ejemplo@correo.com"
-                                    value={newGuest}
-                                    onChange={(e) => setNewGuest(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addGuest())}
-                                    className="flex-1 px-5 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600/20 focus:bg-white outline-none transition-all font-medium"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={addGuest}
-                                    className="px-6 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95"
-                                >
-                                    Añadir
-                                </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {guests.map(email => (
-                                    <div key={email} className="bg-white border border-indigo-100 flex items-center gap-2 px-3 py-1.5 rounded-xl animate-in scale-in duration-200">
-                                        <span className="text-sm font-medium text-indigo-900">{email}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeGuest(email)}
-                                            className="text-gray-400 hover:text-red-500 transition-colors"
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <label className="text-lg font-bold text-gray-900 flex items-center">
-                                <AlignLeft className="mr-2 text-indigo-600" size={20} />
-                                Notas de la reunión
-                            </label>
-                            <textarea
-                                value={formData.notes}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                rows={3}
-                                className="w-full px-5 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all font-medium resize-none shadow-sm"
-                                placeholder="Escribe aquí los temas a tratar..."
-                            />
-                        </div>
-                    </div>
-
-                    {/* Options */}
-                    <div className="p-6 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-200">
-                        <div className="flex items-center gap-4">
-                            <div className="h-12 w-12 rounded-xl bg-white flex items-center justify-center shadow-sm border border-gray-100">
-                                <Send className="text-indigo-600" size={24} />
-                            </div>
-                            <div>
-                                <p className="font-bold text-gray-900">Email de Confirmación</p>
-                                <p className="text-xs font-medium text-gray-500">Se enviará una invitación a todos los asistentes</p>
-                            </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="sr-only peer"
-                                checked={formData.send_confirmation}
-                                onChange={e => setFormData({ ...formData, send_confirmation: e.target.checked })}
-                            />
-                            <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:start-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600 shadow-inner"></div>
-                        </label>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-6 pt-6 border-t border-gray-100/50">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="text-gray-500 font-bold hover:text-gray-900 transition-colors"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading || !formData.lead_id}
-                            className="bg-gray-900 text-white px-8 py-4 rounded-xl font-bold shadow-lg hover:bg-black active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-3"
-                        >
-                            {loading ? (
-                                <>
-                                    <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    <span>Programando...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Clock size={20} />
-                                    <span>Agendar Reunión</span>
-                                </>
-                            )}
-                        </button>
                     </div>
                 </form>
 
                 <style jsx>{`
                     .custom-scrollbar::-webkit-scrollbar {
-                        width: 6px;
+                        width: 4px;
                     }
                     .custom-scrollbar::-webkit-scrollbar-track {
                         background: transparent;
                     }
                     .custom-scrollbar::-webkit-scrollbar-thumb {
-                        background: rgba(79, 70, 229, 0.1);
+                        background: rgba(0, 0, 0, 0.05);
                         border-radius: 20px;
                     }
                     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                        background: rgba(79, 70, 229, 0.3);
-                    }
-                    @keyframes slideIn {
-                      from { transform: translateY(10px); opacity: 0; }
-                      to { transform: translateY(0); opacity: 1; }
-                    }
-                    .animate-slide-in {
-                      animation: slideIn 0.3s ease-out forwards;
+                        background: rgba(0, 0, 0, 0.1);
                     }
                 `}</style>
             </div>
