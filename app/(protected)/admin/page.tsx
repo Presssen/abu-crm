@@ -13,7 +13,8 @@ import {
     Shield,
     CheckCircle,
     Zap,
-    Target
+    Target,
+    Upload
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -37,10 +38,11 @@ interface Profile {
 
 export default function AdminPage() {
     const supabase = createClient()
-    const [activeTab, setActiveTab] = useState<'integrations' | 'users' | 'marathon' | 'leads'>('integrations')
+    const [activeTab, setActiveTab] = useState<'integrations' | 'users' | 'marathon' | 'leads' | 'imports'>('integrations')
     const [integrations, setIntegrations] = useState<Integration[]>([])
     const [profiles, setProfiles] = useState<Profile[]>([])
     const [leads, setLeads] = useState<any[]>([])
+    const [importBatches, setImportBatches] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
@@ -117,6 +119,13 @@ export default function AdminPage() {
                 // Also fetch profiles for the reassignment dropdown
                 const { data: profData } = await supabase.from('profiles').select('id, email, role, created_at')
                 setProfiles(profData || [])
+            } else if (activeTab === 'imports') {
+                const { data, error } = await supabase
+                    .from('import_batches')
+                    .select('*, profiles(email)')
+                    .order('created_at', { ascending: false })
+                if (error) throw error
+                setImportBatches(data || [])
             }
         } catch (error) {
             console.error('Error fetching data:', error)
@@ -235,6 +244,58 @@ export default function AdminPage() {
         )
     }
 
+    const bulkDeleteLeads = async () => {
+        if (!selectedLeads.length) return
+
+        const confirmed = confirm(`¿Estás seguro de eliminar ${selectedLeads.length} leads? Esta acción no se puede deshacer.`)
+        if (!confirmed) return
+
+        setSaving(true)
+        try {
+            const { error } = await supabase.from('leads').delete().in('id', selectedLeads)
+            if (error) throw error
+
+            alert(`Se han eliminado ${selectedLeads.length} leads correctamente`)
+            setSelectedLeads([])
+            fetchData()
+        } catch (error: any) {
+            alert('Error al eliminar leads: ' + error.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const deleteImportBatch = async (batchId: string, totalLeads: number) => {
+        const confirmed = confirm(`¿Eliminar esta importación y sus ${totalLeads} leads asociados? Esta acción no se puede deshacer.`)
+        if (!confirmed) return
+
+        setSaving(true)
+        try {
+            // Delete all leads with this batch_id
+            const { error: leadsError } = await supabase
+                .from('leads')
+                .delete()
+                .eq('import_batch_id', batchId)
+
+            if (leadsError) throw leadsError
+
+            // Delete the batch record
+            const { error: batchError } = await supabase
+                .from('import_batches')
+                .delete()
+                .eq('id', batchId)
+
+            if (batchError) throw batchError
+
+            alert('Importación eliminada correctamente')
+            fetchData()
+        } catch (error: any) {
+            alert('Error al eliminar importación: ' + error.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
     return (
         <div className="h-full overflow-y-auto p-8 space-y-8">
             <div className="flex justify-between items-start">
@@ -255,6 +316,7 @@ export default function AdminPage() {
                     { id: 'marathon', label: 'Marathon Config', icon: Zap },
                     { id: 'users', label: 'Usuarios', icon: Users },
                     { id: 'leads', label: 'Gestión de Leads', icon: Target },
+                    { id: 'imports', label: 'Historial de Importaciones', icon: Upload },
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -494,6 +556,14 @@ export default function AdminPage() {
                                 >
                                     Asignar Masivamente
                                 </button>
+                                <button
+                                    onClick={bulkDeleteLeads}
+                                    disabled={selectedLeads.length === 0 || saving}
+                                    className="px-6 py-2 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 disabled:opacity-50 shadow-lg shadow-rose-100 flex items-center gap-2"
+                                >
+                                    <Trash2 size={16} />
+                                    Eliminar Seleccionados
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -570,6 +640,73 @@ export default function AdminPage() {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* IMPORTS TAB */}
+            {activeTab === 'imports' && (
+                <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+                    <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Usuario</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Detalles</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Estado</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Leads</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {importBatches.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                                        No hay historial de importaciones.
+                                    </td>
+                                </tr>
+                            ) : (
+                                importBatches.map((batch) => (
+                                    <tr key={batch.id} className="hover:bg-gray-50/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm font-medium text-gray-900">
+                                                {new Date(batch.created_at).toLocaleDateString()}
+                                            </div>
+                                            <div className="text-xs text-gray-400">
+                                                {new Date(batch.created_at).toLocaleTimeString()}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm text-gray-900">{batch.profiles?.email || 'Desconocido'}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm text-gray-900">{batch.file_name || 'Sin nombre'}</div>
+                                            <div className="text-xs text-gray-500">{batch.country || 'Sin país'}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={clsx(
+                                                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                                                batch.status === 'completed' ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                                            )}>
+                                                {batch.status === 'completed' ? 'Completado' : 'Fallido'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="text-sm font-bold text-gray-900">{batch.total_leads}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <button
+                                                onClick={() => deleteImportBatch(batch.id, batch.total_leads)}
+                                                className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                title="Eliminar importación y leads asociados"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             )}
         </div>

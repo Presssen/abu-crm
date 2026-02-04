@@ -139,8 +139,29 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
 
             if (!ownerId) throw new Error('No se pudo encontrar al usuario.')
 
+            // Create import batch record
+            const { data: batchData, error: batchError } = await supabase
+                .from('import_batches')
+                .insert([{
+                    created_by: ownerId,
+                    country: selectedCountry,
+                    file_name: fileName,
+                    total_leads: 0,
+                    status: 'completed'
+                }])
+                .select()
+                .single()
+
+            if (batchError) throw batchError
+            const batchId = batchData.id
+
             const leadsToImport = fileData.map((row) => {
-                const lead: any = { owner_id: ownerId, status: 'new', country: selectedCountry }
+                const lead: any = {
+                    owner_id: ownerId,
+                    status: 'new',
+                    country: selectedCountry,
+                    import_batch_id: batchId
+                }
 
                 Object.entries(mapping).forEach(([fileHeader, dbField]) => {
                     if (dbField) {
@@ -178,6 +199,12 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
 
             const { error: importError } = await supabase.from('leads').insert(leadsToImport)
             if (importError) throw importError
+
+            // Update batch with total leads count
+            await supabase
+                .from('import_batches')
+                .update({ total_leads: leadsToImport.length })
+                .eq('id', batchId)
 
             setStep(4)
             setTimeout(() => {
