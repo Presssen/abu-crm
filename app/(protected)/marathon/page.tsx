@@ -58,6 +58,7 @@ export default function MarathonPage() {
     const [emailHistory, setEmailHistory] = useState<any[]>([])
     const [meetings, setMeetings] = useState<any[]>([])
     const [tasks, setTasks] = useState<any[]>([])
+    const [calls, setCalls] = useState<any[]>([])
 
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
     const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false)
@@ -177,17 +178,39 @@ export default function MarathonPage() {
 
     const fetchActivity = async (leadId: string) => {
         try {
-            const [emailsData, meetingsData, tasksData] = await Promise.all([
+            const [emailsData, meetingsData, tasksData, callsData] = await Promise.all([
                 supabase.from('emails').select('*').eq('lead_id', leadId).order('sent_at', { ascending: false }),
                 supabase.from('meetings').select('*').eq('lead_id', leadId).order('start_time', { ascending: false }),
-                supabase.from('tasks').select('*').eq('lead_id', leadId).order('created_at', { ascending: false })
+                supabase.from('tasks').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }),
+                supabase.from('calls').select('*').eq('lead_id', leadId).order('created_at', { ascending: false })
             ])
 
             setEmailHistory(emailsData.data || [])
             setMeetings(meetingsData.data || [])
             setTasks(tasksData.data || [])
+            setCalls(callsData.data || [])
         } catch (error) {
             console.error('Error fetching activity:', error)
+        }
+    }
+
+    const handleLogCall = async () => {
+        if (!currentLead) return
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { error } = await supabase
+            .from('calls')
+            .insert({
+                lead_id: currentLead.id,
+                owner_id: user.id,
+                notes: 'Llamada rápida desde modo maratón'
+            })
+
+        if (!error) {
+            showSuccess('Llamada registrada')
+            fetchActivity(currentLead.id)
         }
     }
 
@@ -531,18 +554,19 @@ export default function MarathonPage() {
                                 <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">Actividad Reciente</h3>
                             </div>
                             <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                                {[...meetings, ...tasks, ...emailHistory].sort((a, b) => new Date(b.created_at || b.sent_at || b.start_time).getTime() - new Date(a.created_at || a.sent_at || a.start_time).getTime()).map((activity, i) => {
+                                {[...meetings, ...tasks, ...emailHistory, ...calls].sort((a, b) => new Date(b.created_at || b.sent_at || b.start_time).getTime() - new Date(a.created_at || a.sent_at || a.start_time).getTime()).map((activity, i) => {
                                     const isEmail = !!activity.subject
                                     const isMeeting = !!activity.start_time
+                                    const isCall = !!activity.notes && !isEmail && !isMeeting && !activity.title
                                     return (
                                         <div key={i} className="flex gap-3 text-sm">
                                             <div className={clsx(
                                                 "mt-0.5 w-1.5 h-1.5 rounded-full shrink-0",
-                                                isEmail ? "bg-blue-500" : isMeeting ? "bg-purple-500" : "bg-emerald-500"
+                                                isEmail ? "bg-blue-500" : isMeeting ? "bg-purple-500" : isCall ? "bg-emerald-500" : "bg-emerald-500"
                                             )} />
                                             <div>
                                                 <p className="font-semibold text-gray-900 leading-tight text-xs">
-                                                    {activity.subject || activity.location || activity.title || 'Evento'}
+                                                    {activity.subject || activity.location || (isCall ? 'Llamada: ' + activity.notes : activity.title || 'Evento')}
                                                 </p>
                                                 <p className="text-[10px] text-gray-400 mt-0.5">
                                                     {new Date(activity.sent_at || activity.start_time || activity.created_at).toLocaleDateString()}
@@ -582,14 +606,22 @@ export default function MarathonPage() {
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Acciones Rápidas</label>
 
                         <button
+                            onClick={handleLogCall}
+                            className="w-full flex items-center justify-between p-4 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-black transition-all text-left shadow-lg shadow-gray-200 group"
+                        >
+                            <span className="flex items-center"><Phone size={16} className="mr-3 text-emerald-400" /> Llamada Realizada</span>
+                            <Plus size={14} className="text-gray-500" />
+                        </button>
+
+                        <button
                             onClick={() => {
                                 setTaskInitialTitle('Llamar para programar llamada')
                                 setIsTaskModalOpen(true)
                             }}
-                            className="w-full flex items-center justify-between p-4 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-black transition-all text-left shadow-lg shadow-gray-200 group"
+                            className="w-full flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all text-left group"
                         >
-                            <span className="flex items-center"><Phone size={16} className="mr-3 text-emerald-400" /> Llamar para programar</span>
-                            <Plus size={14} className="text-gray-500" />
+                            <span className="flex items-center"><Phone size={16} className="mr-3 text-gray-400 group-hover:text-gray-600" /> Programar Llamada</span>
+                            <Plus size={14} className="text-gray-300" />
                         </button>
 
                         <div className="h-px bg-gray-100 my-2" />

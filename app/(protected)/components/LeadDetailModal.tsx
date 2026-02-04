@@ -61,6 +61,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const [emails, setEmails] = useState<any[]>([])
     const [meetings, setMeetings] = useState<any[]>([])
     const [tasks, setTasks] = useState<any[]>([])
+    const [calls, setCalls] = useState<any[]>([])
 
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
     const [selectedToEmail, setSelectedToEmail] = useState('')
@@ -130,6 +131,14 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 .order('due_date', { ascending: false })
                 .limit(5)
             setTasks(taskData || [])
+
+            const { data: callData } = await supabase
+                .from('calls')
+                .select('*')
+                .eq('lead_id', leadId)
+                .order('created_at', { ascending: false })
+                .limit(5)
+            setCalls(callData || [])
 
         } catch (error) {
             console.error('Error fetching lead details:', error)
@@ -207,6 +216,28 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
 
         if (!error) {
             setContacts(contacts.map(c => c.id === contactId ? { ...c, ...updates } : c))
+        }
+    }
+
+    const logCall = async () => {
+        const notes = prompt('Notas de la llamada (opcional):')
+        if (notes === null) return
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { error } = await supabase
+            .from('calls')
+            .insert({
+                lead_id: leadId,
+                owner_id: user.id,
+                notes: notes
+            })
+
+        if (!error) {
+            showSuccess('Llamada registrada')
+            fetchLeadDetails()
+            if (onUpdate) onUpdate()
         }
     }
 
@@ -440,6 +471,16 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                             )}
                                         </div>
                                     </div>
+
+                                    {!isEditing && (
+                                        <button
+                                            onClick={logCall}
+                                            className="mt-4 w-full py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <Phone size={12} />
+                                            Registrar Llamada Realizada
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Activity Timeline */}
@@ -487,6 +528,26 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                     </div>
                                                 ))}
                                                 {meetings.length === 0 && <p className="text-[11px] text-gray-400 italic text-center py-4">Sin reuniones</p>}
+                                            </div>
+                                        </div>
+
+                                        {/* Calls */}
+                                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <h5 className="text-xs font-bold text-gray-900 flex items-center">
+                                                    <Phone size={14} className="mr-2 text-emerald-500" />
+                                                    Llamadas
+                                                </h5>
+                                                <span className="text-[10px] text-gray-400 font-bold">{calls.length}</span>
+                                            </div>
+                                            <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
+                                                {calls.map(c => (
+                                                    <div key={c.id} className="p-2 bg-emerald-50/50 rounded-lg border border-emerald-100 transition-all">
+                                                        <p className="font-semibold text-emerald-900 text-[11px] line-clamp-1">{c.notes || 'Llamada realizada'}</p>
+                                                        <p className="text-[9px] text-emerald-400 mt-0.5">{new Date(c.created_at).toLocaleDateString()}</p>
+                                                    </div>
+                                                ))}
+                                                {calls.length === 0 && <p className="text-[11px] text-gray-400 italic text-center py-4">Sin llamadas</p>}
                                             </div>
                                         </div>
                                     </div>
