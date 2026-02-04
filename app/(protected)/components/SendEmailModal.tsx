@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/auth/client'
 import { X, Send, User, Mail, ChevronDown, Sparkles, Layout, Variable, Eye } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useNotification } from './ui/NotificationProvider'
 
 interface SendEmailModalProps {
     isOpen: boolean
@@ -22,6 +23,7 @@ interface Template {
 
 export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLeadId, initialTo }: SendEmailModalProps) {
     const supabase = createClient()
+    const { showSuccess, showError } = useNotification()
     const [loading, setLoading] = useState(false)
     const [templates, setTemplates] = useState<Template[]>([])
     const [leads, setLeads] = useState<any[]>([])
@@ -103,12 +105,12 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                 throw new Error(result.error || 'Error desconocido al enviar')
             }
 
-            alert('Email enviado correctamente via Gmail')
+            showSuccess('Email enviado correctamente via Gmail')
             onSuccess()
             onClose()
         } catch (error: any) {
             console.error('Error sending email:', error)
-            alert('Error al enviar email: ' + error.message)
+            showError('Error al enviar email: ' + error.message)
         } finally {
             setLoading(false)
         }
@@ -153,7 +155,6 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
 
     if (!isOpen) return null
 
-    const selectedLead = leads.find(l => l.id === formData.lead_id) || (initialLeadId ? { id: initialLeadId } : null)
     // If we're searching for email options from a lead that's passed as prop but not in 'leads' yet
     const availableEmails = selectedLead?.email ? selectedLead.email.split(':').map((e: string) => e.trim()).filter(Boolean) : []
 

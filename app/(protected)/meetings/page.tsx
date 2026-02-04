@@ -123,54 +123,61 @@ export default function MeetingsPage() {
         })
 
         return (
-            <div className="grid grid-cols-7 h-full bg-white divide-x divide-y divide-gray-100 border-b border-gray-100 overflow-hidden relative">
-                <div className="contents sticky top-0 z-10">
+            <div className="flex flex-col h-full overflow-hidden">
+                {/* Sticky Header */}
+                <div className="grid grid-cols-7 border-b border-gray-100 bg-white sticky top-0 z-10 shadow-sm">
                     {DAYS.map(d => (
-                        <div key={d} className="p-2 text-center text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 bg-white border-b border-gray-100 flex items-center justify-center sticky top-0 z-10 h-12">
+                        <div key={d} className="p-2 text-center text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 bg-white flex items-center justify-center h-12">
                             {d}
                         </div>
                     ))}
                 </div>
-                {slots.map((date, i) => {
-                    if (!date) return <div key={i} className="bg-slate-50/30" />
 
-                    const dayMeetings = meetings.filter(m => isSameDate(new Date(m.start_time), date))
-                    const isToday = isSameDate(date, new Date())
+                {/* Scrollable Calendar Grid */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="grid grid-cols-7 divide-x divide-y divide-gray-100 border-b border-gray-100">
+                        {slots.map((date, i) => {
+                            if (!date) return <div key={i} className="bg-slate-50/30 min-h-[120px]" />
 
-                    return (
-                        <div key={i} className={clsx(
-                            "p-3 min-h-[120px] flex flex-col hover:bg-slate-50/50 transition-colors group overflow-hidden",
-                            isToday ? "bg-emerald-50/10" : "bg-white"
-                        )}>
-                            <div className="flex justify-between items-start mb-2">
-                                <span className={clsx(
-                                    "text-xs font-bold w-7 h-7 flex items-center justify-center rounded-lg transition-all",
-                                    isToday ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 group-hover:text-slate-900"
+                            const dayMeetings = meetings.filter(m => isSameDate(new Date(m.start_time), date))
+                            const isToday = isSameDate(date, new Date())
+
+                            return (
+                                <div key={i} className={clsx(
+                                    "p-3 min-h-[120px] flex flex-col hover:bg-slate-50/50 transition-colors group overflow-hidden",
+                                    isToday ? "bg-emerald-50/10" : "bg-white"
                                 )}>
-                                    {date.getDate()}
-                                </span>
-                                <button className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-slate-100 rounded-md text-slate-400 transition-all active:scale-90">
-                                    <Plus size={14} />
-                                </button>
-                            </div>
-                            <div className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-1">
-                                {dayMeetings.map(m => (
-                                    <button
-                                        key={m.id}
-                                        onClick={() => setSelectedEventId(m.id)}
-                                        className="w-full text-left text-[9px] bg-slate-50 text-slate-600 px-2 py-1 rounded-md border border-slate-200 truncate font-bold hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-sm"
-                                    >
-                                        <div className="flex items-center space-x-1.5">
-                                            <div className="h-1 w-1 bg-emerald-500 rounded-full" />
-                                            <span>{new Date(m.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                            <span className="opacity-60 font-medium">{m.leads?.company_name}</span>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )
-                })}
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className={clsx(
+                                            "text-xs font-bold w-7 h-7 flex items-center justify-center rounded-lg transition-all",
+                                            isToday ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 group-hover:text-slate-900"
+                                        )}>
+                                            {date.getDate()}
+                                        </span>
+                                        <button className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-slate-100 rounded-md text-slate-400 transition-all active:scale-90">
+                                            <Plus size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-1">
+                                        {dayMeetings.map(m => (
+                                            <button
+                                                key={m.id}
+                                                onClick={() => setSelectedEventId(m.id)}
+                                                className="w-full text-left text-[9px] bg-slate-50 text-slate-600 px-2 py-1 rounded-md border border-slate-200 truncate font-bold hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-sm"
+                                            >
+                                                <div className="flex items-center space-x-1.5">
+                                                    <div className="h-1 w-1 bg-emerald-500 rounded-full" />
+                                                    <span>{new Date(m.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    <span className="opacity-60 font-medium">{m.leads?.company_name}</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
             </div>
         )
     }
@@ -380,6 +387,23 @@ export default function MeetingsPage() {
                     }}
                 />
             )}
+
+            <style jsx>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 6px;
+                    height: 6px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: rgba(0, 0, 0, 0.1);
+                    border-radius: 20px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: rgba(0, 0, 0, 0.2);
+                }
+            `}</style>
         </div>
     )
 }
