@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import SendEmailModal from './SendEmailModal'
+import { useSuccess } from './ui/SuccessOverlay'
 
 interface LeadDetailModalProps {
     isOpen: boolean
@@ -51,6 +52,7 @@ const statusLabels: Record<string, string> = {
 
 export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: LeadDetailModalProps) {
     const supabase = createClient()
+    const { showSuccess } = useSuccess()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
@@ -147,9 +149,9 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
             setIsEditing(false)
             await fetchLeadDetails()
             if (onUpdate) onUpdate()
-            alert('Lead actualizado correctamente')
+            showSuccess('Lead actualizado')
         } catch (error: any) {
-            alert('Error al guardar: ' + error.message)
+            showSuccess('Error al guardar')
         } finally {
             setSaving(false)
         }
@@ -166,95 +168,97 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const phonesList = lead?.phone ? lead.phone.split(':').map((p: string) => p.trim()).filter(Boolean) : []
 
     return (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-[40px] shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-100 italic-none">
-                <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
-                    <div className="flex items-center space-x-4">
-                        <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100">
-                            <Building2 className="text-white" size={24} />
+        <div className="fixed inset-0 bg-gray-901/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200">
+                {/* Compact Header */}
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                    <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-gray-900 rounded-lg shadow-sm">
+                            <Building2 className="text-white" size={18} />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Detalles del Lead</h2>
-                            <p className="text-sm text-gray-500 font-medium">Gestiona la información y actividad del cliente</p>
+                            <h2 className="text-lg font-bold text-gray-900 tracking-tight">Expediente de Lead</h2>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Información y Actividad Centralizada</p>
                         </div>
                     </div>
                     <div className="flex items-center space-x-2">
                         {!isEditing ? (
                             <button
                                 onClick={() => setIsEditing(true)}
-                                className="flex items-center space-x-2 px-4 py-2 bg-white border-2 border-gray-100 rounded-xl text-sm font-bold text-gray-600 hover:border-indigo-600 hover:text-indigo-600 transition-all active:scale-95"
+                                className="flex items-center space-x-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:border-gray-900 hover:text-gray-900 transition-all active:scale-95"
                             >
-                                <Edit2 size={16} />
+                                <Edit2 size={14} />
                                 <span>Editar</span>
                             </button>
                         ) : (
                             <button
                                 onClick={handleSave}
                                 disabled={saving}
-                                className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 rounded-xl text-sm font-bold text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                                className="flex items-center space-x-2 px-3 py-1.5 bg-gray-900 rounded-lg text-xs font-bold text-white shadow-sm hover:bg-black transition-all active:scale-95 disabled:opacity-50"
                             >
-                                <Save size={16} />
+                                <Save size={14} />
                                 <span>{saving ? 'Guardando...' : 'Guardar'}</span>
                             </button>
                         )}
+                        <div className="h-4 w-px bg-gray-200 mx-1" />
                         <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors group">
-                            <X size={24} className="text-gray-400 group-hover:text-gray-900" />
+                            <X size={20} className="text-gray-400 group-hover:text-gray-900" />
                         </button>
                     </div>
                 </div>
 
-                <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
+                <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
                     {loading ? (
                         <div className="text-center py-20">
-                            <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-indigo-600 border-r-transparent"></div>
-                            <p className="mt-4 text-gray-500 font-bold uppercase tracking-widest text-xs">Cargando base de datos...</p>
+                            <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-solid border-gray-900 border-r-transparent"></div>
+                            <p className="mt-4 text-gray-400 font-bold uppercase tracking-widest text-[10px]">Cargando base de datos...</p>
                         </div>
                     ) : lead ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             {/* Left Column: Basic Info */}
-                            <div className="lg:col-span-2 space-y-8">
-                                <div className="bg-gray-50/50 rounded-[32px] p-8 border border-gray-100 shadow-sm space-y-6">
+                            <div className="lg:col-span-2 space-y-6">
+                                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm space-y-6">
                                     <div className="flex items-start justify-between">
-                                        <div className="flex items-center space-x-6">
-                                            <div className="h-20 w-20 rounded-[24px] bg-indigo-600 flex items-center justify-center text-white font-black text-3xl shadow-xl shadow-indigo-100">
+                                        <div className="flex items-center space-x-5">
+                                            <div className="h-14 w-14 rounded-lg bg-gray-900 flex items-center justify-center text-white font-bold text-xl shadow-md">
                                                 {editForm.company_name.charAt(0)}
                                             </div>
-                                            <div className="space-y-1">
+                                            <div className="space-y-0.5">
                                                 {isEditing ? (
                                                     <input
-                                                        className="text-3xl font-black text-gray-900 bg-white border-2 border-indigo-100 rounded-xl px-4 py-1 w-full focus:border-indigo-600 outline-none"
+                                                        className="text-2xl font-bold text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1 w-full focus:border-gray-900 outline-none"
                                                         value={editForm.company_name}
                                                         onChange={e => setEditForm({ ...editForm, company_name: e.target.value })}
                                                     />
                                                 ) : (
-                                                    <h3 className="text-3xl font-black text-gray-900 tracking-tight">{lead.company_name}</h3>
+                                                    <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{lead.company_name}</h3>
                                                 )}
                                                 <div className="flex items-center space-x-2">
-                                                    <User size={16} className="text-indigo-400" />
+                                                    <User size={14} className="text-gray-400" />
                                                     {isEditing ? (
                                                         <input
-                                                            className="text-gray-600 font-bold bg-white border border-gray-200 rounded-lg px-2 py-0.5 focus:border-indigo-600 outline-none"
+                                                            className="text-gray-600 font-semibold bg-white border border-gray-200 rounded-lg px-2 py-0.5 text-sm focus:border-gray-900 outline-none"
                                                             value={editForm.contact_name}
                                                             onChange={e => setEditForm({ ...editForm, contact_name: e.target.value })}
                                                         />
                                                     ) : (
-                                                        <p className="text-gray-600 font-bold">{lead.contact_name}</p>
+                                                        <p className="text-gray-500 font-semibold text-sm">{lead.contact_name || 'Sin contacto'}</p>
                                                     )}
                                                 </div>
                                             </div>
                                         </div>
                                         <span className={clsx(
-                                            "inline-flex items-center px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-wider border-2",
+                                            "inline-flex items-center px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border",
                                             statusColors[lead.status] || 'bg-gray-50 text-gray-700'
                                         )}>
                                             {statusLabels[lead.status] || lead.status}
                                         </span>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="p-6 bg-white rounded-3xl border border-gray-100 shadow-sm relative group">
-                                            <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center mb-3">
-                                                <Mail size={12} className="mr-1.5" />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 bg-gray-50/50 rounded-xl border border-gray-100 relative group">
+                                            <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center mb-3 border-b border-gray-100 pb-1">
+                                                <Mail size={10} className="mr-1.5" />
                                                 Emails de Contacto
                                             </label>
                                             <div className="space-y-2">
@@ -263,7 +267,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                         {editForm.emails.map((email, idx) => (
                                                             <div key={idx} className="flex gap-2">
                                                                 <input
-                                                                    className="flex-1 text-indigo-600 font-bold bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 rounded-xl px-3 py-2 outline-none"
+                                                                    className="flex-1 text-sm text-gray-900 font-semibold bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-gray-900"
                                                                     value={email}
                                                                     onChange={e => {
                                                                         const newEmails = [...editForm.emails]
@@ -279,28 +283,28 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                                         }}
                                                                         className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
                                                                     >
-                                                                        <Trash2 size={16} />
+                                                                        <Trash2 size={14} />
                                                                     </button>
                                                                 )}
                                                             </div>
                                                         ))}
                                                         <button
                                                             onClick={() => setEditForm({ ...editForm, emails: [...editForm.emails, ''] })}
-                                                            className="w-full py-2 border-2 border-dashed border-indigo-100 rounded-xl text-indigo-400 font-bold text-xs hover:border-indigo-600 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                                                            className="w-full py-1.5 border border-dashed border-gray-300 rounded-lg text-gray-400 font-bold text-[10px] hover:border-gray-900 hover:text-gray-900 transition-all flex items-center justify-center gap-2"
                                                         >
-                                                            <Plus size={14} />
+                                                            <Plus size={12} />
                                                             <span>Añadir Email</span>
                                                         </button>
                                                     </div>
                                                 ) : (
                                                     emailsList.map((email: string, idx: number) => (
                                                         <div key={idx} className="flex items-center justify-between group/item">
-                                                            <span className="text-indigo-600 font-bold">{email}</span>
+                                                            <span className="text-sm text-gray-700 font-semibold">{email}</span>
                                                             <button
                                                                 onClick={() => openEmailComposer(email)}
-                                                                className="opacity-0 group-hover/item:opacity-100 p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all"
+                                                                className="opacity-0 group-hover/item:opacity-100 p-1 bg-gray-900 text-white rounded-md hover:bg-black transition-all"
                                                             >
-                                                                <Send size={12} />
+                                                                <Send size={10} />
                                                             </button>
                                                         </div>
                                                     ))
@@ -308,9 +312,9 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                             </div>
                                         </div>
 
-                                        <div className="p-6 bg-white rounded-3xl border border-gray-100 shadow-sm relative group">
-                                            <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center mb-3">
-                                                <Phone size={12} className="mr-1.5" />
+                                        <div className="p-4 bg-gray-50/50 rounded-xl border border-gray-100 relative group">
+                                            <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center mb-3 border-b border-gray-100 pb-1">
+                                                <Phone size={10} className="mr-1.5" />
                                                 Teléfonos
                                             </label>
                                             <div className="space-y-2">
@@ -319,7 +323,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                         {editForm.phones.map((phone, idx) => (
                                                             <div key={idx} className="flex gap-2">
                                                                 <input
-                                                                    className="flex-1 text-gray-900 font-bold bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 rounded-xl px-3 py-2 outline-none"
+                                                                    className="flex-1 text-sm text-gray-900 font-semibold bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-gray-900"
                                                                     value={phone}
                                                                     onChange={e => {
                                                                         const newPhones = [...editForm.phones]
@@ -335,24 +339,24 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                                         }}
                                                                         className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
                                                                     >
-                                                                        <Trash2 size={16} />
+                                                                        <Trash2 size={14} />
                                                                     </button>
                                                                 )}
                                                             </div>
                                                         ))}
                                                         <button
                                                             onClick={() => setEditForm({ ...editForm, phones: [...editForm.phones, ''] })}
-                                                            className="w-full py-2 border-2 border-dashed border-gray-100 rounded-xl text-gray-400 font-bold text-xs hover:border-gray-900 hover:text-gray-900 transition-all flex items-center justify-center gap-2"
+                                                            className="w-full py-1.5 border border-dashed border-gray-300 rounded-lg text-gray-400 font-bold text-[10px] hover:border-gray-900 hover:text-gray-900 transition-all flex items-center justify-center gap-2"
                                                         >
-                                                            <Plus size={14} />
+                                                            <Plus size={12} />
                                                             <span>Añadir Teléfono</span>
                                                         </button>
                                                     </div>
                                                 ) : (
                                                     phonesList.map((p: string, idx: number) => (
                                                         <div key={idx} className="flex items-center justify-between">
-                                                            <span className="text-gray-900 font-bold">{p}</span>
-                                                            <a href={`tel:${p}`} className="p-1.5 bg-gray-50 text-gray-400 rounded-lg hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-transparent hover:border-emerald-100">
+                                                            <span className="text-sm text-gray-700 font-semibold">{p}</span>
+                                                            <a href={`tel:${p}`} className="p-1 text-gray-400 hover:text-gray-900 transition-all">
                                                                 <Phone size={12} />
                                                             </a>
                                                         </div>
@@ -362,34 +366,34 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                         </div>
                                     </div>
 
-                                    <div className="p-6 bg-indigo-600 rounded-[32px] shadow-xl shadow-indigo-100 relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 p-8 transform translate-x-4 -translate-y-4 opacity-10 group-hover:scale-110 transition-transform">
-                                            <Globe size={120} />
+                                    <div className="p-5 bg-gray-900 rounded-xl relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 p-6 transform translate-x-2 -translate-y-2 opacity-10">
+                                            <Globe size={80} className="text-white" />
                                         </div>
                                         <div className="relative z-10 space-y-1">
-                                            <label className="text-[10px] font-black text-indigo-200 uppercase tracking-widest flex items-center">
-                                                <Globe size={12} className="mr-1.5" />
-                                                Sitio Web Corporativo
+                                            <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center mb-1.5">
+                                                <Globe size={10} className="mr-1.5" />
+                                                Web Oficial
                                             </label>
                                             {isEditing ? (
                                                 <input
-                                                    className="w-full text-xl font-black text-white bg-indigo-500/50 border-2 border-indigo-400/30 rounded-2xl px-4 py-2 outline-none focus:border-white/50"
+                                                    className="w-full text-base font-bold text-white bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 outline-none focus:border-white/50"
                                                     value={editForm.website}
                                                     onChange={e => setEditForm({ ...editForm, website: e.target.value })}
                                                     placeholder="www.empresa.com"
                                                 />
                                             ) : (
                                                 <div className="flex items-center space-x-3">
-                                                    <span className="text-2xl font-black text-white tracking-tight">
+                                                    <span className="text-lg font-bold text-white tracking-tight">
                                                         {lead.website || 'No registrado'}
                                                     </span>
                                                     {lead.website && (
                                                         <a
                                                             href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
                                                             target="_blank"
-                                                            className="p-2 bg-white/20 text-white rounded-xl hover:bg-white hover:text-indigo-600 transition-all"
+                                                            className="p-1.5 bg-white/10 text-white rounded-md hover:bg-white hover:text-gray-900 transition-all"
                                                         >
-                                                            <ExternalLink size={16} />
+                                                            <ExternalLink size={14} />
                                                         </a>
                                                     )}
                                                 </div>
@@ -398,52 +402,51 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                     </div>
                                 </div>
 
-                                {/* Activity Sections */}
-                                <div className="space-y-6">
-                                    <h4 className="text-xl font-black text-gray-900 flex items-center space-x-2">
-                                        <TrendingUp className="text-indigo-600" size={20} />
-                                        <span>Línea de Tiempo</span>
+                                {/* Activity Timeline */}
+                                <div className="space-y-4">
+                                    <h4 className="text-sm font-bold text-gray-900 flex items-center space-x-2 border-b border-gray-100 pb-2">
+                                        <TrendingUp className="text-gray-400" size={16} />
+                                        <span className="uppercase tracking-widest text-[10px]">Línea de Vida del Lead</span>
                                     </h4>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {/* Recent Emails */}
-                                        <div className="bg-white rounded-[32px] border border-gray-100 p-6 shadow-sm">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h5 className="font-bold text-gray-900 flex items-center">
-                                                    <Mail size={16} className="mr-2 text-indigo-600" />
-                                                    Email History
+                                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <h5 className="text-xs font-bold text-gray-900 flex items-center">
+                                                    <Mail size={14} className="mr-2 text-blue-500" />
+                                                    Emails
                                                 </h5>
-                                                <span className="px-2 py-0.5 bg-gray-50 text-gray-400 text-[10px] font-bold rounded-lg uppercase">{emails.length}</span>
+                                                <span className="text-[10px] text-gray-400 font-bold">{emails.length}</span>
                                             </div>
-                                            <div className="space-y-3">
+                                            <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
                                                 {emails.map(email => (
-                                                    <div key={email.id} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-50 group hover:border-indigo-100 transition-all cursor-pointer">
-                                                        <p className="font-bold text-gray-900 text-xs line-clamp-1">{email.subject}</p>
-                                                        <p className="text-[10px] text-gray-400 mt-1 font-medium">{new Date(email.sent_at).toLocaleDateString('es-ES')}</p>
+                                                    <div key={email.id} className="p-2 bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-all">
+                                                        <p className="font-semibold text-gray-900 text-[11px] line-clamp-1">{email.subject}</p>
+                                                        <p className="text-[9px] text-gray-400 mt-0.5">{new Date(email.sent_at).toLocaleDateString()}</p>
                                                     </div>
                                                 ))}
+                                                {emails.length === 0 && <p className="text-[11px] text-gray-400 italic text-center py-4">Sin emails</p>}
                                             </div>
                                         </div>
 
                                         {/* Meetings */}
-                                        <div className="bg-white rounded-[32px] border border-gray-100 p-6 shadow-sm">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h5 className="font-bold text-gray-900 flex items-center">
-                                                    <Calendar size={16} className="mr-2 text-indigo-600" />
+                                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <h5 className="text-xs font-bold text-gray-900 flex items-center">
+                                                    <Calendar size={14} className="mr-2 text-purple-500" />
                                                     Reuniones
                                                 </h5>
-                                                <span className="px-2 py-0.5 bg-gray-50 text-gray-400 text-[10px] font-bold rounded-lg uppercase">{meetings.length}</span>
+                                                <span className="text-[10px] text-gray-400 font-bold">{meetings.length}</span>
                                             </div>
-                                            <div className="space-y-3">
+                                            <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
                                                 {meetings.map(m => (
-                                                    <div key={m.id} className="p-3 bg-indigo-50/30 rounded-2xl border border-indigo-50/50 group hover:border-indigo-200 transition-all">
-                                                        <p className="font-bold text-indigo-900 text-xs line-clamp-1">{m.location || 'Reunión'}</p>
-                                                        <div className="flex items-center justify-between mt-1">
-                                                            <p className="text-[10px] text-indigo-400 font-medium">{new Date(m.start_time).toLocaleDateString()}</p>
-                                                            <Clock size={10} className="text-indigo-300" />
-                                                        </div>
+                                                    <div key={m.id} className="p-2 bg-purple-50/50 rounded-lg border border-purple-100 transition-all">
+                                                        <p className="font-semibold text-purple-900 text-[11px] line-clamp-1">{m.location || 'Reunión'}</p>
+                                                        <p className="text-[9px] text-purple-400 mt-0.5">{new Date(m.start_time).toLocaleDateString()}</p>
                                                     </div>
                                                 ))}
+                                                {meetings.length === 0 && <p className="text-[11px] text-gray-400 italic text-center py-4">Sin reuniones</p>}
                                             </div>
                                         </div>
                                     </div>
@@ -451,63 +454,64 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                             </div>
 
                             {/* Right Column: Metadata & Tasks */}
-                            <div className="space-y-8">
-                                <div className="bg-gray-50/50 rounded-[32px] p-6 border border-gray-100 space-y-6">
+                            <div className="space-y-6">
+                                <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100 space-y-5">
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center mb-2">
-                                            <Tag size={12} className="mr-1.5" />
-                                            Origen del Lead
+                                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center mb-1.5">
+                                            <Tag size={10} className="mr-1.5" />
+                                            Origen
                                         </label>
-                                        <p className="font-bold text-gray-900">{lead.source || 'Directo'}</p>
+                                        <p className="text-sm font-semibold text-gray-900">{lead.source || 'Directo'}</p>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center mb-2">
-                                            <Calendar size={12} className="mr-1.5" />
-                                            Fecha de Registro
+                                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center mb-1.5">
+                                            <Calendar size={10} className="mr-1.5" />
+                                            Alta Sistema
                                         </label>
-                                        <p className="font-bold text-gray-900">{new Date(lead.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                                        <p className="text-sm font-semibold text-gray-900">{new Date(lead.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                                     </div>
                                     <div className="pt-4 border-t border-gray-200/50">
-                                        <div className="bg-white p-4 rounded-2xl border border-gray-100">
-                                            <p className="text-[10px] font-black text-indigo-600 uppercase mb-2">Owner ID</p>
-                                            <p className="text-[10px] font-mono text-gray-400 truncate">{lead.owner_id}</p>
+                                        <div className="bg-white p-3 rounded-lg border border-gray-100">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Lead ID Signature</p>
+                                            <p className="text-[9px] font-mono text-gray-300 truncate">{lead.id}</p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="bg-white rounded-[32px] border border-gray-100 p-6 shadow-sm">
-                                    <h5 className="font-black text-gray-900 text-sm flex items-center mb-4">
-                                        <FileText size={16} className="mr-2 text-indigo-600" />
-                                        Pendiente ({tasks.length})
+                                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                    <h5 className="text-xs font-bold text-gray-900 flex items-center mb-4">
+                                        <FileText size={14} className="mr-2 text-emerald-500" />
+                                        Tareas Pendientes ({tasks.length})
                                     </h5>
-                                    <div className="space-y-3">
+                                    <div className="space-y-2">
                                         {tasks.map(t => (
-                                            <div key={t.id} className="flex items-start space-x-3 p-3 bg-gray-50/50 rounded-2xl border border-gray-100">
+                                            <div key={t.id} className="flex items-start space-x-2.5 p-2.5 bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-all">
                                                 <div className={clsx(
-                                                    "mt-1.5 h-2 w-2 rounded-full shrink-0",
+                                                    "mt-1 h-1.5 w-1.5 rounded-full shrink-0",
                                                     t.status === 'completed' ? "bg-emerald-500" : "bg-amber-500"
                                                 )} />
-                                                <div>
-                                                    <p className="text-xs font-bold text-gray-900">{t.title}</p>
-                                                    <p className="text-[10px] text-gray-400 font-medium">Due: {t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No date'}</p>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[11px] font-bold text-gray-900 truncate">{t.title}</p>
+                                                    <p className="text-[9px] text-gray-400">Vence: {t.due_date ? new Date(t.due_date).toLocaleDateString() : 'N/A'}</p>
                                                 </div>
                                             </div>
                                         ))}
+                                        {tasks.length === 0 && <p className="text-[11px] text-gray-400 italic text-center py-2">Sin tareas</p>}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <p className="text-center text-gray-500 py-12">No se pudo cargar la información del lead.</p>
+                        <p className="text-center text-gray-400 py-12 text-sm font-semibold italic">Información no recuperada.</p>
                     )}
                 </div>
 
-                <div className="p-8 border-t border-gray-100 flex justify-end bg-gray-50/50">
+                <div className="px-6 py-4 border-t border-gray-100 flex justify-end bg-gray-50/50">
                     <button
                         onClick={onClose}
-                        className="px-8 py-4 bg-white border-2 border-gray-100 rounded-[20px] text-sm font-black text-gray-500 hover:border-gray-900 hover:text-gray-900 transition-all active:scale-95"
+                        className="px-6 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-500 hover:border-gray-400 hover:text-gray-900 transition-all active:scale-95"
                     >
-                        Cerrar Ventana
+                        Cerrar Sesión
                     </button>
                 </div>
             </div>
