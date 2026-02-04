@@ -35,12 +35,13 @@ export async function POST(request: Request) {
 
         const sendEmail = async (token: string) => {
             // Construct MIME message
+            const formattedBody = body.replace(/\n/g, '<br>')
             const str = [
                 `To: ${to}`,
                 `Subject: ${subject}`,
                 `Content-Type: text/html; charset=utf-8`,
                 '',
-                body
+                formattedBody
             ].join('\n')
 
             const encodedMessage = Buffer.from(str)

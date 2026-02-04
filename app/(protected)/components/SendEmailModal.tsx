@@ -37,7 +37,11 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
     useEffect(() => {
         if (isOpen) {
             fetchTemplates()
-            if (!initialLeadId) fetchLeads()
+            if (!initialLeadId) {
+                fetchLeads()
+            } else {
+                fetchSingleLead(initialLeadId)
+            }
 
             // Update formData if props change
             setFormData(prev => ({
@@ -47,6 +51,17 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
             }))
         }
     }, [isOpen, initialLeadId, initialTo])
+
+    const fetchSingleLead = async (id: string) => {
+        const { data } = await supabase.from('leads').select('id, company_name, contact_name, email, domain, categories, country').eq('id', id).single()
+        if (data) {
+            setLeads(prev => {
+                const exists = prev.find(l => l.id === data.id)
+                if (exists) return prev
+                return [...prev, data]
+            })
+        }
+    }
 
     const fetchTemplates = async () => {
         const { data } = await supabase.from('email_templates').select('*')
@@ -87,6 +102,10 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
 
             if (!ownerId) throw new Error('No se pudo encontrar al usuario.')
 
+            // Replace tags before sending
+            const finalSubject = getPreviewContent(formData.subject)
+            const finalBody = getPreviewContent(formData.body)
+
             // Call our new API route
             const response = await fetch('/api/gmail/send', {
                 method: 'POST',
@@ -94,8 +113,8 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                 body: JSON.stringify({
                     lead_id: formData.lead_id,
                     to: formData.to_email,
-                    subject: formData.subject,
-                    body: formData.body
+                    subject: finalSubject,
+                    body: finalBody
                 })
             })
 

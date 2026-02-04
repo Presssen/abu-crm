@@ -11,7 +11,9 @@ import {
     ChevronRight,
     Search,
     Plus,
-    Check
+    Check,
+    Variable,
+    Sparkles
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import SendEmailModal from '../components/SendEmailModal'
@@ -158,6 +160,13 @@ export default function EmailsPage() {
         } finally {
             setLoading(false)
         }
+    }
+
+    const insertVariable = (variable: string) => {
+        setFormData(prev => ({
+            ...prev,
+            body: prev.body + ` {{${variable}}}`
+        }))
     }
 
     const handleDeleteTemplate = async (id: string) => {
@@ -391,13 +400,38 @@ export default function EmailsPage() {
                                     onChange={e => setFormData({ ...formData, subject: e.target.value })}
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Cuerpo del Mensaje</label>
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center">
+                                        <Variable size={14} className="mr-1" />
+                                        Etiquetas Dinámicas
+                                    </label>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[
+                                        { id: 'contact_name', label: 'Nombre' },
+                                        { id: 'company_name', label: 'Empresa' },
+                                        { id: 'categories', label: 'Categoría' },
+                                        { id: 'country', label: 'País' },
+                                        { id: 'domain', label: 'Web' },
+                                        { id: 'user_name', label: 'Firma (Yo)' }
+                                    ].map(v => (
+                                        <button
+                                            key={v.id}
+                                            type="button"
+                                            onClick={() => insertVariable(v.id)}
+                                            className="px-2 py-1 bg-white border border-gray-200 text-[10px] font-bold text-gray-500 rounded-md hover:border-indigo-200 hover:text-indigo-600 transition-all flex items-center"
+                                        >
+                                            <Sparkles size={10} className="mr-1" />
+                                            {v.label}
+                                        </button>
+                                    ))}
+                                </div>
                                 <textarea
                                     required
-                                    rows={5}
-                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none"
-                                    placeholder="Escribe el contenido aquí..."
+                                    rows={8}
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none text-sm leading-relaxed"
+                                    placeholder="Escribe el contenido aquí... Usa las etiquetas para personalizar."
                                     value={formData.body}
                                     onChange={e => setFormData({ ...formData, body: e.target.value })}
                                 />
