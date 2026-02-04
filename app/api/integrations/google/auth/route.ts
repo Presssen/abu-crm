@@ -23,13 +23,29 @@ export async function GET(request: Request) {
     }
 
     const clientId = process.env.SUPABASE_AUTH_GOOGLE_CLIENT_ID
-    // Redirect URI must match what's in Google Cloud Console
-    // We'll use the origin from the request or a configured env var
-    const origin = new URL(request.url).origin
-    const redirectUri = `${origin}/api/integrations/google/callback`
+
+    // Improved origin detection
+    // 1. Try NEXT_PUBLIC_APP_URL (standard for many setups)
+    // 2. Try VERCEL_URL (for Vercel deployments)
+    // 3. Fallback to request origin
+
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!baseUrl && process.env.VERCEL_URL) {
+        baseUrl = `https://${process.env.VERCEL_URL}`
+    }
+    if (!baseUrl) {
+        baseUrl = new URL(request.url).origin
+    }
+
+    // Remove trailing slash if present to ensure consistency
+    baseUrl = baseUrl.replace(/\/$/, '')
+
+    const redirectUri = `${baseUrl}/api/integrations/google/callback`
+
+    console.log(`🔐 Google Auth Initiated. Type: ${type}, Redirect URI: ${redirectUri}`)
 
     if (!clientId) {
-        return NextResponse.json({ error: 'Google Client ID not configured' }, { status: 500 })
+        return NextResponse.json({ error: 'Google Client ID not configured', detail: 'Check SUPABASE_AUTH_GOOGLE_CLIENT_ID' }, { status: 500 })
     }
 
     const params = new URLSearchParams({

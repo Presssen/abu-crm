@@ -25,7 +25,19 @@ export async function GET(request: Request) {
         }
 
         // 2. Exchange code for tokens
-        const redirectUri = `${origin}/api/integrations/google/callback`
+        // logic must strictly match the auth route
+        let baseUrl = process.env.NEXT_PUBLIC_APP_URL
+        if (!baseUrl && process.env.VERCEL_URL) {
+            baseUrl = `https://${process.env.VERCEL_URL}`
+        }
+        if (!baseUrl) {
+            baseUrl = origin
+        }
+        baseUrl = baseUrl.replace(/\/$/, '')
+
+        const redirectUri = `${baseUrl}/api/integrations/google/callback`
+        console.log(`🔄 Exchanging code for tokens. Redirect URI: ${redirectUri}`)
+
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
