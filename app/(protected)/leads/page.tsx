@@ -83,6 +83,7 @@ export default function LeadsPage() {
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
     const [profiles, setProfiles] = useState<any[]>([])
+    const [profile, setProfile] = useState<any>(null)
     const [isAdmin, setIsAdmin] = useState(false)
     const [isReassigning, setIsReassigning] = useState(false)
 
@@ -97,6 +98,19 @@ export default function LeadsPage() {
         setLoading(true)
         try {
             let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
+
+            // Filter out won/lost leads if not admin
+            if (!isAdmin) {
+                query = query.not('status', 'in', '("won","lost")')
+
+                // If marathon mode is enabled for the user, only show leads they own
+                if (profile?.marathon_enabled) {
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user) {
+                        query = query.eq('owner_id', user.id)
+                    }
+                }
+            }
 
             if (statusFilter !== 'all') {
                 query = query.eq('status', statusFilter)
@@ -155,7 +169,8 @@ export default function LeadsPage() {
     const checkAdminStatus = async () => {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-            const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+            setProfile(data)
             setIsAdmin(data?.role === 'admin')
         }
     }

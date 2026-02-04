@@ -47,7 +47,7 @@ export default function PipelinePage() {
         try {
             const { data, error } = await supabase
                 .from('leads')
-                .select('*')
+                .select('*, profiles:won_by(first_name, last_name)')
 
             if (error) throw error
             setLeads(data || [])
@@ -211,15 +211,15 @@ export default function PipelinePage() {
                                             <div className="space-y-2">
                                                 <div className="text-xs text-gray-500 flex items-center">
                                                     <User className="h-3 w-3 mr-1.5 text-gray-400" />
-                                                    {lead.contact_name}
+                                                    {lead.contact_name || 'Sin contacto'}
                                                 </div>
                                                 <div className="text-xs text-gray-500 flex items-center">
                                                     <Mail className="h-3 w-3 mr-1.5 text-gray-400" />
-                                                    {lead.email}
+                                                    {lead.email || 'Sin email'}
                                                 </div>
                                                 {lead.status === 'won' && (lead as any).profiles && (
                                                     <div className="mt-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg flex items-center">
-                                                        🏆 Éxito por: {(lead as any).profiles.first_name} {(lead as any).profiles.last_name}
+                                                        🏆 Éxito por: {(lead as any).profiles.first_name || ''} {(lead as any).profiles.last_name || ''}
                                                     </div>
                                                 )}
                                             </div>
@@ -227,7 +227,7 @@ export default function PipelinePage() {
                                             <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
                                                 <div className="flex -space-x-1">
                                                     <div className="h-6 w-6 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-gray-400 uppercase">
-                                                        {lead.contact_name.charAt(0)}
+                                                        {lead.contact_name?.charAt(0) || lead.company_name?.charAt(0) || '?'}
                                                     </div>
                                                 </div>
                                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">

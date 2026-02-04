@@ -500,16 +500,17 @@ function AdminContent() {
                                     <td className="px-6 py-4">
                                         <input
                                             type="number"
-                                            key={`${profile.id}-${marathonGoal}`} // Force re-render if global goal changes
-                                            defaultValue={profile.daily_lead_goal || marathonGoal || 20}
-                                            onBlur={(e) => {
+                                            value={profile.daily_lead_goal !== undefined && profile.daily_lead_goal !== null
+                                                ? profile.daily_lead_goal
+                                                : marathonGoal}
+                                            onChange={(e) => {
                                                 const val = parseInt(e.target.value)
                                                 if (!isNaN(val)) updateUserProfile(profile.id, { daily_lead_goal: val })
                                             }}
                                             className="w-20 px-3 py-1 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-1 focus:ring-indigo-500 outline-none"
                                         />
                                         <div className="text-[10px] text-gray-400 mt-1">
-                                            {profile.daily_lead_goal ? 'Personalizado' : 'Usando global'}
+                                            {profile.daily_lead_goal ? 'Personalizado' : 'Global'}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
