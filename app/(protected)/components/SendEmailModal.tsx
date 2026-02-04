@@ -54,7 +54,7 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
     }
 
     const fetchLeads = async () => {
-        const { data } = await supabase.from('leads').select('id, company_name, contact_name, email')
+        const { data } = await supabase.from('leads').select('id, company_name, contact_name, email, domain, categories, country')
         setLeads(data || [])
     }
 
@@ -136,8 +136,10 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
         if (selectedLead) {
             preview = preview.replace(/\{\{company_name\}\}/g, selectedLead.company_name || '[Empresa]')
             preview = preview.replace(/\{\{contact_name\}\}/g, selectedLead.contact_name || '[Contacto]')
-            preview = preview.replace(/\{\{sector\}\}/g, selectedLead.sector || '[Sector]')
+            preview = preview.replace(/\{\{sector\}\}/g, selectedLead.categories || '[Categoría]')
+            preview = preview.replace(/\{\{categories\}\}/g, selectedLead.categories || '[Categoría]')
             preview = preview.replace(/\{\{country\}\}/g, selectedLead.country || '[País]')
+            preview = preview.replace(/\{\{domain\}\}/g, selectedLead.domain || '[Web]')
         }
         if (currentUser) {
             preview = preview.replace(/\{\{user_name\}\}/g, currentUser.user_metadata?.full_name || currentUser.email || '[Tu Nombre]')
@@ -268,8 +270,9 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                                 {[
                                     { id: 'contact_name', label: 'Nombre' },
                                     { id: 'company_name', label: 'Empresa' },
-                                    { id: 'sector', label: 'Sector' },
+                                    { id: 'categories', label: 'Categoría' },
                                     { id: 'country', label: 'País' },
+                                    { id: 'domain', label: 'Web' },
                                     { id: 'user_name', label: 'Firma (Yo)' }
                                 ].map(v => (
                                     <button

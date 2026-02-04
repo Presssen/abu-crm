@@ -74,7 +74,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
         contact_name: '',
         emails: [''],
         phones: [''],
-        website: ''
+        domain: ''
     })
 
     useEffect(() => {
@@ -99,7 +99,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     contact_name: leadData.contact_name || '',
                     emails: leadData.email ? leadData.email.split(':').map((e: string) => e.trim()).filter(Boolean) : [''],
                     phones: leadData.phone ? leadData.phone.split(':').map((p: string) => p.trim()).filter(Boolean) : [''],
-                    website: leadData.website || ''
+                    domain: leadData.domain || ''
                 })
             }
 
@@ -159,7 +159,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     contact_name: editForm.contact_name,
                     email: editForm.emails.filter(Boolean).join(' : '),
                     phone: editForm.phones.filter(Boolean).join(' : '),
-                    website: editForm.website,
+                    domain: editForm.domain,
                 })
                 .eq('id', leadId)
 
@@ -467,18 +467,18 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                             {isEditing ? (
                                                 <input
                                                     className="w-full text-base font-bold text-white bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 outline-none focus:border-white/50"
-                                                    value={editForm.website}
-                                                    onChange={e => setEditForm({ ...editForm, website: e.target.value })}
+                                                    value={editForm.domain}
+                                                    onChange={e => setEditForm({ ...editForm, domain: e.target.value })}
                                                     placeholder="www.empresa.com"
                                                 />
                                             ) : (
                                                 <div className="flex items-center space-x-3">
                                                     <span className="text-lg font-bold text-white tracking-tight">
-                                                        {lead.website || 'No registrado'}
+                                                        {lead.domain || 'No registrado'}
                                                     </span>
-                                                    {lead.website && (
+                                                    {lead.domain && (
                                                         <a
-                                                            href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
+                                                            href={lead.domain.startsWith('http') ? lead.domain : `https://${lead.domain}`}
                                                             target="_blank"
                                                             className="p-1.5 bg-white/10 text-white rounded-md hover:bg-white hover:text-gray-900 transition-all"
                                                         >

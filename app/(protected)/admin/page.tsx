@@ -55,14 +55,14 @@ export default function AdminPage() {
     const [bulkOwnerId, setBulkOwnerId] = useState<string>('')
     const [filters, setFilters] = useState({
         country: '',
-        sector: '',
+        categories: '',
         status: '',
         owner: 'all' // all, assigned, unassigned
     })
 
     const filteredLeads = leads.filter(lead => {
         if (filters.country && lead.country !== filters.country) return false
-        if (filters.sector && lead.sector !== filters.sector) return false
+        if (filters.categories && lead.categories !== filters.categories) return false
         if (filters.status && lead.status !== filters.status) return false
         if (filters.owner === 'assigned' && !lead.owner_id) return false
         if (filters.owner === 'unassigned' && lead.owner_id) return false
@@ -70,7 +70,7 @@ export default function AdminPage() {
     })
 
     const countries = Array.from(new Set(leads.map(l => l.country).filter(Boolean)))
-    const sectors = Array.from(new Set(leads.map(l => l.sector).filter(Boolean)))
+    const categories = Array.from(new Set(leads.map(l => l.categories).filter(Boolean)))
 
     useEffect(() => {
         fetchData()
@@ -111,7 +111,7 @@ export default function AdminPage() {
             } else if (activeTab === 'leads') {
                 const { data, error } = await supabase
                     .from('leads')
-                    .select('*, profiles(email)')
+                    .select('*')
                     .order('created_at', { ascending: false })
                 if (error) throw error
                 setLeads(data || [])
@@ -167,12 +167,19 @@ export default function AdminPage() {
     }
 
     const updateUserProfile = async (userId: string, updates: Partial<Profile>) => {
+        setSaving(true)
         try {
             const { error } = await supabase.from('profiles').update(updates).eq('id', userId)
             if (error) throw error
-            fetchData()
+
+            // Update local state for immediate feedback
+            setProfiles(prev => prev.map(p => p.id === userId ? { ...p, ...updates } : p))
+            // alert('Usuario actualizado correctamente') // Alert might be too much for toggle
         } catch (error: any) {
             alert('Error al actualizar usuario: ' + error.message)
+            fetchData() // Refresh on error
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -515,14 +522,14 @@ export default function AdminPage() {
                                 </select>
                             </div>
                             <div className="flex-1 min-w-[200px]">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Sector</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Categoría</label>
                                 <select
-                                    value={filters.sector}
-                                    onChange={(e) => setFilters({ ...filters, sector: e.target.value })}
+                                    value={filters.categories}
+                                    onChange={(e) => setFilters({ ...filters, categories: e.target.value })}
                                     className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
                                 >
-                                    <option value="">Todos los sectores</option>
-                                    {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+                                    <option value="">Todas las categorías</option>
+                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
                             </div>
                             <div className="flex-1 min-w-[150px]">
@@ -538,7 +545,7 @@ export default function AdminPage() {
                                 </select>
                             </div>
                             <button
-                                onClick={() => setFilters({ country: '', sector: '', status: '', owner: 'all' })}
+                                onClick={() => setFilters({ country: '', categories: '', status: '', owner: 'all' })}
                                 className="px-4 py-2 text-sm font-bold text-gray-400 hover:text-gray-600"
                             >
                                 Limpiar
@@ -625,7 +632,7 @@ export default function AdminPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-xs text-gray-600 line-clamp-1">
-                                                {lead.country || 'N/A'} • {lead.sector || 'N/A'}
+                                                {lead.country || 'N/A'} • {lead.categories || 'N/A'} • {lead.domain || 'N/A'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">

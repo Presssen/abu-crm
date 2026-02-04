@@ -39,7 +39,7 @@ interface Lead {
     contact_name: string
     email: string
     phone: string
-    website?: string
+    domain?: string
     status: string
     notes?: string
 }
@@ -73,7 +73,7 @@ export default function MarathonPage() {
     const [editForm, setEditForm] = useState({
         company_name: '',
         contact_name: '',
-        website: '',
+        domain: '',
         email: '',
         phone: ''
     })
@@ -89,7 +89,7 @@ export default function MarathonPage() {
             setEditForm({
                 company_name: leads[currentIndex].company_name || '',
                 contact_name: leads[currentIndex].contact_name || '',
-                website: leads[currentIndex].website || '',
+                domain: leads[currentIndex].domain || '',
                 email: leads[currentIndex].email || '',
                 phone: leads[currentIndex].phone || ''
             })
@@ -106,7 +106,7 @@ export default function MarathonPage() {
                 .update({
                     company_name: editForm.company_name,
                     contact_name: editForm.contact_name,
-                    website: editForm.website,
+                    domain: editForm.domain,
                     email: editForm.email,
                     phone: editForm.phone
                 })
@@ -228,14 +228,14 @@ export default function MarathonPage() {
     }
 
     const handleEnrich = async () => {
-        if (!currentLead?.website) {
+        if (!currentLead?.domain) {
             showSuccess('Web no disponible para investigar')
             return
         }
 
         setEnriching(true)
         try {
-            const result = await enrichLead(currentLead.id, currentLead.website)
+            const result = await enrichLead(currentLead.id, currentLead.domain)
 
             if (result.success && result.data) {
                 const { contact_name, emails: newEmails, phones: newPhones } = result.data
@@ -383,8 +383,8 @@ export default function MarathonPage() {
                                         />
                                         <input
                                             type="text"
-                                            value={editForm.website}
-                                            onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                                            value={editForm.domain}
+                                            onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })}
                                             className="block w-full text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-300"
                                             placeholder="Sitio web"
                                         />
@@ -446,15 +446,15 @@ export default function MarathonPage() {
                                 )}
                             </div>
 
-                            {currentLead.website && !isEditingLead && (
+                            {currentLead.domain && !isEditingLead && (
                                 <a
-                                    href={currentLead.website.startsWith('http') ? currentLead.website : `https://${currentLead.website}`}
+                                    href={currentLead.domain.startsWith('http') ? currentLead.domain : `https://${currentLead.domain}`}
                                     target="_blank"
                                     className="flex items-center justify-between px-5 py-3 bg-gray-900 text-white rounded-lg hover:bg-black transition-all shadow-sm group/btn"
                                 >
                                     <div className="mr-6">
                                         <span className="text-[10px] font-bold text-gray-400 uppercase block">Website</span>
-                                        <span className="text-sm font-semibold truncate max-w-[150px] block">{currentLead.website}</span>
+                                        <span className="text-sm font-semibold truncate max-w-[150px] block">{currentLead.domain}</span>
                                     </div>
                                     <ExternalLink size={16} className="text-gray-400 group-hover/btn:text-white transition-colors" />
                                 </a>
@@ -641,7 +641,7 @@ export default function MarathonPage() {
 
                         <button
                             onClick={handleEnrich}
-                            disabled={enriching || !currentLead.website}
+                            disabled={enriching || !currentLead.domain}
                             className="w-full py-2 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all disabled:opacity-50 flex justify-center items-center"
                         >
                             {enriching ? <Loader2 size={12} className="animate-spin mr-2" /> : <Sparkles size={12} className="mr-2" />}
