@@ -219,6 +219,17 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                 }])
             }
 
+            // 4. Update Lead Status & Last Activity
+            if (formData.lead_id) {
+                await supabase
+                    .from('leads')
+                    .update({
+                        status: 'demo_scheduled',
+                        last_activity_at: new Date().toISOString()
+                    })
+                    .eq('id', formData.lead_id)
+            }
+
             showSuccess('Reunión agendada correctamente')
             onSuccess()
             onClose()

@@ -129,6 +129,25 @@ export async function POST(request: Request) {
 
         if (logError) console.error('Error logging email to DB:', logError)
 
+        // 4. Update Lead Status & Last Activity
+        const { error: updateError } = await supabase
+            .from('leads')
+            .update({
+                last_activity_at: new Date().toISOString(),
+                // Only move to contacted if it was 'new'
+                status: 'contacted'
+            })
+            .eq('id', lead_id)
+            .eq('status', 'new')
+
+        if (updateError) console.error('Error updating lead status:', updateError)
+
+        // Always update last_activity_at regardless of status
+        await supabase
+            .from('leads')
+            .update({ last_activity_at: new Date().toISOString() })
+            .eq('id', lead_id)
+
         return NextResponse.json({ success: true, id: data.id })
 
     } catch (error: any) {

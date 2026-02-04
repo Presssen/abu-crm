@@ -13,6 +13,7 @@ import {
 import { clsx } from 'clsx'
 import CreateLeadModal from '../components/CreateLeadModal'
 import LeadDetailModal from '../components/LeadDetailModal'
+import { syncInactiveLeads } from '@/lib/leads/sync'
 
 const STAGES = [
     { id: 'new', label: 'Nuevos', color: 'bg-blue-500' },
@@ -45,6 +46,9 @@ export default function PipelinePage() {
     const fetchLeads = async () => {
         setLoading(true)
         try {
+            // First, sync inactive leads
+            await syncInactiveLeads(supabase)
+
             const { data, error } = await supabase
                 .from('leads')
                 .select('*, profiles:won_by(first_name, last_name)')

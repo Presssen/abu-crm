@@ -38,6 +38,22 @@ export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadN
 
             if (error) throw error
 
+            // Update Lead Status & Last Activity
+            await supabase
+                .from('leads')
+                .update({
+                    last_activity_at: new Date().toISOString(),
+                    status: 'contacted'
+                })
+                .eq('id', leadId)
+                .eq('status', 'new')
+
+            // Always update last_activity_at regardless of status
+            await supabase
+                .from('leads')
+                .update({ last_activity_at: new Date().toISOString() })
+                .eq('id', leadId)
+
             showSuccess('Llamada registrada correctamente')
             setNotes('')
             onSuccess()
