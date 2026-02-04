@@ -34,6 +34,23 @@ const LEAD_FIELDS = [
     { key: 'notes', label: 'Notas', required: false },
 ]
 
+const excelSerialToDate = (serial: any) => {
+    if (!serial) return null
+    // If it's a number or a numeric string
+    const num = Number(serial)
+    if (!isNaN(num) && num > 25569) { // 25569 is 1970-01-01 roughly, avoids small numbers being treated as dates if they aren't
+        // Excel base date: Dec 30, 1899
+        const date = new Date((num - 25569) * 86400 * 1000)
+        return date.toISOString()
+    }
+    // Try standard parsing
+    const date = new Date(serial)
+    if (!isNaN(date.getTime())) {
+        return date.toISOString()
+    }
+    return null
+}
+
 const COUNTRIES = [
     'Andorra', 'España', 'México', 'Argentina', 'Colombia', 'Chile', 'Perú', 'Venezuela',
     'Ecuador', 'Guatemala', 'Cuba', 'Bolivia', 'República Dominicana', 'Honduras',
@@ -224,7 +241,7 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                                 lead['categories'] = valStr
                             }
                         } else if (dbField === 'created') {
-                            lead['created_date'] = value
+                            lead['created_date'] = excelSerialToDate(value)
                         } else if (dbField === 'status') {
                             lead['shopify_status'] = value
                         } else if (dbField === 'plan') {
