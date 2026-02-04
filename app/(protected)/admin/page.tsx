@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/auth/client'
 import {
     Settings,
@@ -37,8 +38,27 @@ interface Profile {
 }
 
 export default function AdminPage() {
+    return (
+        <Suspense fallback={<div>Cargando...</div>}>
+            <AdminContent />
+        </Suspense>
+    )
+}
+
+function AdminContent() {
     const supabase = createClient()
-    const [activeTab, setActiveTab] = useState<'integrations' | 'users' | 'marathon' | 'leads' | 'imports'>('integrations')
+    const router = useRouter()
+    const searchParams = useSearchParams()
+
+    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports'
+    const activeTab = (searchParams.get('tab') as TabType) || 'integrations'
+
+    const setActiveTab = (tab: TabType) => {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('tab', tab)
+        router.push(`?${params.toString()}`)
+    }
+
     const [integrations, setIntegrations] = useState<Integration[]>([])
     const [profiles, setProfiles] = useState<Profile[]>([])
     const [leads, setLeads] = useState<any[]>([])

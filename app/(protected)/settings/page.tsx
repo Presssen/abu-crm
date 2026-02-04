@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/auth/client'
 import {
     User,
@@ -22,14 +23,26 @@ import { clsx } from 'clsx'
 type Tab = 'profile' | 'integrations' | 'notifications' | 'security'
 
 export default function SettingsPage() {
+    return (
+        <Suspense fallback={<div>Cargando...</div>}>
+            <SettingsContent />
+        </Suspense>
+    )
+}
+
+function SettingsContent() {
     const supabase = createClient()
-    const [activeTab, setActiveTab] = useState<Tab>(() => {
-        if (typeof window !== 'undefined') {
-            const params = new URLSearchParams(window.location.search)
-            return (params.get('tab') as Tab) || 'profile'
-        }
-        return 'profile'
-    })
+    const router = useRouter()
+    const searchParams = useSearchParams()
+
+    const activeTab = (searchParams.get('tab') as Tab) || 'profile'
+
+    const setActiveTab = (tab: Tab) => {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('tab', tab)
+        router.push(`?${params.toString()}`)
+    }
+
     const [loading, setLoading] = useState(true)
     const [user, setUser] = useState<any>(null)
     const [profile, setProfile] = useState<any>(null)

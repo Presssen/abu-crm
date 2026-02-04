@@ -26,6 +26,10 @@ DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" 
 ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Admins can update all profiles" ON public.profiles;
+CREATE POLICY "Admins can update all profiles" 
+ON public.profiles FOR UPDATE USING (is_admin());
+
 
 -- Function to handle new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -106,7 +110,25 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 4. MEETINGS
+-- 4. APP SETTINGS
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS on app_settings
+ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Settings are viewable by everyone" ON app_settings;
+CREATE POLICY "Settings are viewable by everyone" ON app_settings
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admins can manage app_settings" ON app_settings;
+CREATE POLICY "Admins can manage app_settings" ON app_settings
+    FOR ALL USING (is_admin());
+
+-- 5. MEETINGS
 CREATE TABLE IF NOT EXISTS meetings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
