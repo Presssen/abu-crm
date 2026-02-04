@@ -118,7 +118,8 @@ export async function POST(request: Request) {
 
             console.log('📤 Sending event to Google Calendar API:', JSON.stringify(event, null, 2))
 
-            const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
+            // Add sendUpdates=all to send email notifications to attendees
+            const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
