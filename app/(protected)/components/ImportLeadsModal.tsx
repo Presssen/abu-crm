@@ -22,9 +22,7 @@ const LEAD_FIELDS = [
     { key: 'domain', label: 'Domain', required: false },
     { key: 'contact_name', label: 'Nombre de Contacto', required: false },
     { key: 'email', label: 'Email', required: false },
-    { key: 'emails', label: 'Emails', required: false },
     { key: 'phone', label: 'Teléfono', required: false },
-    { key: 'phones', label: 'Phones', required: false },
     { key: 'categories', label: 'Categories', required: false },
     { key: 'city', label: 'City', required: false },
     { key: 'created', label: 'Created', required: false },
@@ -178,17 +176,32 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                         if (!value) return
 
                         // Handle Shopify-specific mappings & special parsing
-                        if (dbField === 'email' || (dbField === 'email' && mapping[fileHeader] === 'emails')) {
-                            // Split emails values like "a@a.com:b@b.com"
-                            const emails = value.toString().split(':').map((s: string) => s.trim()).filter(Boolean)
-                            allEmails = [...allEmails, ...emails]
-                            // Set primary email if not set
-                            if (!lead['email'] && emails.length > 0) {
-                                lead['email'] = emails[0]
+                        // Handle Shopify-specific mappings & special parsing
+                        if (dbField === 'email') {
+                            const valStr = value.toString()
+                            // Extract emails using regex to handle cases like "a@b.com.c@d.com" or separators
+                            // We use \b at the end to ensure we don't match partial domains if they run into a separator like .user
+                            const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/gi
+                            const matches = valStr.match(emailRegex)
+
+                            if (matches) {
+                                // Clean up matches that might have captured leading separators (like .email@domain.com)
+                                const cleanMatches = matches.map((m: string) => m.replace(/^[.:,;\s]+/, ''))
+                                allEmails = [...allEmails, ...cleanMatches]
+                                if (!lead['email']) {
+                                    lead['email'] = cleanMatches[0]
+                                }
+                            } else {
+                                // Fallback split if no clear email pattern found
+                                const parts = valStr.split(/[:;,]\s*/).map((s: string) => s.trim()).filter(Boolean)
+                                allEmails = [...allEmails, ...parts]
+                                if (!lead['email'] && parts.length > 0) {
+                                    lead['email'] = parts[0]
+                                }
                             }
-                        } else if (dbField === 'phone' || (dbField === 'phone' && mapping[fileHeader] === 'phones')) {
-                            // Split phones values like "123:456"
-                            const phones = value.toString().split(':').map((s: string) => s.trim()).filter(Boolean)
+                        } else if (dbField === 'phone') {
+                            // Split phones values like "123:456" or "123, 456"
+                            const phones = value.toString().split(/[:;,]\s*/).map((s: string) => s.trim()).filter(Boolean)
                             allPhones = [...allPhones, ...phones]
                             // Set primary phone if not set
                             if (!lead['phone'] && phones.length > 0) {
