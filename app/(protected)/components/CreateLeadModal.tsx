@@ -34,12 +34,27 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
 
             if (!ownerId) throw new Error('No se pudo encontrar al usuario.')
 
-            const { error } = await supabase.from('leads').insert([{
-                ...formData,
-                owner_id: ownerId
-            }])
+            const { data: leadData, error: leadError } = await supabase
+                .from('leads')
+                .insert([{
+                    ...formData,
+                    owner_id: ownerId
+                }])
+                .select()
+                .single()
 
-            if (error) throw error
+            if (leadError) throw leadError
+
+            // Create initial contact in lead_contacts
+            if (leadData && (formData.contact_name || formData.email || formData.phone)) {
+                await supabase.from('lead_contacts').insert([{
+                    lead_id: leadData.id,
+                    name: formData.contact_name || 'Contacto Principal',
+                    email: formData.email,
+                    phone: formData.phone,
+                    is_primary: true
+                }])
+            }
 
             // Reset form
             setFormData({

@@ -57,6 +57,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const [saving, setSaving] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [lead, setLead] = useState<any>(null)
+    const [contacts, setContacts] = useState<any[]>([])
     const [emails, setEmails] = useState<any[]>([])
     const [meetings, setMeetings] = useState<any[]>([])
     const [tasks, setTasks] = useState<any[]>([])
@@ -98,6 +99,13 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     website: leadData.website || ''
                 })
             }
+
+            const { data: contactsData } = await supabase
+                .from('lead_contacts')
+                .select('*')
+                .eq('lead_id', leadId)
+                .order('is_primary', { ascending: false })
+            setContacts(contactsData || [])
 
             const { data: emailData } = await supabase
                 .from('emails')
@@ -160,6 +168,46 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const openEmailComposer = (email: string) => {
         setSelectedToEmail(email)
         setIsEmailModalOpen(true)
+    }
+
+    const handleAddContact = async () => {
+        const { data, error } = await supabase
+            .from('lead_contacts')
+            .insert({
+                lead_id: leadId,
+                name: 'Nuevo Contacto',
+                is_primary: contacts.length === 0
+            })
+            .select()
+            .single()
+
+        if (!error && data) {
+            setContacts([...contacts, data])
+            setIsEditing(true)
+        }
+    }
+
+    const handleDeleteContact = async (contactId: string) => {
+        if (!confirm('¿Seguro que quieres eliminar este contacto?')) return
+        const { error } = await supabase
+            .from('lead_contacts')
+            .delete()
+            .eq('id', contactId)
+
+        if (!error) {
+            setContacts(contacts.filter(c => c.id !== contactId))
+        }
+    }
+
+    const handleUpdateContact = async (contactId: string, updates: any) => {
+        const { error } = await supabase
+            .from('lead_contacts')
+            .update(updates)
+            .eq('id', contactId)
+
+        if (!error) {
+            setContacts(contacts.map(c => c.id === contactId ? { ...c, ...updates } : c))
+        }
     }
 
     if (!isOpen) return null
@@ -255,114 +303,106 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                         </span>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-4 bg-gray-50/50 rounded-xl border border-gray-100 relative group">
-                                            <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center mb-3 border-b border-gray-100 pb-1">
-                                                <Mail size={10} className="mr-1.5" />
-                                                Emails de Contacto
-                                            </label>
-                                            <div className="space-y-2">
-                                                {isEditing ? (
-                                                    <div className="space-y-2">
-                                                        {editForm.emails.map((email, idx) => (
-                                                            <div key={idx} className="flex gap-2">
-                                                                <input
-                                                                    className="flex-1 text-sm text-gray-900 font-semibold bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-gray-900"
-                                                                    value={email}
-                                                                    onChange={e => {
-                                                                        const newEmails = [...editForm.emails]
-                                                                        newEmails[idx] = e.target.value
-                                                                        setEditForm({ ...editForm, emails: newEmails })
-                                                                    }}
-                                                                />
-                                                                {editForm.emails.length > 1 && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const newEmails = editForm.emails.filter((_, i) => i !== idx)
-                                                                            setEditForm({ ...editForm, emails: newEmails })
-                                                                        }}
-                                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                                                                    >
-                                                                        <Trash2 size={14} />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                        <button
-                                                            onClick={() => setEditForm({ ...editForm, emails: [...editForm.emails, ''] })}
-                                                            className="w-full py-1.5 border border-dashed border-gray-300 rounded-lg text-gray-400 font-bold text-[10px] hover:border-gray-900 hover:text-gray-900 transition-all flex items-center justify-center gap-2"
-                                                        >
-                                                            <Plus size={12} />
-                                                            <span>Añadir Email</span>
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    emailsList.map((email: string, idx: number) => (
-                                                        <div key={idx} className="flex items-center justify-between group/item">
-                                                            <span className="text-sm text-gray-700 font-semibold">{email}</span>
-                                                            <button
-                                                                onClick={() => openEmailComposer(email)}
-                                                                className="opacity-0 group-hover/item:opacity-100 p-1 bg-gray-900 text-white rounded-md hover:bg-black transition-all"
-                                                            >
-                                                                <Send size={10} />
-                                                            </button>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                            <h4 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
+                                                <User className="text-gray-400" size={16} />
+                                                <span className="uppercase tracking-widest text-[10px]">Personas de Contacto</span>
+                                            </h4>
+                                            <button
+                                                onClick={handleAddContact}
+                                                className="p-1 px-2 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-bold hover:bg-indigo-100 transition-all flex items-center gap-1"
+                                            >
+                                                <Plus size={10} />
+                                                Añadir Persona
+                                            </button>
                                         </div>
 
-                                        <div className="p-4 bg-gray-50/50 rounded-xl border border-gray-100 relative group">
-                                            <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center mb-3 border-b border-gray-100 pb-1">
-                                                <Phone size={10} className="mr-1.5" />
-                                                Teléfonos
-                                            </label>
-                                            <div className="space-y-2">
-                                                {isEditing ? (
-                                                    <div className="space-y-2">
-                                                        {editForm.phones.map((phone, idx) => (
-                                                            <div key={idx} className="flex gap-2">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {contacts.map((contact) => (
+                                                <div key={contact.id} className="p-4 bg-gray-50/50 rounded-xl border border-gray-100 flex flex-col space-y-3 group/contact relative">
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex-1 min-w-0">
+                                                            {isEditing ? (
                                                                 <input
-                                                                    className="flex-1 text-sm text-gray-900 font-semibold bg-white border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-gray-900"
-                                                                    value={phone}
-                                                                    onChange={e => {
-                                                                        const newPhones = [...editForm.phones]
-                                                                        newPhones[idx] = e.target.value
-                                                                        setEditForm({ ...editForm, phones: newPhones })
-                                                                    }}
+                                                                    className="text-sm font-bold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1 w-full focus:border-gray-900 outline-none"
+                                                                    value={contact.name}
+                                                                    onChange={e => handleUpdateContact(contact.id, { name: e.target.value })}
                                                                 />
-                                                                {editForm.phones.length > 1 && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const newPhones = editForm.phones.filter((_, i) => i !== idx)
-                                                                            setEditForm({ ...editForm, phones: newPhones })
-                                                                        }}
-                                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                                                                    >
-                                                                        <Trash2 size={14} />
-                                                                    </button>
+                                                            ) : (
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-bold text-gray-900 truncate">{contact.name}</span>
+                                                                    {contact.is_primary && (
+                                                                        <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[8px] font-bold uppercase tracking-wider">Ppal</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {isEditing ? (
+                                                                <input
+                                                                    className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-2 py-0.5 w-full mt-1 focus:border-gray-900 outline-none"
+                                                                    value={contact.job_title || ''}
+                                                                    onChange={e => handleUpdateContact(contact.id, { job_title: e.target.value })}
+                                                                    placeholder="Cargo / Puesto"
+                                                                />
+                                                            ) : (
+                                                                <p className="text-[10px] text-gray-500 font-medium">{contact.job_title || 'Colaborador'}</p>
+                                                            )}
+                                                        </div>
+                                                        {isEditing && (
+                                                            <button
+                                                                onClick={() => handleDeleteContact(contact.id)}
+                                                                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover/contact:opacity-100 transition-all"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                                                        <div className="flex items-center justify-between group/item">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <Mail size={10} className="text-gray-400 shrink-0" />
+                                                                {isEditing ? (
+                                                                    <input
+                                                                        className="text-[11px] text-gray-600 font-medium bg-white border border-gray-200 rounded-lg px-2 py-0.5 w-full focus:border-gray-900 outline-none"
+                                                                        value={contact.email || ''}
+                                                                        onChange={e => handleUpdateContact(contact.id, { email: e.target.value })}
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-[11px] text-gray-600 font-medium truncate">{contact.email || 'Sin email'}</span>
                                                                 )}
                                                             </div>
-                                                        ))}
-                                                        <button
-                                                            onClick={() => setEditForm({ ...editForm, phones: [...editForm.phones, ''] })}
-                                                            className="w-full py-1.5 border border-dashed border-gray-300 rounded-lg text-gray-400 font-bold text-[10px] hover:border-gray-900 hover:text-gray-900 transition-all flex items-center justify-center gap-2"
-                                                        >
-                                                            <Plus size={12} />
-                                                            <span>Añadir Teléfono</span>
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    phonesList.map((p: string, idx: number) => (
-                                                        <div key={idx} className="flex items-center justify-between">
-                                                            <span className="text-sm text-gray-700 font-semibold">{p}</span>
-                                                            <a href={`tel:${p}`} className="p-1 text-gray-400 hover:text-gray-900 transition-all">
-                                                                <Phone size={12} />
-                                                            </a>
+                                                            {!isEditing && contact.email && (
+                                                                <button
+                                                                    onClick={() => openEmailComposer(contact.email)}
+                                                                    className="opacity-0 group-hover/contact:opacity-100 p-1 bg-gray-900 text-white rounded-md hover:bg-black transition-all"
+                                                                >
+                                                                    <Send size={8} />
+                                                                </button>
+                                                            )}
                                                         </div>
-                                                    ))
-                                                )}
-                                            </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <Phone size={10} className="text-gray-400 shrink-0" />
+                                                                {isEditing ? (
+                                                                    <input
+                                                                        className="text-[11px] text-gray-600 font-medium bg-white border border-gray-200 rounded-lg px-2 py-0.5 w-full focus:border-gray-900 outline-none"
+                                                                        value={contact.phone || ''}
+                                                                        onChange={e => handleUpdateContact(contact.id, { phone: e.target.value })}
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-[11px] text-gray-600 font-medium truncate">{contact.phone || 'Sin teléfono'}</span>
+                                                                )}
+                                                            </div>
+                                                            {!isEditing && contact.phone && (
+                                                                <a href={`tel:${contact.phone}`} className="opacity-0 group-hover/contact:opacity-100 p-1 text-gray-400 hover:text-gray-900 transition-all">
+                                                                    <Phone size={10} />
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
 
