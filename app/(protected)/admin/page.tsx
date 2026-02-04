@@ -296,6 +296,25 @@ export default function AdminPage() {
         }
     }
 
+    const deleteLead = async (leadId: string) => {
+        if (!confirm('¿Estás seguro de eliminar este lead? Esta acción no se puede deshacer.')) return
+
+        setSaving(true) // Reuse saving state for UI indication if needed, or local loading
+        try {
+            const { error } = await supabase.from('leads').delete().eq('id', leadId)
+            if (error) throw error
+
+            // Remove from local state immediately for better UX
+            setLeads(prev => prev.filter(l => l.id !== leadId))
+            setSelectedLeads(prev => prev.filter(id => id !== leadId))
+
+        } catch (error: any) {
+            alert('Error al eliminar lead: ' + error.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
     return (
         <div className="h-full overflow-y-auto p-8 space-y-8">
             <div className="flex justify-between items-start">
@@ -622,13 +641,23 @@ export default function AdminPage() {
                                             </select>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => reassignLead(lead.id, null)}
-                                                className="px-4 py-2 bg-amber-50 text-amber-600 text-xs font-bold rounded-xl hover:bg-amber-100 border border-amber-100 transition-all flex items-center space-x-1"
-                                            >
-                                                <Zap size={14} />
-                                                <span>Liberar</span>
-                                            </button>
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={() => reassignLead(lead.id, null)}
+                                                    className="px-3 py-1.5 bg-amber-50 text-amber-600 text-xs font-bold rounded-lg hover:bg-amber-100 border border-amber-100 transition-all flex items-center space-x-1"
+                                                    title="Liberar lead al pool"
+                                                >
+                                                    <Zap size={14} />
+                                                    <span>Liberar</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteLead(lead.id)}
+                                                    className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                    title="Eliminar lead"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

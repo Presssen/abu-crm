@@ -21,8 +21,23 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
         phone: '',
         source: '',
         notes: '',
-        status: 'new'
+        status: 'new',
+        // Shopify fields
+        domain: '',
+        plan: '', // Shopify Plus, Shopify Standard
+        shopify_status: '', // Active, etc
+        city: '',
+        country: '',
+        categories: '',
+        tags: '' // string input, converted to array on submit
     })
+
+    const COUNTRIES = [
+        'Andorra', 'España', 'México', 'Argentina', 'Colombia', 'Chile', 'Perú', 'Venezuela',
+        'Ecuador', 'Guatemala', 'Cuba', 'Bolivia', 'República Dominicana', 'Honduras',
+        'Paraguay', 'El Salvador', 'Nicaragua', 'Costa Rica', 'Panamá', 'Uruguay',
+        'Puerto Rico', 'Estados Unidos', 'Otro'
+    ]
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -38,6 +53,8 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 .from('leads')
                 .insert([{
                     ...formData,
+                    tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : [],
+                    plan: formData.plan || null, // Ensure empty string doesn't overwrite if nullable
                     owner_id: ownerId
                 }])
                 .select()
@@ -64,7 +81,14 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 phone: '',
                 source: '',
                 notes: '',
-                status: 'new'
+                status: 'new',
+                domain: '',
+                plan: '',
+                shopify_status: '',
+                city: '',
+                country: '',
+                categories: '',
+                tags: ''
             })
 
             onSuccess()
@@ -81,7 +105,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
 
     return (
         <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="sticky top-0 bg-white border-b border-gray-100 p-6 flex items-center justify-between rounded-t-3xl">
                     <h2 className="text-2xl font-bold text-gray-900">Crear Nuevo Lead</h2>
                     <button
@@ -181,6 +205,109 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                                 <option value="demo_scheduled">Demo Agendada</option>
                                 <option value="proposal_sent">Propuesta Enviada</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Información Shopify</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Dominio (Web)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.domain}
+                                    onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                    placeholder="tienda.com"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Plan Shopify
+                                </label>
+                                <select
+                                    value={formData.plan}
+                                    onChange={(e) => setFormData({ ...formData, plan: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                >
+                                    <option value="">Seleccionar Plan...</option>
+                                    <option value="Shopify Plus">Shopify Plus</option>
+                                    <option value="Shopify Standard">Shopify Standard</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Estado Shopify
+                                </label>
+                                <select
+                                    value={formData.shopify_status}
+                                    onChange={(e) => setFormData({ ...formData, shopify_status: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                >
+                                    <option value="">Seleccionar Estado...</option>
+                                    <option value="Active">Active</option>
+                                    <option value="Password Protected">Password Protected</option>
+                                    <option value="Frozen">Frozen</option>
+                                    <option value="Other">Otro</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    País
+                                </label>
+                                <select
+                                    value={formData.country}
+                                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                >
+                                    <option value="">Seleccionar País...</option>
+                                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Ciudad
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.city}
+                                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                    placeholder="Madrid"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Categorías
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.categories}
+                                    onChange={(e) => setFormData({ ...formData, categories: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                    placeholder="Moda, Tecnología..."
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Tags (separados por coma)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.tags}
+                                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                                    placeholder="tag1, tag2, tag3"
+                                />
+                            </div>
                         </div>
                     </div>
 
