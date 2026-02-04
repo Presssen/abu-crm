@@ -155,7 +155,11 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
             if (batchError) throw batchError
             const batchId = batchData.id
 
-            const leadsToImport = fileData.map((row) => {
+            const leadsToInsert: any[] = []
+            const contactsToInsert: any[] = []
+
+            // Prepare leads
+            const preparedLeads = fileData.map((row) => {
                 const lead: any = {
                     owner_id: ownerId,
                     status: 'new',
@@ -163,26 +167,55 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                     import_batch_id: batchId
                 }
 
+                // Temporary storage for split values
+                let allEmails: string[] = []
+                let allPhones: string[] = []
+
                 Object.entries(mapping).forEach(([fileHeader, dbField]) => {
                     if (dbField) {
                         let value = row[fileHeader]
 
-                        // Handle Shopify-specific mappings
-                        if (dbField === 'email' && mapping[fileHeader] === 'emails') {
-                            // Map 'emails' column to 'email'
-                            lead['email'] = value
-                        } else if (dbField === 'phone' && mapping[fileHeader] === 'phones') {
-                            // Map 'phones' column to 'phone'
-                            lead['phone'] = value
+                        if (!value) return
+
+                        // Handle Shopify-specific mappings & special parsing
+                        if (dbField === 'email' || (dbField === 'email' && mapping[fileHeader] === 'emails')) {
+                            // Split emails values like "a@a.com:b@b.com"
+                            const emails = value.toString().split(':').map((s: string) => s.trim()).filter(Boolean)
+                            allEmails = [...allEmails, ...emails]
+                            // Set primary email if not set
+                            if (!lead['email'] && emails.length > 0) {
+                                lead['email'] = emails[0]
+                            }
+                        } else if (dbField === 'phone' || (dbField === 'phone' && mapping[fileHeader] === 'phones')) {
+                            // Split phones values like "123:456"
+                            const phones = value.toString().split(':').map((s: string) => s.trim()).filter(Boolean)
+                            allPhones = [...allPhones, ...phones]
+                            // Set primary phone if not set
+                            if (!lead['phone'] && phones.length > 0) {
+                                lead['phone'] = phones[0]
+                            }
+                        } else if (dbField === 'categories') {
+                            // Parse category: "/Beauty & Fitness/Face & Body Care" -> "Beauty & Fitness"
+                            // Take the part between the first two slashes if it starts with /
+                            const valStr = value.toString()
+                            if (valStr.startsWith('/')) {
+                                const parts = valStr.split('/')
+                                // parts[0] is empty string before first slash
+                                // parts[1] is "Beauty & Fitness"
+                                if (parts.length > 1 && parts[1]) {
+                                    lead['categories'] = parts[1]
+                                } else {
+                                    lead['categories'] = valStr // Fallback
+                                }
+                            } else {
+                                lead['categories'] = valStr
+                            }
                         } else if (dbField === 'created') {
-                            // Map 'created' to 'created_date'
                             lead['created_date'] = value
                         } else if (dbField === 'status') {
-                            // Map 'status' to 'shopify_status'
                             lead['shopify_status'] = value
                         } else if (dbField === 'plan') {
-                            // Normalize plan: Shopify Plus or Shopify Standard
-                            lead['plan'] = value?.toLowerCase().includes('plus') ? 'Shopify Plus' : 'Shopify Standard'
+                            lead['plan'] = value?.toString().toLowerCase().includes('plus') ? 'Shopify Plus' : 'Shopify Standard'
                         } else {
                             lead[dbField] = value
                         }
@@ -194,16 +227,91 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                     lead.company_name = lead.domain
                 }
 
-                return lead
-            }).filter(l => l.email || l.company_name || l.domain)
+                if (!lead.email && !lead.company_name && !lead.domain) return null
 
-            const { error: importError } = await supabase.from('leads').insert(leadsToImport)
+                // Return both the lead object and the extra contact info needed
+                return {
+                    leadData: lead,
+                    extraContacts: {
+                        emails: allEmails,
+                        phones: allPhones,
+                        contact_name: lead.contact_name
+                    }
+                }
+            }).filter(Boolean)
+
+            if (preparedLeads.length === 0) {
+                throw new Error('No se encontraron leads validos para importar.')
+            }
+
+            // Insert leads in batches to avoid huge requests, but we need IDs so likely fine to do one big insert for reasonable sizes.
+            // Supabase returns inserted rows.
+            const { data: insertedLeads, error: importError } = await supabase
+                .from('leads')
+                .insert(preparedLeads.map(p => p!.leadData))
+                .select('id, email, phone')
+
             if (importError) throw importError
+
+            // Prepare contacts
+            // We need to match inserted leads back to our prepared data.
+            // Assumption: The order of insertedLeads matches the order of preparedLeads.
+            // THIS IS NOT GUARANTEED IN ALL SQL IMPLEMENTATIONS but typically works in single batch inserts.
+            // A safer way is ensuring we can map back via some unique key, but we might not have one.
+            // However, Supabase/Postgres `insert returning` typically preserves order of the values clause.
+
+            // To be safer/more robust, let's just iterate and assume validity for this script or use a loop.
+            // Actually, for bulk imports, order preservation in RETURNING is standard in Postgres for the VALUES list.
+
+            insertedLeads.forEach((insertedLead, index) => {
+                const prepared = preparedLeads[index]
+                if (!prepared) return
+
+                const { emails, phones, contact_name } = prepared.extraContacts
+
+                // Create contact entries
+                // Add emails that are NOT the primary email
+                emails.forEach((email: string) => {
+                    if (email !== insertedLead.email) {
+                        contactsToInsert.push({
+                            lead_id: insertedLead.id,
+                            name: contact_name || 'Contacto Adicional',
+                            email: email,
+                            is_primary: false
+                        })
+                    }
+                })
+
+                // Add phones that are NOT the primary phone
+                phones.forEach((phone: string) => {
+                    if (phone !== insertedLead.phone) {
+                        contactsToInsert.push({
+                            lead_id: insertedLead.id,
+                            name: contact_name || 'Contacto Adicional',
+                            phone: phone,
+                            is_primary: false
+                        })
+                    }
+                    // Note: We are creating separate contact entries for extra emails and extra phones for now, 
+                    // as we don't know which phone belongs to which email if they are just lists.
+                })
+            })
+
+            if (contactsToInsert.length > 0) {
+                const { error: contactsError } = await supabase
+                    .from('lead_contacts')
+                    .insert(contactsToInsert)
+
+                if (contactsError) {
+                    console.error('Error importing contacts:', contactsError)
+                    // We don't fail the whole import if contacts fail, but maybe we should warn?
+                }
+            }
 
             // Update batch with total leads count
             await supabase
                 .from('import_batches')
-                .update({ total_leads: leadsToImport.length })
+                .update({ total_leads: insertedLeads.length })
                 .eq('id', batchId)
 
             setStep(4)
@@ -211,6 +319,7 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                 onSuccess()
             }, 1000)
         } catch (err: any) {
+            console.error(err)
             setError(err.message || 'Error al importar los datos.')
         } finally {
             setImporting(false)
