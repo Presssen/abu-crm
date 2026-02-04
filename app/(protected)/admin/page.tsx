@@ -396,7 +396,7 @@ function AdminContent() {
                                     <Zap className="text-emerald-600" size={24} />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold text-gray-900">Inteligencia Artificial (Gemini)</h2>
+                                    <h2 className="text-lg font-bold text-gray-900">Conectar AI de Google</h2>
                                     <p className="text-sm text-gray-500">Configura la API Key de Google Gemini para el enriquecimiento automático de leads.</p>
                                 </div>
                             </div>
