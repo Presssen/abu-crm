@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/auth/client'
-import { X, Send, User, Mail, ChevronDown } from 'lucide-react'
+import { X, Send, User, Mail, ChevronDown, Sparkles, Layout, Variable, Eye } from 'lucide-react'
 import { clsx } from 'clsx'
 
 interface SendEmailModalProps {
@@ -114,6 +114,43 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
         }
     }
 
+    const [currentUser, setCurrentUser] = useState<any>(null)
+
+    useEffect(() => {
+        const getUser = async () => {
+            const { data } = await supabase.auth.getUser()
+            setCurrentUser(data.user)
+        }
+        getUser()
+    }, [])
+
+    const selectedLead = useMemo(() => {
+        return leads.find(l => l.id === formData.lead_id) || (initialLeadId ? { id: initialLeadId } : null)
+    }, [leads, formData.lead_id, initialLeadId])
+
+    const getPreviewContent = (text: string) => {
+        if (!text) return ''
+        let preview = text
+        if (selectedLead) {
+            preview = preview.replace(/\{\{company_name\}\}/g, selectedLead.company_name || '[Empresa]')
+            preview = preview.replace(/\{\{contact_name\}\}/g, selectedLead.contact_name || '[Contacto]')
+            preview = preview.replace(/\{\{sector\}\}/g, selectedLead.sector || '[Sector]')
+            preview = preview.replace(/\{\{country\}\}/g, selectedLead.country || '[País]')
+        }
+        if (currentUser) {
+            preview = preview.replace(/\{\{user_name\}\}/g, currentUser.user_metadata?.full_name || currentUser.email || '[Tu Nombre]')
+            preview = preview.replace(/\{\{user_email\}\}/g, currentUser.email || '[Tu Email]')
+        }
+        return preview
+    }
+
+    const insertVariable = (variable: string) => {
+        setFormData(prev => ({
+            ...prev,
+            body: prev.body + ` {{${variable}}}`
+        }))
+    }
+
     if (!isOpen) return null
 
     const selectedLead = leads.find(l => l.id === formData.lead_id) || (initialLeadId ? { id: initialLeadId } : null)
@@ -121,137 +158,176 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
     const availableEmails = selectedLead?.email ? selectedLead.email.split(':').map((e: string) => e.trim()).filter(Boolean) : []
 
     return (
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all animate-in fade-in duration-300">
-            <div className="bg-white rounded-[40px] shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-white/20">
-                <div className="p-8 border-b border-gray-100/50 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
-                    <div className="flex items-center space-x-4">
-                        <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100">
-                            <Mail className="text-white" size={24} />
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all animate-in fade-in duration-300">
+            <div className="bg-white rounded-[32px] shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-100">
+                {/* Header */}
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white">
+                    <div className="flex items-center space-x-3">
+                        <div className="h-10 w-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                            <Mail className="text-white" size={20} />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Redactar Email</h2>
-                            <p className="text-sm text-gray-500 font-medium">Personaliza tu comunicación con el lead</p>
+                            <h2 className="text-xl font-bold text-gray-900 tracking-tight">Redactar Email Profesional</h2>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors group">
-                        <X size={24} className="text-gray-400 group-hover:text-gray-900" />
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors group">
+                        <X size={20} className="text-gray-400 group-hover:text-gray-900" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-                    {/* Templates Selector */}
-                    {templates.length > 0 && (
-                        <div className="space-y-3">
-                            <label className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center">
-                                <ChevronDown size={14} className="mr-1" />
-                                Plantillas Disponibles
-                            </label>
-                            <div className="flex flex-wrap gap-2">
-                                {templates.map(t => (
-                                    <button
-                                        key={t.id}
-                                        type="button"
-                                        onClick={() => handleApplyTemplate(t)}
-                                        className="px-4 py-2 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95"
-                                    >
-                                        {t.name}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {!initialLeadId && (
+                <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+                    {/* Left Column: Form */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 border-r border-gray-50">
+                        {/* Templates */}
+                        {templates.length > 0 && (
                             <div className="space-y-2">
-                                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Destinatario</label>
-                                <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
-                                    <select
-                                        value={formData.lead_id}
-                                        onChange={handleLeadChange}
-                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 focus:bg-white rounded-2xl outline-none transition-all font-bold text-gray-900 appearance-none"
-                                    >
-                                        <option value="">Seleccionar Lead...</option>
-                                        {leads.map(l => (
-                                            <option key={l.id} value={l.id}>{l.company_name} ({l.contact_name})</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center">
+                                    <Layout size={12} className="mr-1" />
+                                    Plantillas Rápidas
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {templates.map(t => (
+                                        <button
+                                            key={t.id}
+                                            type="button"
+                                            onClick={() => handleApplyTemplate(t)}
+                                            className="px-3 py-1.5 bg-gray-50 text-gray-600 text-xs font-bold rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-all border border-transparent hover:border-indigo-100"
+                                        >
+                                            {t.name}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         )}
 
-                        <div className={clsx(!initialLeadId ? "space-y-2" : "md:col-span-2 space-y-2")}>
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Enviar a</label>
-                            <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {!initialLeadId && (
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Lead</label>
+                                    <select
+                                        value={formData.lead_id}
+                                        onChange={handleLeadChange}
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-sm font-medium"
+                                    >
+                                        <option value="">Seleccionar Lead...</option>
+                                        {leads.map(l => (
+                                            <option key={l.id} value={l.id}>{l.company_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            <div className={clsx(!initialLeadId ? "space-y-1.5" : "md:col-span-2 space-y-1.5")}>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Enviar a</label>
                                 {availableEmails.length > 1 ? (
-                                    <div className="relative">
-                                        <select
-                                            required
-                                            value={formData.to_email}
-                                            onChange={(e) => setFormData({ ...formData, to_email: e.target.value })}
-                                            className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 focus:bg-white rounded-2xl outline-none transition-all font-bold text-indigo-600 appearance-none"
-                                        >
-                                            {availableEmails.map((email: string, idx: number) => (
-                                                <option key={idx} value={email}>{email}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
-                                    </div>
+                                    <select
+                                        required
+                                        value={formData.to_email}
+                                        onChange={(e) => setFormData({ ...formData, to_email: e.target.value })}
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-sm font-bold text-indigo-600"
+                                    >
+                                        {availableEmails.map((email: string, idx: number) => (
+                                            <option key={idx} value={email}>{email}</option>
+                                        ))}
+                                    </select>
                                 ) : (
                                     <input
                                         type="email"
                                         required
                                         value={formData.to_email}
                                         onChange={(e) => setFormData({ ...formData, to_email: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-indigo-600/20 focus:bg-white rounded-2xl outline-none transition-all font-bold text-gray-900"
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-sm font-medium"
                                         placeholder="ejemplo@correo.com"
                                     />
                                 )}
                             </div>
                         </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Asunto</label>
+                            <input
+                                type="text"
+                                required
+                                value={formData.subject}
+                                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-sm font-bold"
+                                placeholder="Introduce el asunto..."
+                            />
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center">
+                                    <Variable size={12} className="mr-1" />
+                                    Contenido Dinámico
+                                </label>
+                                <span className="text-[10px] text-indigo-500 font-bold bg-indigo-50 px-2 py-0.5 rounded-full">Pro Mode</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                                {[
+                                    { id: 'contact_name', label: 'Nombre' },
+                                    { id: 'company_name', label: 'Empresa' },
+                                    { id: 'sector', label: 'Sector' },
+                                    { id: 'country', label: 'País' },
+                                    { id: 'user_name', label: 'Firma (Yo)' }
+                                ].map(v => (
+                                    <button
+                                        key={v.id}
+                                        type="button"
+                                        onClick={() => insertVariable(v.id)}
+                                        className="px-2 py-1 bg-white border border-gray-200 text-[10px] font-bold text-gray-500 rounded-md hover:border-indigo-200 hover:text-indigo-600 transition-all flex items-center"
+                                    >
+                                        <Sparkles size={10} className="mr-1" />
+                                        {v.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <textarea
+                                required
+                                value={formData.body}
+                                onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+                                rows={10}
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-sm leading-relaxed resize-none font-medium"
+                                placeholder="Escribe tu mensaje aquí..."
+                            />
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Asunto</label>
-                        <input
-                            type="text"
-                            required
-                            value={formData.subject}
-                            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="Introduce el asunto..."
-                        />
+                    {/* Right Column: Preview */}
+                    <div className="hidden md:flex flex-1 bg-gray-50 p-6 flex-col overflow-hidden">
+                        <div className="flex items-center space-x-2 mb-4">
+                            <Eye size={16} className="text-gray-400" />
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Vista Previa Real</h3>
+                        </div>
+                        <div className="flex-1 bg-white rounded-3xl border border-gray-200 shadow-inner overflow-y-auto p-8 flex flex-col">
+                            <div className="border-b border-gray-100 pb-4 mb-6 space-y-1">
+                                <div className="text-xs font-bold text-gray-400">Asunto: <span className="text-gray-900">{formData.subject || '(Sin asunto)'}</span></div>
+                                <div className="text-xs font-bold text-gray-400">Para: <span className="text-indigo-600">{formData.to_email || '(Sin destinatario)'}</span></div>
+                            </div>
+                            <div className="flex-1 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap font-medium">
+                                {getPreviewContent(formData.body) || <span className="text-gray-300 italic">Escribe tu mensaje para ver la vista previa...</span>}
+                            </div>
+                            <div className="mt-8 pt-6 border-t border-gray-50 text-[10px] text-gray-400 text-center uppercase tracking-widest font-black">
+                                Enviado via Gmail CRM Integration
+                            </div>
+                        </div>
                     </div>
+                </div>
 
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Mensaje</label>
-                        <textarea
-                            required
-                            value={formData.body}
-                            onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                            rows={8}
-                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                            placeholder="Escribe tu mensaje aquí..."
-                        />
-                    </div>
-
-                    <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-100">
-                        <button type="button" onClick={onClose} className="px-6 py-3 text-sm font-bold text-gray-600 hover:text-gray-900">
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="flex items-center px-8 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-50"
-                        >
-                            <Send size={18} className="mr-2" />
-                            {loading ? 'Enviando...' : 'Enviar Email'}
-                        </button>
-                    </div>
-                </form>
+                {/* Footer Actions */}
+                <div className="p-6 border-t border-gray-100 flex items-center justify-end space-x-3 bg-white">
+                    <button type="button" onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:bg-gray-50 rounded-xl transition-all">
+                        Descartar
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={loading || !formData.to_email || !formData.subject || !formData.body}
+                        className="flex items-center px-8 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all disabled:opacity-50 active:scale-95"
+                    >
+                        <Send size={16} className="mr-2" />
+                        {loading ? 'Enviando...' : 'Enviar Ahora'}
+                    </button>
+                </div>
             </div>
         </div>
     )

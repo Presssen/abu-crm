@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/auth/client'
 import { Phone, AlignLeft, Check, X } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useSuccess } from './ui/SuccessOverlay'
+import { useNotification } from './ui/NotificationProvider'
 
 interface LogCallModalProps {
     isOpen: boolean
@@ -16,7 +16,7 @@ interface LogCallModalProps {
 
 export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadName }: LogCallModalProps) {
     const supabase = createClient()
-    const { showSuccess } = useSuccess()
+    const { showSuccess, showError } = useNotification()
     const [loading, setLoading] = useState(false)
     const [notes, setNotes] = useState('')
 
@@ -44,7 +44,7 @@ export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadN
             onClose()
         } catch (error: any) {
             console.error('Error logging call:', error)
-            alert('Error al registrar la llamada: ' + error.message)
+            showError('Error al registrar la llamada: ' + error.message)
         } finally {
             setLoading(false)
         }

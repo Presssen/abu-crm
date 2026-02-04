@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/auth/client'
 import { X, Calendar, Clock, MapPin, AlignLeft, User, Send, Search, Plus, Trash2, ChevronLeft, ChevronRight, Timer } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useNotification } from './ui/NotificationProvider'
 
 interface CreateMeetingModalProps {
     isOpen: boolean
@@ -23,6 +24,7 @@ const DURATIONS = [
 
 export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initialLeadId }: CreateMeetingModalProps) {
     const supabase = createClient()
+    const { showSuccess, showError } = useNotification()
     const [loading, setLoading] = useState(false)
     const [leads, setLeads] = useState<any[]>([])
     const [searchQuery, setSearchQuery] = useState('')
@@ -217,11 +219,12 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                 }])
             }
 
+            showSuccess('Reunión agendada correctamente')
             onSuccess()
             onClose()
         } catch (error: any) {
             console.error('Error creating meeting:', error)
-            alert('Error al crear reunión: ' + error.message)
+            showError('Error al crear reunión: ' + error.message)
         } finally {
             setLoading(false)
         }

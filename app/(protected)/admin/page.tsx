@@ -48,6 +48,28 @@ export default function AdminPage() {
     const [openaiKey, setOpenaiKey] = useState('')
     const [marathonGoal, setMarathonGoal] = useState('20')
 
+    // Selection & Filters
+    const [selectedLeads, setSelectedLeads] = useState<string[]>([])
+    const [bulkOwnerId, setBulkOwnerId] = useState<string>('')
+    const [filters, setFilters] = useState({
+        country: '',
+        sector: '',
+        status: '',
+        owner: 'all' // all, assigned, unassigned
+    })
+
+    const filteredLeads = leads.filter(lead => {
+        if (filters.country && lead.country !== filters.country) return false
+        if (filters.sector && lead.sector !== filters.sector) return false
+        if (filters.status && lead.status !== filters.status) return false
+        if (filters.owner === 'assigned' && !lead.owner_id) return false
+        if (filters.owner === 'unassigned' && lead.owner_id) return false
+        return true
+    })
+
+    const countries = Array.from(new Set(leads.map(l => l.country).filter(Boolean)))
+    const sectors = Array.from(new Set(leads.map(l => l.sector).filter(Boolean)))
+
     useEffect(() => {
         fetchData()
     }, [activeTab])
@@ -175,6 +197,42 @@ export default function AdminPage() {
         } catch (error: any) {
             alert('Error al reasignar lead: ' + error.message)
         }
+    }
+
+    const bulkUpdateLeads = async (leadIds: string[], newOwnerId: string | null) => {
+        if (!leadIds.length) return
+        setSaving(true)
+        try {
+            const updates: any = { owner_id: newOwnerId }
+            if (newOwnerId === null) {
+                updates.status = 'new'
+            }
+
+            const { error } = await supabase.from('leads').update(updates).in('id', leadIds)
+            if (error) throw error
+
+            alert(`Se han reasignado ${leadIds.length} leads correctamente`)
+            setSelectedLeads([])
+            fetchData()
+        } catch (error: any) {
+            alert('Error en actualización masiva: ' + error.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const toggleSelectAll = () => {
+        if (selectedLeads.length === filteredLeads.length) {
+            setSelectedLeads([])
+        } else {
+            setSelectedLeads(filteredLeads.map(l => l.id))
+        }
+    }
+
+    const toggleSelectLead = (id: string) => {
+        setSelectedLeads(prev =>
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        )
     }
 
     return (
@@ -360,56 +418,158 @@ export default function AdminPage() {
 
             {/* LEADS TAB */}
             {activeTab === 'leads' && (
-                <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Empresa / Lead</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Asignado a</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Estado</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {leads.map((lead) => (
-                                <tr key={lead.id} className="hover:bg-gray-50/50">
-                                    <td className="px-6 py-4">
-                                        <div className="font-bold text-gray-900">{lead.company_name}</div>
-                                        <div className="text-xs text-gray-400">{lead.contact_name}</div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <select
-                                            value={lead.owner_id || ''}
-                                            onChange={(e) => reassignLead(lead.id, e.target.value || null)}
-                                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium"
-                                        >
-                                            <option value="">Pool Marathon (Sin asignar)</option>
-                                            {profiles.map(p => (
-                                                <option key={p.id} value={p.id}>{p.email}</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={clsx(
-                                            "px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border",
-                                            lead.status === 'new' ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-gray-50 text-gray-600 border-gray-100"
-                                        )}>
-                                            {lead.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <button
-                                            onClick={() => reassignLead(lead.id, null)}
-                                            className="px-4 py-2 bg-amber-50 text-amber-600 text-xs font-bold rounded-xl hover:bg-amber-100 border border-amber-100 transition-all flex items-center space-x-1"
-                                        >
-                                            <Zap size={14} />
-                                            <span>Forzar Marathon</span>
-                                        </button>
-                                    </td>
+                <div className="space-y-4">
+                    {/* Filters & Bulk Actions */}
+                    <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-6">
+                        <div className="flex flex-wrap gap-4 items-end">
+                            <div className="flex-1 min-w-[200px]">
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">País</label>
+                                <select
+                                    value={filters.country}
+                                    onChange={(e) => setFilters({ ...filters, country: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                                >
+                                    <option value="">Todos los países</option>
+                                    {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex-1 min-w-[200px]">
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Sector</label>
+                                <select
+                                    value={filters.sector}
+                                    onChange={(e) => setFilters({ ...filters, sector: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                                >
+                                    <option value="">Todos los sectores</option>
+                                    {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex-1 min-w-[150px]">
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Asignación</label>
+                                <select
+                                    value={filters.owner}
+                                    onChange={(e) => setFilters({ ...filters, owner: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                                >
+                                    <option value="all">Todos</option>
+                                    <option value="assigned">Asignados</option>
+                                    <option value="unassigned">Sin asignar (Marathon)</option>
+                                </select>
+                            </div>
+                            <button
+                                onClick={() => setFilters({ country: '', sector: '', status: '', owner: 'all' })}
+                                className="px-4 py-2 text-sm font-bold text-gray-400 hover:text-gray-600"
+                            >
+                                Limpiar
+                            </button>
+                        </div>
+
+                        {/* Bulk Action Bar */}
+                        <div className={clsx(
+                            "flex items-center justify-between p-4 rounded-2xl border transition-all",
+                            selectedLeads.length > 0 ? "bg-indigo-50 border-indigo-100" : "bg-gray-50 border-gray-100 opacity-50"
+                        )}>
+                            <div className="flex items-center space-x-4">
+                                <span className="text-sm font-bold text-indigo-900">
+                                    {selectedLeads.length} leads seleccionados
+                                </span>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                                <select
+                                    value={bulkOwnerId}
+                                    onChange={(e) => setBulkOwnerId(e.target.value)}
+                                    className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm"
+                                    disabled={selectedLeads.length === 0}
+                                >
+                                    <option value="">Seleccionar destinatario...</option>
+                                    <option value="null">Pool Marathon (Sin asignar)</option>
+                                    {profiles.map(p => (
+                                        <option key={p.id} value={p.id}>{p.email}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={() => bulkUpdateLeads(selectedLeads, bulkOwnerId === 'null' ? null : bulkOwnerId)}
+                                    disabled={selectedLeads.length === 0 || !bulkOwnerId}
+                                    className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 shadow-lg shadow-indigo-100"
+                                >
+                                    Asignar Masivamente
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th className="px-6 py-4 text-left">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
+                                            onChange={toggleSelectAll}
+                                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                    </th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Empresa / Lead</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Detalles</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Asignado a</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Acciones</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {filteredLeads.map((lead) => (
+                                    <tr key={lead.id} className={clsx(
+                                        "hover:bg-gray-50/50 transition-colors",
+                                        selectedLeads.includes(lead.id) && "bg-indigo-50/30"
+                                    )}>
+                                        <td className="px-6 py-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedLeads.includes(lead.id)}
+                                                onChange={() => toggleSelectLead(lead.id)}
+                                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-gray-900">{lead.company_name}</div>
+                                            <div className="text-xs text-gray-400">{lead.contact_name}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-xs text-gray-600 line-clamp-1">
+                                                {lead.country || 'N/A'} • {lead.sector || 'N/A'}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <select
+                                                value={lead.owner_id || ''}
+                                                onChange={(e) => reassignLead(lead.id, e.target.value || null)}
+                                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium"
+                                            >
+                                                <option value="">Pool Marathon (Sin asignar)</option>
+                                                {profiles.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.email}</option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <button
+                                                onClick={() => reassignLead(lead.id, null)}
+                                                className="px-4 py-2 bg-amber-50 text-amber-600 text-xs font-bold rounded-xl hover:bg-amber-100 border border-amber-100 transition-all flex items-center space-x-1"
+                                            >
+                                                <Zap size={14} />
+                                                <span>Liberar</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {filteredLeads.length === 0 && (
+                            <div className="p-12 text-center">
+                                <p className="text-gray-400 font-medium">No se encontraron leads con los filtros actuales.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

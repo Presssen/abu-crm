@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/auth/client'
 import { X } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useNotification } from './ui/NotificationProvider'
 
 interface CreateTaskModalProps {
     isOpen: boolean
@@ -15,6 +16,7 @@ interface CreateTaskModalProps {
 
 export default function CreateTaskModal({ isOpen, onClose, onSuccess, initialLeadId, initialTitle }: CreateTaskModalProps) {
     const supabase = createClient()
+    const { showSuccess, showError } = useNotification()
     const [loading, setLoading] = useState(false)
     const [leads, setLeads] = useState<any[]>([])
     const [formData, setFormData] = useState({
@@ -84,11 +86,12 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, initialLea
                 status: 'open'
             })
 
+            showSuccess('Tarea creada correctamente')
             onSuccess()
             onClose()
         } catch (error: any) {
             console.error('Error creating task:', error)
-            alert('Error al crear la tarea: ' + error.message)
+            showError('Error al crear la tarea: ' + error.message)
         } finally {
             setLoading(false)
         }

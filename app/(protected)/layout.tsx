@@ -4,7 +4,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/auth/client'
-import { SuccessProvider } from './components/ui/SuccessOverlay'
+import { NotificationProvider } from './components/ui/NotificationProvider'
 import {
     LayoutDashboard,
     Users,
@@ -168,9 +168,9 @@ export default function ProtectedLayout({
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0 md:pl-64 h-full">
                 <main className="flex-1 overflow-hidden flex flex-col">
-                    <SuccessProvider>
+                    <NotificationProvider>
                         {children}
-                    </SuccessProvider>
+                    </NotificationProvider>
                 </main>
             </div>
 

@@ -413,7 +413,7 @@ export default function SettingsPage() {
                                                 {isConnectGmailLoading ? (
                                                     <Loader2 className="h-5 w-5 animate-spin mr-2" />
                                                 ) : (
-                                                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/2560px-Gmail_icon_%282020%29.svg.png" alt="G" className="w-5 h-5 mr-2" />
+                                                    <Mail className="h-5 w-5 mr-2 text-red-600" />
                                                 )}
                                                 Conectar Gmail
                                             </button>
