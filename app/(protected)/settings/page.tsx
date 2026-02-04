@@ -116,52 +116,14 @@ export default function SettingsPage() {
         }
     }
 
-    const handleConnectCalendar = async () => {
+    const handleConnectCalendar = () => {
         setIsConnectCalendarLoading(true)
-        try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: `${window.location.origin}/auth/callback?type=calendar`,
-                    scopes: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly',
-                    queryParams: {
-                        access_type: 'offline',
-                        prompt: 'consent',
-                    },
-                },
-            })
-
-            if (error) throw error
-        } catch (error) {
-            console.error('Error connecting calendar:', error)
-            alert('Error al iniciar la conexión con Google')
-        } finally {
-            setIsConnectCalendarLoading(false)
-        }
+        window.location.href = '/api/integrations/google/auth?type=calendar'
     }
 
-    const handleConnectGmail = async () => {
+    const handleConnectGmail = () => {
         setIsConnectGmailLoading(true)
-        try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: `${window.location.origin}/auth/callback?type=gmail`,
-                    scopes: 'https://www.googleapis.com/auth/gmail.send',
-                    queryParams: {
-                        access_type: 'offline',
-                        prompt: 'consent',
-                    },
-                },
-            })
-
-            if (error) throw error
-        } catch (error) {
-            console.error('Error connecting gmail:', error)
-            alert('Error al iniciar la conexión con Gmail')
-        } finally {
-            setIsConnectGmailLoading(false)
-        }
+        window.location.href = '/api/integrations/google/auth?type=gmail'
     }
 
     // Function to disconnect (optional, but good for testing)
