@@ -24,7 +24,7 @@ import {
 import { clsx } from 'clsx'
 import SendEmailModal from './SendEmailModal'
 import LogCallModal from './LogCallModal'
-import { useSuccess } from './ui/SuccessOverlay'
+import { useNotification } from './ui/NotificationProvider'
 
 interface LeadDetailModalProps {
     isOpen: boolean
@@ -53,7 +53,7 @@ const statusLabels: Record<string, string> = {
 
 export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: LeadDetailModalProps) {
     const supabase = createClient()
-    const { showSuccess } = useSuccess()
+    const { showSuccess, showError } = useNotification()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [isEditing, setIsEditing] = useState(false)

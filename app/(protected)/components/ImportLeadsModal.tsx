@@ -18,12 +18,29 @@ import {
 import { clsx } from 'clsx'
 
 const LEAD_FIELDS = [
-    { key: 'company_name', label: 'Empresa', required: true },
+    { key: 'company_name', label: 'Empresa', required: false },
+    { key: 'domain', label: 'Domain', required: false },
     { key: 'contact_name', label: 'Nombre de Contacto', required: false },
-    { key: 'email', label: 'Email', required: true },
+    { key: 'email', label: 'Email', required: false },
+    { key: 'emails', label: 'Emails', required: false },
     { key: 'phone', label: 'Teléfono', required: false },
+    { key: 'phones', label: 'Phones', required: false },
+    { key: 'categories', label: 'Categories', required: false },
+    { key: 'city', label: 'City', required: false },
+    { key: 'created', label: 'Created', required: false },
+    { key: 'plan', label: 'Plan', required: false },
+    { key: 'platform', label: 'Platform', required: false },
+    { key: 'platform_rank', label: 'Platform Rank', required: false },
+    { key: 'status', label: 'Status', required: false },
     { key: 'source', label: 'Fuente', required: false },
     { key: 'notes', label: 'Notas', required: false },
+]
+
+const COUNTRIES = [
+    'España', 'México', 'Argentina', 'Colombia', 'Chile', 'Perú', 'Venezuela',
+    'Ecuador', 'Guatemala', 'Cuba', 'Bolivia', 'República Dominicana', 'Honduras',
+    'Paraguay', 'El Salvador', 'Nicaragua', 'Costa Rica', 'Panamá', 'Uruguay',
+    'Puerto Rico', 'Estados Unidos', 'Otro'
 ]
 
 interface ImportLeadsModalProps {
@@ -40,6 +57,7 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
     const [importing, setImporting] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [fileName, setFileName] = useState<string | null>(null)
+    const [selectedCountry, setSelectedCountry] = useState<string>('')
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = createClient()
@@ -122,14 +140,41 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
             if (!ownerId) throw new Error('No se pudo encontrar al usuario.')
 
             const leadsToImport = fileData.map((row) => {
-                const lead: any = { owner_id: ownerId, status: 'new' }
+                const lead: any = { owner_id: ownerId, status: 'new', country: selectedCountry }
+
                 Object.entries(mapping).forEach(([fileHeader, dbField]) => {
                     if (dbField) {
-                        lead[dbField] = row[fileHeader]
+                        let value = row[fileHeader]
+
+                        // Handle Shopify-specific mappings
+                        if (dbField === 'email' && mapping[fileHeader] === 'emails') {
+                            // Map 'emails' column to 'email'
+                            lead['email'] = value
+                        } else if (dbField === 'phone' && mapping[fileHeader] === 'phones') {
+                            // Map 'phones' column to 'phone'
+                            lead['phone'] = value
+                        } else if (dbField === 'created') {
+                            // Map 'created' to 'created_date'
+                            lead['created_date'] = value
+                        } else if (dbField === 'status') {
+                            // Map 'status' to 'shopify_status'
+                            lead['shopify_status'] = value
+                        } else if (dbField === 'plan') {
+                            // Normalize plan: Shopify Plus or Shopify Standard
+                            lead['plan'] = value?.toLowerCase().includes('plus') ? 'Shopify Plus' : 'Shopify Standard'
+                        } else {
+                            lead[dbField] = value
+                        }
                     }
                 })
+
+                // Use domain as company_name if company_name is empty
+                if (!lead.company_name && lead.domain) {
+                    lead.company_name = lead.domain
+                }
+
                 return lead
-            }).filter(l => l.email || l.company_name)
+            }).filter(l => l.email || l.company_name || l.domain)
 
             const { error: importError } = await supabase.from('leads').insert(leadsToImport)
             if (importError) throw importError
@@ -152,6 +197,7 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
         setMapping({})
         setFileName(null)
         setError(null)
+        setSelectedCountry('')
     }
 
     return (
@@ -187,16 +233,55 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                     </div>
 
                     {step === 1 && (
-                        <div
-                            onClick={() => fileInputRef.current?.click()}
-                            className="border-2 border-dashed border-gray-300 rounded-3xl h-64 flex flex-col items-center justify-center bg-white hover:border-indigo-500 hover:bg-indigo-50/50 transition-all cursor-pointer group"
-                        >
-                            <input ref={fileInputRef} type="file" onChange={handleFileUpload} accept=".xlsx, .xls, .csv" className="hidden" />
-                            <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform mb-4">
-                                <Upload size={32} />
+                        <div className="space-y-6">
+                            {/* Country Selection */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700">País de origen de los leads *</label>
+                                <select
+                                    value={selectedCountry}
+                                    onChange={(e) => setSelectedCountry(e.target.value)}
+                                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm font-medium"
+                                    required
+                                >
+                                    <option value="">Seleccionar país...</option>
+                                    {COUNTRIES.map(country => (
+                                        <option key={country} value={country}>{country}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500">Este país se asignará a todos los leads importados</p>
                             </div>
-                            <p className="font-bold text-gray-900">Haz clic o arrastra tu archivo aquí</p>
-                            <p className="text-sm text-gray-500 mt-1">Soporta Excel y CSV</p>
+
+                            {/* File Upload */}
+                            <div
+                                onClick={() => selectedCountry && fileInputRef.current?.click()}
+                                className={clsx(
+                                    "border-2 border-dashed rounded-3xl h-64 flex flex-col items-center justify-center bg-white transition-all cursor-pointer group",
+                                    selectedCountry
+                                        ? "border-gray-300 hover:border-indigo-500 hover:bg-indigo-50/50"
+                                        : "border-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
+                                )}
+                            >
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    onChange={handleFileUpload}
+                                    accept=".xlsx, .xls, .csv"
+                                    className="hidden"
+                                    disabled={!selectedCountry}
+                                />
+                                <div className={clsx(
+                                    "p-4 rounded-2xl mb-4 transition-transform",
+                                    selectedCountry
+                                        ? "bg-indigo-50 text-indigo-600 group-hover:scale-110"
+                                        : "bg-gray-100 text-gray-400"
+                                )}>
+                                    <Upload size={32} />
+                                </div>
+                                <p className="font-bold text-gray-900">
+                                    {selectedCountry ? 'Haz clic o arrastra tu archivo aquí' : 'Selecciona un país primero'}
+                                </p>
+                                <p className="text-sm text-gray-500 mt-1">Soporta Excel y CSV</p>
+                            </div>
                         </div>
                     )}
 

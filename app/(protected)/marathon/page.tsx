@@ -31,7 +31,7 @@ import SendEmailModal from '../components/SendEmailModal'
 import CreateMeetingModal from '../components/CreateMeetingModal'
 import CreateTaskModal from '../components/CreateTaskModal'
 import LogCallModal from '../components/LogCallModal'
-import { useSuccess } from '../components/ui/SuccessOverlay'
+import { useNotification } from '../components/ui/NotificationProvider'
 
 interface Lead {
     id: string
@@ -67,7 +67,7 @@ export default function MarathonPage() {
     const [isLogCallModalOpen, setIsLogCallModalOpen] = useState(false)
     const [taskInitialTitle, setTaskInitialTitle] = useState('')
     const [emailInitialTo, setEmailInitialTo] = useState('')
-    const { showSuccess } = useSuccess()
+    const { showSuccess, showError } = useNotification()
 
     const [isEditingLead, setIsEditingLead] = useState(false)
     const [editForm, setEditForm] = useState({

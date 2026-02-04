@@ -34,6 +34,16 @@ interface Lead {
     source: string
     owner_id: string | null
     created_at: string
+    domain?: string
+    categories?: string
+    city?: string
+    created_date?: string
+    plan?: string
+    platform?: string
+    platform_rank?: number
+    shopify_status?: string
+    country?: string
+    tags?: string[]
 }
 
 const statusColors: Record<string, string> = {
@@ -76,6 +86,13 @@ export default function LeadsPage() {
     const [isAdmin, setIsAdmin] = useState(false)
     const [isReassigning, setIsReassigning] = useState(false)
 
+    // Shopify Filters
+    const [planFilter, setPlanFilter] = useState('all')
+    const [shopifyStatusFilter, setShopifyStatusFilter] = useState('all')
+    const [countryFilter, setCountryFilter] = useState('all')
+    const [cityFilter, setCityFilter] = useState('all')
+    const [showFilters, setShowFilters] = useState(false)
+
     const fetchLeads = async () => {
         setLoading(true)
         try {
@@ -85,8 +102,24 @@ export default function LeadsPage() {
                 query = query.eq('status', statusFilter)
             }
 
+            if (planFilter !== 'all') {
+                query = query.eq('plan', planFilter)
+            }
+
+            if (shopifyStatusFilter !== 'all') {
+                query = query.eq('shopify_status', shopifyStatusFilter)
+            }
+
+            if (countryFilter !== 'all') {
+                query = query.eq('country', countryFilter)
+            }
+
+            if (cityFilter !== 'all') {
+                query = query.eq('city', cityFilter)
+            }
+
             if (search) {
-                query = query.or(`company_name.ilike.%${search}%,contact_name.ilike.%${search}%,email.ilike.%${search}%`)
+                query = query.or(`company_name.ilike.%${search}%,contact_name.ilike.%${search}%,email.ilike.%${search}%,domain.ilike.%${search}%`)
             }
 
             const { data, error } = await query
@@ -117,7 +150,7 @@ export default function LeadsPage() {
         fetchLeads()
         checkAdminStatus()
         fetchProfiles()
-    }, [statusFilter, search])
+    }, [statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter])
 
     const checkAdminStatus = async () => {
         const { data: { user } } = await supabase.auth.getUser()
@@ -189,33 +222,103 @@ export default function LeadsPage() {
             />
 
             {/* Filters & Search */}
-            <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por empresa, contacto o email..."
-                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
+            <div className="space-y-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar por empresa, contacto, email o domain..."
+                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-gray-500" />
+                        <select
+                            className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                        >
+                            <option value="all">Todos los estados</option>
+                            <option value="new">Nuevos</option>
+                            <option value="contacted">Contactados</option>
+                            <option value="demo_scheduled">Demo Agendada</option>
+                            <option value="proposal_sent">Propuesta Enviada</option>
+                            <option value="won">Ganados</option>
+                            <option value="lost">Perdidos</option>
+                        </select>
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={clsx(
+                                "px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2",
+                                showFilters
+                                    ? "bg-indigo-600 text-white"
+                                    : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                            )}
+                        >
+                            <Filter size={16} />
+                            Filtros Shopify
+                        </button>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-gray-500" />
-                    <select
-                        className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                    >
-                        <option value="all">Todos los estados</option>
-                        <option value="new">Nuevos</option>
-                        <option value="contacted">Contactados</option>
-                        <option value="demo_scheduled">Demo Agendada</option>
-                        <option value="proposal_sent">Propuesta Enviada</option>
-                        <option value="won">Ganados</option>
-                        <option value="lost">Perdidos</option>
-                    </select>
-                </div>
+
+                {/* Shopify Filters Panel */}
+                {showFilters && (
+                    <div className="bg-white border border-gray-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Plan</label>
+                            <select
+                                value={planFilter}
+                                onChange={(e) => setPlanFilter(e.target.value)}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="Shopify Plus">Shopify Plus</option>
+                                <option value="Shopify Standard">Shopify Standard</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Estado Shopify</label>
+                            <select
+                                value={shopifyStatusFilter}
+                                onChange={(e) => setShopifyStatusFilter(e.target.value)}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="Active">Active</option>
+                                <option value="Password Protected">Password Protected</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">País</label>
+                            <select
+                                value={countryFilter}
+                                onChange={(e) => setCountryFilter(e.target.value)}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="all">Todos</option>
+                                {Array.from(new Set(leads.map(l => l.country).filter(Boolean))).map(country => (
+                                    <option key={country} value={country}>{country}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Ciudad</label>
+                            <select
+                                value={cityFilter}
+                                onChange={(e) => setCityFilter(e.target.value)}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="all">Todas</option>
+                                {Array.from(new Set(leads.map(l => l.city).filter(Boolean))).map(city => (
+                                    <option key={city} value={city}>{city}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Table */}
@@ -226,6 +329,8 @@ export default function LeadsPage() {
                             <tr className="bg-gray-50/50 border-b border-gray-100">
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Empresa / Contacto</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email / Teléfono</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Plan / Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Ubicación</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Creado</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Acciones</th>
@@ -238,13 +343,15 @@ export default function LeadsPage() {
                                         <td className="px-6 py-4"><div className="h-10 bg-gray-100 rounded-lg w-48" /></td>
                                         <td className="px-6 py-4"><div className="h-10 bg-gray-100 rounded-lg w-40" /></td>
                                         <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded-full w-24" /></td>
+                                        <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded-full w-24" /></td>
+                                        <td className="px-6 py-4"><div className="h-6 bg-gray-100 rounded-full w-24" /></td>
                                         <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-20" /></td>
                                         <td className="px-6 py-4"><div className="h-8 bg-gray-100 rounded-lg w-8 ml-auto" /></td>
                                     </tr>
                                 ))
                             ) : leads.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                                         No se encontraron leads.
                                     </td>
                                 </tr>
@@ -279,6 +386,37 @@ export default function LeadsPage() {
                                                     <Phone className="h-3 w-3 mr-2 text-gray-400" />
                                                     {lead.phone || 'N/A'}
                                                 </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-1">
+                                                {lead.plan && (
+                                                    <span className={clsx(
+                                                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold",
+                                                        lead.plan === 'Shopify Plus'
+                                                            ? "bg-purple-50 text-purple-700 border border-purple-100"
+                                                            : "bg-gray-50 text-gray-600 border border-gray-100"
+                                                    )}>
+                                                        {lead.plan}
+                                                    </span>
+                                                )}
+                                                {lead.shopify_status && (
+                                                    <span className={clsx(
+                                                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium",
+                                                        lead.shopify_status === 'Active'
+                                                            ? "bg-emerald-50 text-emerald-700"
+                                                            : "bg-amber-50 text-amber-700"
+                                                    )}>
+                                                        {lead.shopify_status}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-xs text-gray-600">
+                                                {lead.city && <div className="font-medium">{lead.city}</div>}
+                                                {lead.country && <div className="text-gray-400">{lead.country}</div>}
+                                                {!lead.city && !lead.country && <span className="text-gray-300">-</span>}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
