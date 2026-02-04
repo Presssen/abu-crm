@@ -327,14 +327,14 @@ export default function EmailsPage() {
                                             <button
                                                 onClick={() => openEditModal(tpl)}
                                                 className="text-sm font-bold text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
-                                                disabled={tpl.is_global && user?.profile?.role !== 'admin'}
+                                                disabled={tpl.owner_id !== user?.id && !(tpl.is_global && profile?.role === 'admin')}
                                             >
                                                 Editar
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteTemplate(tpl.id)}
                                                 className="text-sm font-bold text-red-600 hover:text-red-700 disabled:opacity-50"
-                                                disabled={tpl.is_global && user?.profile?.role !== 'admin'}
+                                                disabled={tpl.owner_id !== user?.id && !(tpl.is_global && profile?.role === 'admin')}
                                             >
                                                 Eliminar
                                             </button>
@@ -402,7 +402,7 @@ export default function EmailsPage() {
                                     onChange={e => setFormData({ ...formData, body: e.target.value })}
                                 />
                             </div>
-                            {user?.profile?.role === 'admin' && (
+                            {profile?.role === 'admin' && (
                                 <div className="flex items-center space-x-3">
                                     <input
                                         type="checkbox"

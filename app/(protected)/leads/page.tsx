@@ -31,6 +31,7 @@ interface Lead {
     phone: string
     status: string
     source: string
+    owner_id: string | null
     created_at: string
 }
 
@@ -69,6 +70,9 @@ export default function LeadsPage() {
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
+    const [profiles, setProfiles] = useState<any[]>([])
+    const [isAdmin, setIsAdmin] = useState(false)
+    const [isReassigning, setIsReassigning] = useState(false)
 
     const fetchLeads = async () => {
         setLoading(true)
@@ -109,7 +113,38 @@ export default function LeadsPage() {
 
     useEffect(() => {
         fetchLeads()
+        checkAdminStatus()
+        fetchProfiles()
     }, [statusFilter, search])
+
+    const checkAdminStatus = async () => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+            const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+            setIsAdmin(data?.role === 'admin')
+        }
+    }
+
+    const fetchProfiles = async () => {
+        const { data } = await supabase.from('profiles').select('id, email, first_name, last_name').order('email')
+        setProfiles(data || [])
+    }
+
+    const reassignLead = async (leadId: string, newOwnerId: string | null) => {
+        try {
+            const { error } = await supabase
+                .from('leads')
+                .update({ owner_id: newOwnerId })
+                .eq('id', leadId)
+            if (error) throw error
+            alert('Lead reasignado correctamente')
+            fetchLeads()
+            setActiveMenuId(null)
+            setIsReassigning(false)
+        } catch (error: any) {
+            alert('Error al reasignar: ' + error.message)
+        }
+    }
 
     return (
         <div className="h-full overflow-y-auto p-6 space-y-6">
@@ -361,6 +396,38 @@ export default function LeadsPage() {
                             <Zap size={14} className="mr-2" />
                             Enviar a Marathon
                         </button>
+
+                        {isAdmin && (
+                            <div className="border-t border-gray-50 pt-1">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setIsReassigning(!isReassigning)
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-indigo-600 hover:bg-indigo-50 flex items-center transition-colors"
+                                >
+                                    <User size={14} className="mr-2" />
+                                    Reasignar Lead
+                                </button>
+                                {isReassigning && (
+                                    <div className="px-2 pb-2">
+                                        <select
+                                            className="w-full text-xs p-2 bg-gray-50 border border-gray-100 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
+                                            onChange={(e) => reassignLead(activeMenuId, e.target.value)}
+                                            defaultValue=""
+                                        >
+                                            <option value="" disabled>Seleccionar usuario...</option>
+                                            <option value="">Pool Marathon (Sin asignar)</option>
+                                            {profiles.map(p => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.first_name ? `${p.first_name} (${p.email})` : p.email}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </>
             )}

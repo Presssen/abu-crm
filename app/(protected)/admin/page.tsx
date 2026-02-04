@@ -62,6 +62,14 @@ export default function AdminPage() {
                     .eq('is_global', true)
                 if (error) throw error
                 setIntegrations(data || [])
+
+                // Also fetch global marathon goal to use across tabs if needed
+                const { data: mGoal } = await supabase
+                    .from('app_settings')
+                    .select('*')
+                    .eq('key', 'marathon_default_goal')
+                    .single()
+                if (mGoal) setMarathonGoal(mGoal.value)
             } else if (activeTab === 'marathon') {
                 const { data, error } = await supabase
                     .from('app_settings')
@@ -326,10 +334,17 @@ export default function AdminPage() {
                                     <td className="px-6 py-4">
                                         <input
                                             type="number"
-                                            defaultValue={profile.daily_lead_goal || 20}
-                                            onBlur={(e) => updateUserProfile(profile.id, { daily_lead_goal: parseInt(e.target.value) })}
-                                            className="w-20 px-3 py-1 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold"
+                                            key={`${profile.id}-${marathonGoal}`} // Force re-render if global goal changes
+                                            defaultValue={profile.daily_lead_goal || marathonGoal || 20}
+                                            onBlur={(e) => {
+                                                const val = parseInt(e.target.value)
+                                                if (!isNaN(val)) updateUserProfile(profile.id, { daily_lead_goal: val })
+                                            }}
+                                            className="w-20 px-3 py-1 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-1 focus:ring-indigo-500 outline-none"
                                         />
+                                        <div className="text-[10px] text-gray-400 mt-1">
+                                            {profile.daily_lead_goal ? 'Personalizado' : 'Usando global'}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <button className="text-gray-400 hover:text-rose-600 transition-colors">
