@@ -85,16 +85,25 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
 
             if (!ownerId) throw new Error('No se pudo encontrar al usuario.')
 
-            const { error } = await supabase.from('emails').insert([{
-                ...formData,
-                owner_id: ownerId,
-                status: 'sent', // Simulate sending
-                sent_at: new Date().toISOString()
-            }])
+            // Call our new API route
+            const response = await fetch('/api/gmail/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    lead_id: formData.lead_id,
+                    to: formData.to_email,
+                    subject: formData.subject,
+                    body: formData.body
+                })
+            })
 
-            if (error) throw error
+            const result = await response.json()
 
-            alert('Email enviado correctamente (Simulado)')
+            if (!response.ok) {
+                throw new Error(result.error || 'Error desconocido al enviar')
+            }
+
+            alert('Email enviado correctamente via Gmail')
             onSuccess()
             onClose()
         } catch (error: any) {

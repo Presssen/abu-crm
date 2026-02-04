@@ -30,6 +30,7 @@ import { enrichLead } from '@/app/actions/enrich-lead'
 import SendEmailModal from '../components/SendEmailModal'
 import CreateMeetingModal from '../components/CreateMeetingModal'
 import CreateTaskModal from '../components/CreateTaskModal'
+import LogCallModal from '../components/LogCallModal'
 import { useSuccess } from '../components/ui/SuccessOverlay'
 
 interface Lead {
@@ -63,6 +64,7 @@ export default function MarathonPage() {
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
     const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false)
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+    const [isLogCallModalOpen, setIsLogCallModalOpen] = useState(false)
     const [taskInitialTitle, setTaskInitialTitle] = useState('')
     const [emailInitialTo, setEmailInitialTo] = useState('')
     const { showSuccess } = useSuccess()
@@ -194,24 +196,8 @@ export default function MarathonPage() {
         }
     }
 
-    const handleLogCall = async () => {
-        if (!currentLead) return
-
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        const { error } = await supabase
-            .from('calls')
-            .insert({
-                lead_id: currentLead.id,
-                owner_id: user.id,
-                notes: 'Llamada rápida desde modo maratón'
-            })
-
-        if (!error) {
-            showSuccess('Llamada registrada')
-            fetchActivity(currentLead.id)
-        }
+    const handleLogCall = () => {
+        setIsLogCallModalOpen(true)
     }
 
     const handleAction = async (action: 'qualify' | 'disqualify' | 'save_notes', data?: any) => {
@@ -717,6 +703,14 @@ export default function MarathonPage() {
                 onSuccess={() => fetchActivity(currentLead.id)}
                 initialLeadId={currentLead.id}
                 initialTitle={taskInitialTitle}
+            />
+
+            <LogCallModal
+                isOpen={isLogCallModalOpen}
+                onClose={() => setIsLogCallModalOpen(false)}
+                onSuccess={() => fetchActivity(currentLead.id)}
+                leadId={currentLead.id}
+                leadName={currentLead.company_name}
             />
         </div>
     )

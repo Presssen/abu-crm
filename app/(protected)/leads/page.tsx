@@ -22,6 +22,7 @@ import SendEmailModal from '../components/SendEmailModal'
 import CreateMeetingModal from '../components/CreateMeetingModal'
 import CreateTaskModal from '../components/CreateTaskModal'
 import LeadDetailModal from '../components/LeadDetailModal'
+import LogCallModal from '../components/LogCallModal'
 
 interface Lead {
     id: string
@@ -66,6 +67,7 @@ export default function LeadsPage() {
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
     const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false)
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+    const [isLogCallModalOpen, setIsLogCallModalOpen] = useState(false)
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
@@ -388,6 +390,20 @@ export default function LeadsPage() {
                         </button>
                         <button
                             onClick={() => {
+                                const lead = leads.find(l => l.id === activeMenuId)
+                                if (lead) {
+                                    setSelectedLead(lead)
+                                    setIsLogCallModalOpen(true)
+                                }
+                                setActiveMenuId(null)
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center transition-colors"
+                        >
+                            <Phone size={14} className="mr-2" />
+                            Registrar Llamada
+                        </button>
+                        <button
+                            onClick={() => {
                                 sendToMarathon(activeMenuId)
                                 setActiveMenuId(null)
                             }}
@@ -451,6 +467,14 @@ export default function LeadsPage() {
                 isOpen={isTaskModalOpen}
                 onClose={() => setIsTaskModalOpen(false)}
                 onSuccess={fetchLeads}
+            />
+
+            <LogCallModal
+                isOpen={isLogCallModalOpen}
+                onClose={() => setIsLogCallModalOpen(false)}
+                onSuccess={fetchLeads}
+                leadId={selectedLead?.id || ''}
+                leadName={selectedLead?.company_name}
             />
 
             {selectedLeadId && (

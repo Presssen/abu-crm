@@ -14,6 +14,7 @@ export async function GET(request: Request) {
         if (!error && data.session) {
             const { user, provider_token, provider_refresh_token } = data.session
             const isCalendar = searchParams.get('type') === 'calendar'
+            const isGmail = searchParams.get('type') === 'gmail'
 
             // If we have a provider token, it's likely from our Google integration
             // We should save it regardless of whether it's 'type=calendar' flow or just a login
@@ -21,9 +22,14 @@ export async function GET(request: Request) {
             if (provider_token) {
                 console.log('📅 Capturing provider tokens for user:', user.email)
 
+                // Determine integration type based on the flow or default to login
+                // However, if we separate them, we want to be explicit.
+                let integrationType = 'google_calendar' // Default/Fallback
+                if (isGmail) integrationType = 'google_mail'
+
                 const payload = {
                     owner_id: user.id,
-                    integration_type: 'google_calendar',
+                    integration_type: integrationType,
                     provider: 'google',
                     credentials: {
                         access_token: provider_token,
@@ -54,6 +60,20 @@ export async function GET(request: Request) {
                 // For calendar flow, redirect back to settings
                 const forwardedHost = request.headers.get('x-forwarded-host')
                 const settingsPath = '/settings?tab=integrations&action=sync'
+
+                if (process.env.NODE_ENV === 'development') {
+                    return NextResponse.redirect(`${origin}${settingsPath}`)
+                } else if (forwardedHost) {
+                    return NextResponse.redirect(`https://${forwardedHost}${settingsPath}`)
+                } else {
+                    return NextResponse.redirect(`${origin}${settingsPath}`)
+                }
+            }
+
+            if (isGmail) {
+                // For gmail flow, redirect back to settings
+                const forwardedHost = request.headers.get('x-forwarded-host')
+                const settingsPath = '/settings?tab=integrations&action=gmail_connected'
 
                 if (process.env.NODE_ENV === 'development') {
                     return NextResponse.redirect(`${origin}${settingsPath}`)

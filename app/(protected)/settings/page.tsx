@@ -34,17 +34,22 @@ export default function SettingsPage() {
     const [user, setUser] = useState<any>(null)
     const [profile, setProfile] = useState<any>(null)
     const [isCalendarConnected, setIsCalendarConnected] = useState(false)
-    const [isConnectLoading, setIsConnectLoading] = useState(false)
+    const [isGmailConnected, setIsGmailConnected] = useState(false)
+    const [isConnectCalendarLoading, setIsConnectCalendarLoading] = useState(false)
+    const [isConnectGmailLoading, setIsConnectGmailLoading] = useState(false)
     const [isSyncing, setIsSyncing] = useState(false)
     const [lastSynced, setLastSynced] = useState<string | null>(null)
 
     useEffect(() => {
         fetchSettings()
 
+
         // Check for sync action from redirect
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search)
-            if (params.get('action') === 'sync') {
+            const action = params.get('action')
+
+            if (action === 'sync') {
                 // Remove param to prevent loop
                 window.history.replaceState({}, '', window.location.pathname + '?tab=integrations')
 
@@ -52,6 +57,10 @@ export default function SettingsPage() {
                 setTimeout(() => {
                     handleSyncCalendar()
                 }, 1000)
+            } else if (action === 'gmail_connected') {
+                window.history.replaceState({}, '', window.location.pathname + '?tab=integrations')
+                // Simple refresh to update UI
+                fetchSettings()
             }
         }
 
@@ -72,18 +81,32 @@ export default function SettingsPage() {
                 setProfile(profile)
 
                 // Check calendar connection
-                const { data: integration } = await supabase
+                const { data: calendarIntegration } = await supabase
                     .from('integrations')
                     .select('*')
                     .eq('owner_id', user.id)
                     .eq('integration_type', 'google_calendar')
                     .maybeSingle()
 
-                if (integration) {
+                if (calendarIntegration) {
                     setIsCalendarConnected(true)
-                    setLastSynced(integration.last_synced)
+                    setLastSynced(calendarIntegration.last_synced)
                 } else {
                     setIsCalendarConnected(false)
+                }
+
+                // Check gmail connection
+                const { data: gmailIntegration } = await supabase
+                    .from('integrations')
+                    .select('*')
+                    .eq('owner_id', user.id)
+                    .eq('integration_type', 'google_mail')
+                    .maybeSingle()
+
+                if (gmailIntegration) {
+                    setIsGmailConnected(true)
+                } else {
+                    setIsGmailConnected(false)
                 }
             }
         } catch (error) {
@@ -94,7 +117,7 @@ export default function SettingsPage() {
     }
 
     const handleConnectCalendar = async () => {
-        setIsConnectLoading(true)
+        setIsConnectCalendarLoading(true)
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -113,14 +136,38 @@ export default function SettingsPage() {
             console.error('Error connecting calendar:', error)
             alert('Error al iniciar la conexión con Google')
         } finally {
-            setIsConnectLoading(false)
+            setIsConnectCalendarLoading(false)
+        }
+    }
+
+    const handleConnectGmail = async () => {
+        setIsConnectGmailLoading(true)
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback?type=gmail`,
+                    scopes: 'https://www.googleapis.com/auth/gmail.send',
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                    },
+                },
+            })
+
+            if (error) throw error
+        } catch (error) {
+            console.error('Error connecting gmail:', error)
+            alert('Error al iniciar la conexión con Gmail')
+        } finally {
+            setIsConnectGmailLoading(false)
         }
     }
 
     // Function to disconnect (optional, but good for testing)
     const handleDisconnectCalendar = async () => {
         if (!confirm('¿Estás seguro de que quieres desconectar Google Calendar?')) return
-        setIsConnectLoading(true)
+        setIsConnectCalendarLoading(true)
         try {
             await supabase
                 .from('integrations')
@@ -132,7 +179,25 @@ export default function SettingsPage() {
         } catch (error) {
             console.error('Error disconnecting:', error)
         } finally {
-            setIsConnectLoading(false)
+            setIsConnectCalendarLoading(false)
+        }
+    }
+
+    const handleDisconnectGmail = async () => {
+        if (!confirm('¿Estás seguro de que quieres desconectar Gmail?')) return
+        setIsConnectGmailLoading(true)
+        try {
+            await supabase
+                .from('integrations')
+                .delete()
+                .eq('owner_id', user.id)
+                .eq('integration_type', 'google_mail')
+
+            setIsGmailConnected(false)
+        } catch (error) {
+            console.error('Error disconnecting:', error)
+        } finally {
+            setIsConnectGmailLoading(false)
         }
     }
 
@@ -328,15 +393,67 @@ export default function SettingsPage() {
                                         ) : (
                                             <button
                                                 onClick={handleConnectCalendar}
-                                                disabled={isConnectLoading}
+                                                disabled={isConnectCalendarLoading}
                                                 className="px-6 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all flex items-center whitespace-nowrap"
                                             >
-                                                {isConnectLoading ? (
+                                                {isConnectCalendarLoading ? (
                                                     <Loader2 className="h-5 w-5 animate-spin mr-2" />
                                                 ) : (
                                                     <img src="https://www.google.com/favicon.ico" alt="G" className="w-5 h-5 mr-2" />
                                                 )}
                                                 Conectar Calendar
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Gmail Card */}
+                                    <div className="bg-white border boundary-gray-200 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:shadow-md transition-shadow">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-16 w-16 bg-red-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                                <Mail className="h-8 w-8 text-red-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                                                    Gmail
+                                                    {isGmailConnected && (
+                                                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] uppercase tracking-wider rounded-full font-bold border border-green-200">
+                                                            Conectado
+                                                        </span>
+                                                    )}
+                                                </h3>
+                                                <p className="text-sm text-gray-500 max-w-sm">
+                                                    Envía correos directamente desde el CRM usando tu cuenta de Google.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {isGmailConnected ? (
+                                            <div className="flex flex-col items-end gap-2">
+                                                <div className="flex items-center gap-4">
+                                                    <span className="flex items-center text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg">
+                                                        <Check size={16} className="mr-2" />
+                                                        Conectado
+                                                    </span>
+                                                    <button
+                                                        onClick={handleDisconnectGmail}
+                                                        className="text-xs text-gray-400 hover:text-red-500 underline"
+                                                    >
+                                                        Desconectar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={handleConnectGmail}
+                                                disabled={isConnectGmailLoading}
+                                                className="px-6 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all flex items-center whitespace-nowrap"
+                                            >
+                                                {isConnectGmailLoading ? (
+                                                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                                                ) : (
+                                                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/2560px-Gmail_icon_%282020%29.svg.png" alt="G" className="w-5 h-5 mr-2" />
+                                                )}
+                                                Conectar Gmail
                                             </button>
                                         )}
                                     </div>

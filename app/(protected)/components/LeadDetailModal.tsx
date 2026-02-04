@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import SendEmailModal from './SendEmailModal'
+import LogCallModal from './LogCallModal'
 import { useSuccess } from './ui/SuccessOverlay'
 
 interface LeadDetailModalProps {
@@ -64,6 +65,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const [calls, setCalls] = useState<any[]>([])
 
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
+    const [isLogCallModalOpen, setIsLogCallModalOpen] = useState(false)
     const [selectedToEmail, setSelectedToEmail] = useState('')
 
     // Edit Form
@@ -220,25 +222,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     }
 
     const logCall = async () => {
-        const notes = prompt('Notas de la llamada (opcional):')
-        if (notes === null) return
-
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        const { error } = await supabase
-            .from('calls')
-            .insert({
-                lead_id: leadId,
-                owner_id: user.id,
-                notes: notes
-            })
-
-        if (!error) {
-            showSuccess('Llamada registrada')
-            fetchLeadDetails()
-            if (onUpdate) onUpdate()
-        }
+        setIsLogCallModalOpen(true)
     }
 
     if (!isOpen) return null
@@ -623,6 +607,17 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 onSuccess={() => fetchLeadDetails()}
                 initialLeadId={leadId}
                 initialTo={selectedToEmail}
+            />
+
+            <LogCallModal
+                isOpen={isLogCallModalOpen}
+                onClose={() => setIsLogCallModalOpen(false)}
+                onSuccess={() => {
+                    fetchLeadDetails()
+                    if (onUpdate) onUpdate()
+                }}
+                leadId={leadId}
+                leadName={lead?.company_name}
             />
         </div>
     )
