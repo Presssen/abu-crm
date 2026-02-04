@@ -205,24 +205,22 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                                 // Clean up matches that might have captured leading separators (like .email@domain.com)
                                 const cleanMatches = matches.map((m: string) => m.replace(/^[.:,;\s]+/, ''))
                                 allEmails = [...allEmails, ...cleanMatches]
-                                if (!lead['email']) {
-                                    lead['email'] = cleanMatches[0]
-                                }
                             } else {
                                 // Fallback split if no clear email pattern found
                                 const parts = valStr.split(/[:;,]\s*/).map((s: string) => s.trim()).filter(Boolean)
                                 allEmails = [...allEmails, ...parts]
-                                if (!lead['email'] && parts.length > 0) {
-                                    lead['email'] = parts[0]
-                                }
+                            }
+                            // Join all found emails into the lead record
+                            if (allEmails.length > 0) {
+                                lead['email'] = allEmails.join(' : ')
                             }
                         } else if (dbField === 'phone') {
                             // Split phones values like "123:456" or "123, 456"
                             const phones = value.toString().split(/[:;,]\s*/).map((s: string) => s.trim()).filter(Boolean)
                             allPhones = [...allPhones, ...phones]
-                            // Set primary phone if not set
-                            if (!lead['phone'] && phones.length > 0) {
-                                lead['phone'] = phones[0]
+
+                            if (allPhones.length > 0) {
+                                lead['phone'] = allPhones.join(' : ')
                             }
                         } else if (dbField === 'categories') {
                             // Parse category: "/Beauty & Fitness/Face & Body Care" -> "Beauty & Fitness"
@@ -299,32 +297,12 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
 
                 const { emails, phones, contact_name } = prepared.extraContacts
 
-                // Create contact entries
-                // Add emails that are NOT the primary email
-                emails.forEach((email: string) => {
-                    if (email !== insertedLead.email) {
-                        contactsToInsert.push({
-                            lead_id: insertedLead.id,
-                            name: contact_name || 'Contacto Adicional',
-                            email: email,
-                            is_primary: false
-                        })
-                    }
-                })
+                // Since we are now joining all emails/phones into the main lead record (company data),
+                // we do NOT create separate contact entries for them during import unless explicitly requested.
+                // The user requested that these be registered as company data, not contact persons.
 
-                // Add phones that are NOT the primary phone
-                phones.forEach((phone: string) => {
-                    if (phone !== insertedLead.phone) {
-                        contactsToInsert.push({
-                            lead_id: insertedLead.id,
-                            name: contact_name || 'Contacto Adicional',
-                            phone: phone,
-                            is_primary: false
-                        })
-                    }
-                    // Note: We are creating separate contact entries for extra emails and extra phones for now, 
-                    // as we don't know which phone belongs to which email if they are just lists.
-                })
+                // If we had logic to extract specific contact persons from other columns, we would do it here.
+                // For now, we skip creating lead_contacts from the email/phone columns.
             })
 
             if (contactsToInsert.length > 0) {

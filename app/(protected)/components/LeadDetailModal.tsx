@@ -318,11 +318,45 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                         </span>
                                     </div>
 
-                                    <div className="space-y-4">
+                                    {/* Company Contact Info */}
+                                    <div className="mt-4 px-1 space-y-2 border-t border-gray-50 pt-4">
+                                        {emailsList.length > 0 && (
+                                            <div className="flex items-start space-x-2">
+                                                <Mail size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                                                <div className="flex flex-wrap gap-2">
+                                                    {emailsList.map((email: string, i: number) => (
+                                                        <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200">
+                                                            {email}
+                                                            <button
+                                                                onClick={() => openEmailComposer(email)}
+                                                                className="ml-1.5 p-0.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-900"
+                                                            >
+                                                                <Send size={10} />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {phonesList.length > 0 && (
+                                            <div className="flex items-start space-x-2">
+                                                <Phone size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                                                <div className="flex flex-wrap gap-2">
+                                                    {phonesList.map((phone: string, i: number) => (
+                                                        <a key={i} href={`tel:${phone}`} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-all">
+                                                            {phone}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-4 pt-4 border-t border-gray-100">
                                         <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                                             <h4 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
                                                 <User className="text-gray-400" size={16} />
-                                                <span className="uppercase tracking-widest text-[10px]">Personas de Contacto</span>
+                                                <span className="uppercase tracking-widest text-[10px]">Personas de Contacto Adicionales</span>
                                             </h4>
                                             <button
                                                 onClick={handleAddContact}
