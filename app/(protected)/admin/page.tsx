@@ -33,8 +33,8 @@ interface Profile {
     email: string
     role: string
     created_at: string
-    daily_lead_goal?: number
-    marathon_enabled?: boolean
+    daily_lead_goal: number | null
+    marathon_enabled: boolean
 }
 
 export default function AdminPage() {
@@ -136,8 +136,8 @@ function AdminContent() {
                 if (error) throw error
                 setLeads(data || [])
 
-                // Also fetch profiles for the reassignment dropdown
-                const { data: profData } = await supabase.from('profiles').select('id, email, role, created_at')
+                // Also fetch profiles for the reassignment dropdown (include marathon fields for consistency)
+                const { data: profData } = await supabase.from('profiles').select('*').order('email')
                 setProfiles(profData || [])
             } else if (activeTab === 'imports') {
                 const { data, error } = await supabase
@@ -194,9 +194,9 @@ function AdminContent() {
 
             // Update local state for immediate feedback
             setProfiles(prev => prev.map(p => p.id === userId ? { ...p, ...updates } : p))
-            // alert('Usuario actualizado correctamente') // Alert might be too much for toggle
         } catch (error: any) {
-            alert('Error al actualizar usuario: ' + error.message)
+            console.error('Update error:', error)
+            alert('Error al actualizar usuario: ' + (error.message || 'Error desconocido'))
             fetchData() // Refresh on error
         } finally {
             setSaving(false)
@@ -500,10 +500,10 @@ function AdminContent() {
                                     <td className="px-6 py-4">
                                         <input
                                             type="number"
-                                            value={profile.daily_lead_goal !== undefined && profile.daily_lead_goal !== null
+                                            defaultValue={profile.daily_lead_goal !== null && profile.daily_lead_goal !== undefined
                                                 ? profile.daily_lead_goal
                                                 : marathonGoal}
-                                            onChange={(e) => {
+                                            onBlur={(e) => {
                                                 const val = parseInt(e.target.value)
                                                 if (!isNaN(val)) updateUserProfile(profile.id, { daily_lead_goal: val })
                                             }}

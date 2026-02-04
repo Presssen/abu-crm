@@ -74,7 +74,11 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
         contact_name: '',
         emails: [''],
         phones: [''],
-        domain: ''
+        domain: '',
+        city: '',
+        country: '',
+        categories: '',
+        status: ''
     })
 
     useEffect(() => {
@@ -99,7 +103,11 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     contact_name: leadData.contact_name || '',
                     emails: leadData.email ? leadData.email.split(':').map((e: string) => e.trim()).filter(Boolean) : [''],
                     phones: leadData.phone ? leadData.phone.split(':').map((p: string) => p.trim()).filter(Boolean) : [''],
-                    domain: leadData.domain || ''
+                    domain: leadData.domain || '',
+                    city: leadData.city || '',
+                    country: leadData.country || '',
+                    categories: leadData.categories || '',
+                    status: leadData.status || 'new'
                 })
             }
 
@@ -160,6 +168,10 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     email: editForm.emails.filter(Boolean).join(' : '),
                     phone: editForm.phones.filter(Boolean).join(' : '),
                     domain: editForm.domain,
+                    city: editForm.city,
+                    country: editForm.country,
+                    categories: editForm.categories,
+                    status: editForm.status
                 })
                 .eq('id', leadId)
 
@@ -310,12 +322,26 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                 </div>
                                             </div>
                                         </div>
-                                        <span className={clsx(
-                                            "inline-flex items-center px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border",
-                                            statusColors[lead.status] || 'bg-gray-50 text-gray-700'
-                                        )}>
-                                            {statusLabels[lead.status] || lead.status}
-                                        </span>
+                                        <div className="flex flex-col items-end space-y-2">
+                                            {isEditing ? (
+                                                <select
+                                                    value={editForm.status}
+                                                    onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                                                    className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold focus:border-gray-900 outline-none"
+                                                >
+                                                    {Object.entries(statusLabels).map(([val, label]) => (
+                                                        <option key={val} value={val}>{label}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <span className={clsx(
+                                                    "inline-flex items-center px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border",
+                                                    statusColors[lead.status] || 'bg-gray-50 text-gray-700'
+                                                )}>
+                                                    {statusLabels[lead.status] || lead.status}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Company Contact Info */}
@@ -452,6 +478,52 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                     </div>
                                                 </div>
                                             ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Location and Category */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-100 mb-6">
+                                        <div className="p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+                                            <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center mb-1.5">
+                                                <Globe size={10} className="mr-1.5" />
+                                                Ubicación
+                                            </label>
+                                            {isEditing ? (
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        className="flex-1 text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1 focus:border-gray-900 outline-none"
+                                                        value={editForm.city}
+                                                        onChange={e => setEditForm({ ...editForm, city: e.target.value })}
+                                                        placeholder="Ciudad"
+                                                    />
+                                                    <input
+                                                        className="flex-1 text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1 focus:border-gray-900 outline-none"
+                                                        value={editForm.country}
+                                                        onChange={e => setEditForm({ ...editForm, country: e.target.value })}
+                                                        placeholder="País"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm font-semibold text-gray-900">
+                                                    {[lead.city, lead.country].filter(Boolean).join(', ') || 'Sin ubicación'}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+                                            <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center mb-1.5">
+                                                <Tag size={10} className="mr-1.5" />
+                                                Sector / Categoría
+                                            </label>
+                                            {isEditing ? (
+                                                <input
+                                                    className="w-full text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1 focus:border-gray-900 outline-none"
+                                                    value={editForm.categories}
+                                                    onChange={e => setEditForm({ ...editForm, categories: e.target.value })}
+                                                    placeholder="Sector"
+                                                />
+                                            ) : (
+                                                <p className="text-sm font-semibold text-gray-900">{lead.categories || 'Sin categoría'}</p>
+                                            )}
                                         </div>
                                     </div>
 

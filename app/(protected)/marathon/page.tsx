@@ -22,7 +22,8 @@ import {
     MessageSquare,
     Save,
     Building2,
-    Target
+    Target,
+    Tag
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
@@ -42,6 +43,10 @@ interface Lead {
     domain?: string
     status: string
     notes?: string
+    city?: string
+    country?: string
+    categories?: string
+    created_at: string
 }
 
 export default function MarathonPage() {
@@ -75,7 +80,11 @@ export default function MarathonPage() {
         contact_name: '',
         domain: '',
         email: '',
-        phone: ''
+        phone: '',
+        city: '',
+        country: '',
+        categories: '',
+        status: ''
     })
 
     useEffect(() => {
@@ -91,7 +100,11 @@ export default function MarathonPage() {
                 contact_name: leads[currentIndex].contact_name || '',
                 domain: leads[currentIndex].domain || '',
                 email: leads[currentIndex].email || '',
-                phone: leads[currentIndex].phone || ''
+                phone: leads[currentIndex].phone || '',
+                city: leads[currentIndex].city || '',
+                country: leads[currentIndex].country || '',
+                categories: leads[currentIndex].categories || '',
+                status: leads[currentIndex].status || ''
             })
             setIsEditingLead(false)
         }
@@ -108,7 +121,11 @@ export default function MarathonPage() {
                     contact_name: editForm.contact_name,
                     domain: editForm.domain,
                     email: editForm.email,
-                    phone: editForm.phone
+                    phone: editForm.phone,
+                    city: editForm.city,
+                    country: editForm.country,
+                    categories: editForm.categories,
+                    status: editForm.status
                 })
                 .eq('id', currentLead.id)
 
@@ -441,6 +458,24 @@ export default function MarathonPage() {
                                         <div className="flex items-center text-gray-500 font-medium text-sm">
                                             <User size={14} className="mr-1.5" />
                                             {currentLead.contact_name || 'Sin contacto'}
+                                        </div>
+                                        <div className="mt-3 grid grid-cols-2 gap-4">
+                                            <div className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-tight">
+                                                <Globe size={12} className="mr-1.5" />
+                                                {currentLead.city ? `${currentLead.city}, ${currentLead.country || ''}` : currentLead.country || 'Sin ubicación'}
+                                            </div>
+                                            <div className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-tight">
+                                                <Tag size={12} className="mr-1.5" />
+                                                {currentLead.categories || 'Sin sector'}
+                                            </div>
+                                            <div className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-tight">
+                                                <Calendar size={12} className="mr-1.5" />
+                                                {new Date(currentLead.created_at).toLocaleDateString()}
+                                            </div>
+                                            <div className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-tight">
+                                                <Target size={12} className="mr-1.5" />
+                                                {currentLead.status}
+                                            </div>
                                         </div>
                                     </>
                                 )}

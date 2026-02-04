@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   first_name TEXT,
   last_name TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  daily_lead_goal INTEGER DEFAULT NULL,
+  marathon_enabled BOOLEAN DEFAULT false
 );
 
 -- Enable RLS on profiles
