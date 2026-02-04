@@ -30,6 +30,7 @@ import { enrichLead } from '@/app/actions/enrich-lead'
 import SendEmailModal from '../components/SendEmailModal'
 import CreateMeetingModal from '../components/CreateMeetingModal'
 import CreateTaskModal from '../components/CreateTaskModal'
+import { useSuccess } from '../components/ui/SuccessOverlay'
 
 interface Lead {
     id: string
@@ -62,6 +63,7 @@ export default function MarathonPage() {
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
     const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false)
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+    const { showSuccess } = useSuccess()
 
     useEffect(() => {
         fetchLeads()
@@ -204,7 +206,7 @@ export default function MarathonPage() {
                     phone: mergedPhones
                 }
                 setLeads(updatedLeads)
-                alert('¡Datos enriquecidos con éxito!')
+                showSuccess('Datos de contacto actualizados')
             } else {
                 alert('No se encontraron nuevos datos o hubo un error: ' + (result.error || 'Desconocido'))
             }
