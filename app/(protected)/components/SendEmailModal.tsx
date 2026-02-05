@@ -125,6 +125,26 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
             }
 
             showSuccess('Email enviado correctamente via Gmail')
+
+            // Update Lead Status & Last Activity
+            if (formData.lead_id) {
+                // If status is 'new', move to 'contacted'
+                await supabase
+                    .from('leads')
+                    .update({
+                        last_activity_at: new Date().toISOString(),
+                        status: 'contacted'
+                    })
+                    .eq('id', formData.lead_id)
+                    .eq('status', 'new')
+
+                // Always update last_activity_at regardless of status
+                await supabase
+                    .from('leads')
+                    .update({ last_activity_at: new Date().toISOString() })
+                    .eq('id', formData.lead_id)
+            }
+
             onSuccess()
             onClose()
         } catch (error: any) {

@@ -221,12 +221,20 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
 
             // 4. Update Lead Status & Last Activity
             if (formData.lead_id) {
+                // If status is 'new' or 'contacted', move to 'demo_scheduled'
                 await supabase
                     .from('leads')
                     .update({
                         status: 'demo_scheduled',
                         last_activity_at: new Date().toISOString()
                     })
+                    .eq('id', formData.lead_id)
+                    .in('status', ['new', 'contacted'])
+
+                // Always update last_activity_at regardless of status
+                await supabase
+                    .from('leads')
+                    .update({ last_activity_at: new Date().toISOString() })
                     .eq('id', formData.lead_id)
             }
 
