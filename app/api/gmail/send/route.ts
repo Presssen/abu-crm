@@ -124,18 +124,36 @@ export async function POST(request: Request) {
         const data = await response.json()
 
         // 3. Log Email in DB
-        const { error: logError } = await supabase.from('emails').insert({
-            lead_id: lead_id,
-            owner_id: user.id,
-            subject: subject,
-            body: body,
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-            message_id: data.id, // Store Gmail Message ID
-            thread_id: data.threadId // Store Gmail Thread ID
-        })
+        // We use a robust approach: try with all columns, fallback if schema is not updated
+        const logEmail = async (includeGmailIds: boolean) => {
+            const payload: any = {
+                lead_id: lead_id,
+                owner_id: user.id,
+                subject: subject,
+                to_email: to, // Ensure this field is present as it's NOT NULL in schema
+                body: body,
+                status: 'sent',
+                sent_at: new Date().toISOString()
+            }
 
-        if (logError) console.error('Error logging email to DB:', logError)
+            if (includeGmailIds) {
+                payload.message_id = data.id
+                payload.thread_id = data.threadId
+            }
+
+            return await supabase.from('emails').insert(payload)
+        }
+
+        let { error: logError } = await logEmail(true)
+
+        // Fallback: If it failed because of missing columns (schema mismatch)
+        if (logError && (logError.code === 'PGRST204' || logError.message?.includes('column'))) {
+            console.warn('⚠️ Missing columns in emails table, falling back to basic log...')
+            const retry = await logEmail(false)
+            logError = retry.error
+        }
+
+        if (logError) console.error('❌ Error logging email to DB:', logError)
 
         // 4. Update Lead Status & Last Activity
         if (lead_id) {
