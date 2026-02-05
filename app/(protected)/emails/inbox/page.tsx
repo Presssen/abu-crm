@@ -46,15 +46,14 @@ export default function InboxPage() {
     const [showReplyModal, setShowReplyModal] = useState(false)
 
     // Fetch unique threads from emails table
+    const [sortOrder, setSortOrder] = useState<'recent' | 'oldest'>('recent')
+
     const fetchThreads = async () => {
         setLoading(true)
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
 
-            // Since we can't easily do DISTINCT ON in simple Supabase query for complex joins,
-            // we'll fetch all sent emails and group them client side for now.
-            // This is efficient for small-medium usage. For scale, we'd need a view or RPC.
             const { data: emails, error } = await supabase
                 .from('emails')
                 .select(`
@@ -73,10 +72,14 @@ export default function InboxPage() {
             const threadMap = new Map<string, Thread>()
 
             emails?.forEach((email: any) => {
-                if (!email.thread_id) return
-                if (!threadMap.has(email.thread_id)) {
-                    threadMap.set(email.thread_id, {
-                        thread_id: email.thread_id,
+                // FALLBACK: If thread_id is null, use email ID as a fake thread ID
+                // ensuring it starts with a prefix to avoid collision if needed, 
+                // but Gmail IDs are unique enough.
+                const effectiveThreadId = email.thread_id || `virtual-${email.id}`
+
+                if (!threadMap.has(effectiveThreadId)) {
+                    threadMap.set(effectiveThreadId, {
+                        thread_id: effectiveThreadId,
                         subject: email.subject,
                         last_message_at: email.sent_at,
                         lead_name: email.leads?.company_name,
@@ -85,9 +88,8 @@ export default function InboxPage() {
                         message_count: 1
                     })
                 } else {
-                    const t = threadMap.get(email.thread_id)!
+                    const t = threadMap.get(effectiveThreadId)!
                     t.message_count++
-                    // Identify latest message?
                     if (new Date(email.sent_at) > new Date(t.last_message_at)) {
                         t.last_message_at = email.sent_at
                         t.subject = email.subject
@@ -95,7 +97,8 @@ export default function InboxPage() {
                 }
             })
 
-            setThreads(Array.from(threadMap.values()))
+            const threadsArray = Array.from(threadMap.values())
+            setThreads(threadsArray)
         } catch (error) {
             console.error('Error fetching threads:', error)
         } finally {
@@ -164,9 +167,19 @@ export default function InboxPage() {
             <div className="w-1/3 border-r border-gray-100 flex flex-col bg-gray-50/50">
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
                     <h3 className="font-bold text-gray-700">Conversaciones</h3>
-                    <button onClick={fetchThreads} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-indigo-600 transition-colors">
-                        <RefreshCw size={16} />
-                    </button>
+                    <div className="flex space-x-1">
+                        <button
+                            onClick={() => setSortOrder(prev => prev === 'recent' ? 'oldest' : 'recent')}
+                            className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-indigo-600 transition-colors"
+                            title={sortOrder === 'recent' ? "Ordenar: Más recientes primero" : "Ordenar: Más antiguos primero"}
+                        >
+                            {/* Simple icon switch or just same icon with tooltip */}
+                            <Calendar size={16} className={sortOrder === 'recent' ? "" : "transform rotate-180"} />
+                        </button>
+                        <button onClick={fetchThreads} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-indigo-600 transition-colors">
+                            <RefreshCw size={16} />
+                        </button>
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
@@ -182,32 +195,38 @@ export default function InboxPage() {
                             No hay conversaciones iniciadas recientes.
                         </div>
                     ) : (
-                        threads.map(thread => (
-                            <div
-                                key={thread.thread_id}
-                                onClick={() => setSelectedThreadId(thread.thread_id)}
-                                className={clsx(
-                                    "p-4 border-b border-gray-100 cursor-pointer hover:bg-indigo-50/50 transition-colors",
-                                    selectedThreadId === thread.thread_id ? "bg-white border-l-4 border-l-indigo-600 shadow-sm" : "border-l-4 border-l-transparent"
-                                )}
-                            >
-                                <div className="flex justify-between items-start mb-1">
-                                    <h4 className={clsx("font-bold text-sm truncate pr-2", selectedThreadId === thread.thread_id ? "text-indigo-900" : "text-gray-900")}>
-                                        {thread.lead_name || 'Sin nombre'}
-                                    </h4>
-                                    <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                        {new Date(thread.last_message_at).toLocaleDateString()}
-                                    </span>
+                        threads
+                            .sort((a, b) => {
+                                const dateA = new Date(a.last_message_at).getTime()
+                                const dateB = new Date(b.last_message_at).getTime()
+                                return sortOrder === 'recent' ? dateB - dateA : dateA - dateB
+                            })
+                            .map(thread => (
+                                <div
+                                    key={thread.thread_id}
+                                    onClick={() => setSelectedThreadId(thread.thread_id)}
+                                    className={clsx(
+                                        "p-4 border-b border-gray-100 cursor-pointer hover:bg-indigo-50/50 transition-colors",
+                                        selectedThreadId === thread.thread_id ? "bg-white border-l-4 border-l-indigo-600 shadow-sm" : "border-l-4 border-l-transparent"
+                                    )}
+                                >
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h4 className={clsx("font-bold text-sm truncate pr-2", selectedThreadId === thread.thread_id ? "text-indigo-900" : "text-gray-900")}>
+                                            {thread.lead_name || 'Sin nombre'}
+                                        </h4>
+                                        <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                            {new Date(thread.last_message_at).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-slate-500 font-medium truncate mb-1">
+                                        {thread.subject}
+                                    </div>
+                                    <div className="flex items-center text-[10px] text-gray-400">
+                                        <div className={clsx("h-1.5 w-1.5 rounded-full mr-1", thread.thread_id.startsWith('virtual-') ? "bg-amber-400" : "bg-emerald-400")} title={thread.thread_id.startsWith('virtual-') ? "Email sin hilo (Legacy)" : "Hilo activo"} />
+                                        {thread.lead_email}
+                                    </div>
                                 </div>
-                                <div className="text-xs text-slate-500 font-medium truncate mb-1">
-                                    {thread.subject}
-                                </div>
-                                <div className="flex items-center text-[10px] text-gray-400">
-                                    <Mail size={10} className="mr-1" />
-                                    {thread.lead_email}
-                                </div>
-                            </div>
-                        ))
+                            ))
                     )}
                 </div>
             </div>

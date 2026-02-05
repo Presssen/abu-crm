@@ -52,6 +52,14 @@ export default function PipelinePage() {
                 .select('*, profiles:won_by(first_name, last_name)')
 
             if (error) throw error
+
+            // Debugging: Log unique statuses found
+            if (data) {
+                const statuses = Array.from(new Set(data.map(l => l.status)))
+                console.log('Fetched leads count:', data.length)
+                console.log('Unique statuses found:', statuses)
+            }
+
             setLeads(data || [])
 
             // Sync inactive leads in background without blocking
@@ -96,7 +104,11 @@ export default function PipelinePage() {
         }
     }
 
-    const getLeadsByStatus = (status: string) => leads.filter(l => l.status === status)
+    const getLeadsByStatus = (status: string) => {
+        return leads.filter(l =>
+            (l.status || '').toLowerCase().trim() === status.toLowerCase().trim()
+        )
+    }
 
     const handleDragStart = (e: React.DragEvent, lead: Lead) => {
         setDraggedLead(lead)
