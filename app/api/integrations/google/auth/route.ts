@@ -17,6 +17,7 @@ export async function GET(request: Request) {
 
     if (type === 'gmail') {
         scopes.push('https://www.googleapis.com/auth/gmail.send')
+        scopes.push('https://www.googleapis.com/auth/gmail.readonly')
     } else if (type === 'calendar') {
         scopes.push('https://www.googleapis.com/auth/calendar.events')
         scopes.push('https://www.googleapis.com/auth/calendar.readonly')

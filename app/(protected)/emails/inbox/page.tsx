@@ -22,6 +22,7 @@ interface Thread {
     lead_email?: string
     lead_id?: string
     message_count: number
+    body?: string
 }
 
 interface Message {
@@ -60,6 +61,7 @@ export default function InboxPage() {
                     id, 
                     thread_id, 
                     subject, 
+                    body,
                     sent_at, 
                     lead_id,
                     leads (company_name, email)
@@ -81,6 +83,7 @@ export default function InboxPage() {
                     threadMap.set(effectiveThreadId, {
                         thread_id: effectiveThreadId,
                         subject: email.subject,
+                        body: email.body, // Store body for legacy fallback
                         last_message_at: email.sent_at,
                         lead_name: email.leads?.company_name,
                         lead_email: email.leads?.email,
@@ -93,6 +96,12 @@ export default function InboxPage() {
                     if (new Date(email.sent_at) > new Date(t.last_message_at)) {
                         t.last_message_at = email.sent_at
                         t.subject = email.subject
+                        // Keep original body or update? Usually subject is enough for list, 
+                        // but for fallback view we might want the latest or first? 
+                        // Let's keep the first one or latest. 
+                        // Simplest is to keep the one that started the "thread" (which is virtual)
+                        // but actually strict order might vary. Let's just update body too to latest.
+                        t.body = email.body
                     }
                 }
             })
@@ -113,6 +122,43 @@ export default function InboxPage() {
     const fetchThreadDetail = async (threadId: string) => {
         setLoadingMessages(true)
         setMessages([])
+
+        // Check for virtual thread (Legacy fallback)
+        if (threadId.startsWith('virtual-')) {
+            const t = threads.find(th => th.thread_id === threadId)
+            if (t) {
+                // Construct a fake message from local data
+                const fakeMessage: Message = {
+                    id: t.thread_id,
+                    threadId: t.thread_id,
+                    snippet: t.subject,
+                    internalDate: new Date(t.last_message_at).getTime().toString(),
+                    payload: {
+                        headers: [
+                            { name: 'From', value: 'me' }, // Assumed sent by us
+                            { name: 'Subject', value: t.subject },
+                            { name: 'Date', value: t.last_message_at }
+                        ],
+                        body: { data: '' }, // Not used directly if parts are missing, but let's emulate structure
+                        parts: [
+                            {
+                                mimeType: 'text/html',
+                                body: {
+                                    data: Buffer.from(t.body || '(Sin contenido)').toString('base64')
+                                        .replace(/\+/g, '-')
+                                        .replace(/\//g, '_')
+                                        .replace(/=+$/, '')
+                                }
+                            }
+                        ]
+                    }
+                }
+                setMessages([fakeMessage])
+                setLoadingMessages(false)
+                return
+            }
+        }
+
         try {
             const res = await fetch(`/api/gmail/thread?threadId=${threadId}`)
             const data = await res.json()
