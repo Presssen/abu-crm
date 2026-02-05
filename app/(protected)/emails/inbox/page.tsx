@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import SendEmailModal from '../../components/SendEmailModal'
+import InlineReply from '../../components/InlineReply'
+import CreateMeetingModal from '../../components/CreateMeetingModal'
 
 interface Thread {
     thread_id: string
@@ -45,6 +47,18 @@ export default function InboxPage() {
     const [messages, setMessages] = useState<Message[]>([])
     const [loadingMessages, setLoadingMessages] = useState(false)
     const [showReplyModal, setShowReplyModal] = useState(false)
+    const [showMeetingModal, setShowMeetingModal] = useState(false)
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            scrollToBottom()
+        }
+    }, [messages])
 
     // Fetch unique threads from emails table
     const [sortOrder, setSortOrder] = useState<'recent' | 'oldest'>('recent')
@@ -326,13 +340,14 @@ export default function InboxPage() {
                                     <span className="text-gray-400">&lt;{selectedThreadData?.lead_email}&gt;</span>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => setShowReplyModal(true)}
-                                className="flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100"
-                            >
-                                <Reply size={16} className="mr-2" />
-                                Responder
-                            </button>
+                            <div className="flex space-x-2">
+                                <button
+                                    onClick={() => setShowReplyModal(true)}
+                                    className="flex items-center px-4 py-2 border border-gray-200 text-gray-600 text-sm font-bold rounded-xl hover:bg-gray-50 transition-all shadow-sm bg-white"
+                                >
+                                    Redactar Nuevo
+                                </button>
+                            </div>
                         </div>
 
                         {/* Thread Messages */}
@@ -373,7 +388,20 @@ export default function InboxPage() {
                                     )
                                 })
                             )}
+                            <div ref={messagesEndRef} />
                         </div>
+
+                        {/* Inline Reply Area */}
+                        <InlineReply
+                            leadId={selectedThreadData?.lead_id}
+                            toEmail={selectedThreadData?.lead_email}
+                            subject={selectedThreadData?.subject}
+                            threadId={selectedThreadData?.thread_id}
+                            onSuccess={() => {
+                                if (selectedThreadId) fetchThreadDetail(selectedThreadId)
+                            }}
+                            onOpenMeetingModal={() => setShowMeetingModal(true)}
+                        />
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-gray-400 bg-gray-50/30">
@@ -395,6 +423,16 @@ export default function InboxPage() {
                 initialTo={selectedThreadData?.lead_email}
                 initialSubject={`Re: ${selectedThreadData?.subject?.replace(/^Re: /i, '')}`}
                 initialThreadId={selectedThreadData?.thread_id}
+            />
+
+            <CreateMeetingModal
+                isOpen={showMeetingModal}
+                onClose={() => setShowMeetingModal(false)}
+                onSuccess={() => {
+                    // Refresh thread detail to show potentially new meeting log if the API does that
+                    if (selectedThreadId) fetchThreadDetail(selectedThreadId)
+                }}
+                initialLeadId={selectedThreadData?.lead_id}
             />
         </div>
     )
