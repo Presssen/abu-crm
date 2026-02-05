@@ -3,7 +3,7 @@ import { createClient } from '@/lib/auth/server'
 
 export async function POST(request: Request) {
     try {
-        const { threadId } = await request.json()
+        const { threadId, unread } = await request.json()
         if (!threadId) return NextResponse.json({ error: 'Thread ID required' }, { status: 400 })
 
         const supabase = await createClient()
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
         const { access_token } = integration.credentials
 
-        // Mark thread as read (remove UNREAD label)
+        // Mark thread as read or unread
         const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
             method: 'POST',
             headers: {
@@ -30,7 +30,8 @@ export async function POST(request: Request) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                removeLabelIds: ['UNREAD']
+                addLabelIds: unread ? ['UNREAD'] : [],
+                removeLabelIds: unread ? [] : ['UNREAD']
             })
         })
 

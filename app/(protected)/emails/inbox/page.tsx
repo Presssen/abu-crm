@@ -9,7 +9,8 @@ import {
     Calendar,
     Search,
     RefreshCw,
-    Reply
+    Reply,
+    MailOpen
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import SendEmailModal from '../../components/SendEmailModal'
@@ -201,7 +202,7 @@ export default function InboxPage() {
 
                 // If the thread was unread, mark it as read
                 if (unreadThreads.has(threadId)) {
-                    markAsRead(threadId)
+                    markAsReadStatus(threadId, false)
                 }
             }
         } catch (error) {
@@ -212,20 +213,24 @@ export default function InboxPage() {
         }
     }
 
-    const markAsRead = async (threadId: string) => {
+    const markAsReadStatus = async (threadId: string, isUnread: boolean) => {
         try {
             await fetch('/api/gmail/read', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ threadId })
+                body: JSON.stringify({ threadId, unread: isUnread })
             })
             setUnreadThreads(prev => {
                 const next = new Set(prev)
-                next.delete(threadId)
+                if (isUnread) {
+                    next.add(threadId)
+                } else {
+                    next.delete(threadId)
+                }
                 return next
             })
         } catch (error) {
-            console.error('Error marking as read:', error)
+            console.error('Error updating read status:', error)
         }
     }
 
@@ -320,37 +325,64 @@ export default function InboxPage() {
                                     const dateB = new Date(b.last_message_at).getTime()
                                     return sortOrder === 'recent' ? dateB - dateA : dateA - dateB
                                 })
-                                .map(thread => (
-                                    <div
-                                        key={thread.thread_id}
-                                        onClick={() => setSelectedThreadId(thread.thread_id)}
-                                        className={clsx(
-                                            "p-4 border-b border-gray-100 cursor-pointer hover:bg-indigo-50/50 transition-colors",
-                                            selectedThreadId === thread.thread_id ? "bg-white border-l-4 border-l-indigo-600 shadow-sm" : "border-l-4 border-l-transparent"
-                                        )}
-                                    >
-                                        <div className="flex justify-between items-start mb-1">
-                                            <h4 className={clsx("font-bold text-sm truncate pr-2", selectedThreadId === thread.thread_id ? "text-indigo-900" : "text-gray-900")}>
-                                                {thread.lead_name || 'Sin nombre'}
-                                            </h4>
-                                            <div className="flex items-center space-x-2">
-                                                {unreadThreads.has(thread.thread_id) && (
-                                                    <span className="h-2 w-2 bg-indigo-600 rounded-full shadow-[0_0_8px_rgba(79,70,229,0.5)]" title="Mensaje Nuevo" />
-                                                )}
-                                                <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                                    {new Date(thread.last_message_at).toLocaleDateString()}
-                                                </span>
+                                .map(thread => {
+                                    const isUnread = unreadThreads.has(thread.thread_id)
+                                    const isSelected = selectedThreadId === thread.thread_id
+
+                                    return (
+                                        <div
+                                            key={thread.thread_id}
+                                            onClick={() => setSelectedThreadId(thread.thread_id)}
+                                            className={clsx(
+                                                "p-4 border-b border-gray-100 cursor-pointer transition-all relative group",
+                                                isSelected
+                                                    ? "bg-white border-l-4 border-l-indigo-600 shadow-sm z-10"
+                                                    : isUnread
+                                                        ? "bg-indigo-50/40 border-l-4 border-l-indigo-400"
+                                                        : "hover:bg-gray-100 border-l-4 border-l-transparent"
+                                            )}
+                                        >
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h4 className={clsx(
+                                                    "font-bold text-sm truncate pr-2",
+                                                    isSelected ? "text-indigo-900" : isUnread ? "text-indigo-700" : "text-gray-900"
+                                                )}>
+                                                    {thread.lead_name || 'Sin nombre'}
+                                                </h4>
+                                                <div className="flex items-center space-x-2">
+                                                    {isUnread && (
+                                                        <span className="flex h-2 w-2 rounded-full bg-indigo-600 animate-pulse shadow-[0_0_8px_rgba(79,70,229,0.5)]" />
+                                                    )}
+                                                    <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                                        {new Date(thread.last_message_at).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className={clsx(
+                                                "text-xs truncate mb-1",
+                                                isUnread ? "text-indigo-600 font-bold" : "text-slate-500 font-medium"
+                                            )}>
+                                                {thread.subject}
+                                            </div>
+                                            <div className="flex items-center justify-between mt-2">
+                                                <div className="flex items-center text-[10px] text-gray-400">
+                                                    <div className={clsx("h-1.5 w-1.5 rounded-full mr-1", thread.thread_id.startsWith('virtual-') ? "bg-amber-400" : "bg-emerald-400")} title={thread.thread_id.startsWith('virtual-') ? "Email sin hilo (Legacy)" : "Hilo activo"} />
+                                                    {thread.lead_email}
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        markAsReadStatus(thread.thread_id, !unreadThreads.has(thread.thread_id));
+                                                    }}
+                                                    className="p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-indigo-600 transition-colors"
+                                                    title={unreadThreads.has(thread.thread_id) ? "Marcar como leído" : "Marcar como no leído"}
+                                                >
+                                                    {unreadThreads.has(thread.thread_id) ? <MailOpen size={12} /> : <Mail size={12} />}
+                                                </button>
                                             </div>
                                         </div>
-                                        <div className={clsx("text-xs truncate mb-1", unreadThreads.has(thread.thread_id) ? "text-indigo-600 font-bold" : "text-slate-500 font-medium")}>
-                                            {thread.subject}
-                                        </div>
-                                        <div className="flex items-center text-[10px] text-gray-400">
-                                            <div className={clsx("h-1.5 w-1.5 rounded-full mr-1", thread.thread_id.startsWith('virtual-') ? "bg-amber-400" : "bg-emerald-400")} title={thread.thread_id.startsWith('virtual-') ? "Email sin hilo (Legacy)" : "Hilo activo"} />
-                                            {thread.lead_email}
-                                        </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             {hasMore && (
                                 <div className="p-4 text-center">
                                     <button
@@ -366,7 +398,8 @@ export default function InboxPage() {
                                 </div>
                             )}
                         </>
-                    )}
+                    )
+                    }
                 </div>
             </div>
 
