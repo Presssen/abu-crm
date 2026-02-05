@@ -12,6 +12,8 @@ interface SendEmailModalProps {
     onSuccess: () => void
     initialLeadId?: string
     initialTo?: string
+    initialSubject?: string
+    initialThreadId?: string
 }
 
 interface Template {
@@ -21,7 +23,7 @@ interface Template {
     body: string
 }
 
-export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLeadId, initialTo }: SendEmailModalProps) {
+export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLeadId, initialTo, initialSubject, initialThreadId }: SendEmailModalProps) {
     const supabase = createClient()
     const { showSuccess, showError } = useNotification()
     const [loading, setLoading] = useState(false)
@@ -30,7 +32,7 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
     const [formData, setFormData] = useState({
         lead_id: initialLeadId || '',
         to_email: initialTo || '',
-        subject: '',
+        subject: initialSubject || '',
         body: ''
     })
 
@@ -47,10 +49,11 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
             setFormData(prev => ({
                 ...prev,
                 lead_id: initialLeadId || prev.lead_id,
-                to_email: initialTo || prev.to_email
+                to_email: initialTo || prev.to_email,
+                subject: initialSubject || prev.subject
             }))
         }
-    }, [isOpen, initialLeadId, initialTo])
+    }, [isOpen, initialLeadId, initialTo, initialSubject])
 
     const fetchSingleLead = async (id: string) => {
         const { data } = await supabase.from('leads').select('id, company_name, contact_name, email, domain, categories, country').eq('id', id).single()
@@ -114,7 +117,8 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                     lead_id: formData.lead_id,
                     to: formData.to_email,
                     subject: finalSubject,
-                    body: finalBody
+                    body: finalBody,
+                    threadId: initialThreadId
                 })
             })
 

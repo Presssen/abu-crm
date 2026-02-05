@@ -46,15 +46,18 @@ export default function PipelinePage() {
     const fetchLeads = async () => {
         setLoading(true)
         try {
-            // First, sync inactive leads
-            await syncInactiveLeads(supabase)
-
+            // Fetch leads immediately
             const { data, error } = await supabase
                 .from('leads')
                 .select('*, profiles:won_by(first_name, last_name)')
 
             if (error) throw error
             setLeads(data || [])
+
+            // Sync inactive leads in background without blocking
+            syncInactiveLeads(supabase).catch(err =>
+                console.error('Background sync failed:', err)
+            )
         } catch (error) {
             console.error('Error fetching leads:', error)
         } finally {

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/auth/server'
 
 export async function POST(request: Request) {
     try {
-        const { to, subject, body, lead_id } = await request.json()
+        const { to, subject, body, lead_id, threadId } = await request.json()
 
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -50,15 +50,21 @@ export async function POST(request: Request) {
                 .replace(/\//g, '_')
                 .replace(/=+$/, '')
 
+            const payload: any = {
+                raw: encodedMessage
+            }
+
+            if (threadId) {
+                payload.threadId = threadId
+            }
+
             const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    raw: encodedMessage
-                })
+                body: JSON.stringify(payload)
             })
 
             return res
@@ -125,7 +131,8 @@ export async function POST(request: Request) {
             body: body,
             status: 'sent',
             sent_at: new Date().toISOString(),
-            message_id: data.id // Store Gmail Message ID
+            message_id: data.id, // Store Gmail Message ID
+            thread_id: data.threadId // Store Gmail Thread ID
         })
 
         if (logError) console.error('Error logging email to DB:', logError)
