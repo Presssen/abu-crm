@@ -23,35 +23,23 @@ export async function POST(request: Request) {
         const { access_token } = integration.credentials
 
         // To make unread status persistent and reliable for Gmail search,
-        // we apply/remove the UNREAD label from ALL messages in the thread.
-
-        // 1. Fetch thread messages to get IDs
-        const threadRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}`, {
-            headers: { 'Authorization': `Bearer ${access_token}` }
-        })
-        const threadData = await threadRes.json()
-        const messageIds = (threadData.messages || []).map((m: any) => m.id)
-
-        if (messageIds.length === 0) return NextResponse.json({ success: true })
-
-        // 2. Modify messages in batch
-        const modifyRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/batchModify`, {
+        // we apply/remove the UNREAD label from the THREAD directly.
+        const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${access_token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                ids: messageIds,
                 addLabelIds: unread ? ['UNREAD'] : [],
                 removeLabelIds: unread ? [] : ['UNREAD']
             })
         })
 
-        if (!modifyRes.ok) {
-            const err = await modifyRes.json()
-            console.error('Batch modify error:', err)
-            throw new Error('Failed to modify messages in Gmail')
+        if (!res.ok) {
+            const err = await res.json()
+            console.error('Modify error:', err)
+            throw new Error('Failed to modify thread in Gmail')
         }
 
         return NextResponse.json({ success: true })

@@ -117,12 +117,15 @@ export default function ProtectedLayout({
                 isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="flex flex-col h-full">
-                    <div className={clsx("flex items-center px-6 py-6 border-b border-gray-100", isCollapsed ? "justify-center" : "justify-between")}>
-                        <div className="flex items-center overflow-hidden">
+                    <div className={clsx(
+                        "flex items-center border-b border-gray-100 h-[88px] transition-all duration-300",
+                        isCollapsed ? "px-2 justify-center" : "px-6 justify-between"
+                    )}>
+                        <div className={clsx("flex items-center overflow-hidden transition-all duration-300", isCollapsed ? "justify-center" : "")}>
                             <img
                                 src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"
                                 alt="ABU Logo"
-                                className="h-10 w-auto object-contain mr-2 shrink-0"
+                                className={clsx("h-10 w-auto object-contain transition-all", isCollapsed ? "" : "mr-2 shrink-0")}
                             />
                             {!isCollapsed && (
                                 <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent truncate">
@@ -130,13 +133,24 @@ export default function ProtectedLayout({
                                 </span>
                             )}
                         </div>
+                        {!isCollapsed && (
+                            <button
+                                onClick={toggleSidebar}
+                                className="hidden md:flex p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600 transition-colors"
+                            >
+                                <ChevronLeft size={18} />
+                            </button>
+                        )}
+                    </div>
+                    {isCollapsed && (
                         <button
                             onClick={toggleSidebar}
-                            className="hidden md:flex p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600 transition-colors"
+                            className="hidden md:flex items-center justify-center p-2 hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors border-b border-gray-100"
+                            title="Expandir menú"
                         >
-                            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                            <ChevronRight size={18} />
                         </button>
-                    </div>
+                    )}
 
                     <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
                         {fullNavigation.map((item) => {

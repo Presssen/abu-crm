@@ -17,6 +17,7 @@ import { clsx } from 'clsx'
 import SendEmailModal from '../../components/SendEmailModal'
 import InlineReply from '../../components/InlineReply'
 import CreateMeetingModal from '../../components/CreateMeetingModal'
+import { useNotification } from '../../components/ui/NotificationProvider'
 
 interface Thread {
     thread_id: string
@@ -43,6 +44,7 @@ interface Message {
 
 export default function InboxPage() {
     const supabase = createClient()
+    const { showSuccess, showError } = useNotification()
     const [threads, setThreads] = useState<Thread[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
@@ -132,9 +134,11 @@ export default function InboxPage() {
 
             setThreads(Array.from(existingMap.values()))
 
-            // Fetch status from Gmail
-            fetchUnreadStatus()
-            fetchInboxStatus()
+            // Fetch status from Gmail in parallel
+            await Promise.all([
+                fetchUnreadStatus(),
+                fetchInboxStatus()
+            ])
         } catch (error) {
             console.error('Error fetching threads:', error)
         } finally {
@@ -180,9 +184,13 @@ export default function InboxPage() {
                     return next
                 })
                 if (selectedThreadId === threadId) setSelectedThreadId(null)
+                showSuccess('Conversación archivada')
+            } else {
+                showError('No se pudo archivar la conversación')
             }
         } catch (error) {
             console.error('Error archiving:', error)
+            showError('Error al archivar')
         }
     }
 
@@ -265,8 +273,10 @@ export default function InboxPage() {
                 }
                 return next
             })
+            showSuccess(isUnread ? 'Marcado como no leído' : 'Marcado como leído')
         } catch (error) {
             console.error('Error updating read status:', error)
+            showError('Error al actualizar estado')
         }
     }
 

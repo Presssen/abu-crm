@@ -370,6 +370,7 @@ export default function MarathonPage() {
                         setIsTaskModalOpen(true)
                     }}
                     onAction={handleAction}
+                    onEdit={() => setIsEditingLead(true)}
                     enriching={enriching}
                     saving={savingDetails}
                 />
