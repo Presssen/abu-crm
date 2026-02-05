@@ -309,7 +309,7 @@ export default function PipelinePage() {
                 <div>
                     <strong>DEBUG:</strong> Leads Fetched: {leads.length} |
                     Statuses: {Array.from(new Set(leads.map(l => l.status || 'null'))).join(', ')} |
-                    UID: {supabase.auth.getUser().then(res => res.data.user?.id.substring(0, 8) || 'none')}
+                    UID: {leads.length > 0 ? 'Loaded' : 'Check Console'}
                 </div>
                 <div>
                     Loading: {loading ? 'Yes' : 'No'}

@@ -241,7 +241,7 @@ export default function InboxPage() {
                             {/* Simple icon switch or just same icon with tooltip */}
                             <Calendar size={16} className={sortOrder === 'recent' ? "" : "transform rotate-180"} />
                         </button>
-                        <button onClick={fetchThreads} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-indigo-600 transition-colors">
+                        <button onClick={() => fetchThreads(true)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-indigo-600 transition-colors">
                             <RefreshCw size={16} />
                         </button>
                     </div>
@@ -260,50 +260,54 @@ export default function InboxPage() {
                             No hay conversaciones iniciadas recientes.
                         </div>
                     ) : (
-                        threads
-                            .sort((a, b) => {
-                                const dateA = new Date(a.last_message_at).getTime()
-                                const dateB = new Date(b.last_message_at).getTime()
-                                return sortOrder === 'recent' ? dateB - dateA : dateA - dateB
-                            })
-                            .map(thread => (
-                                <div
-                                    key={thread.thread_id}
-                                    onClick={() => setSelectedThreadId(thread.thread_id)}
-                                    className={clsx(
-                                        "p-4 border-b border-gray-100 cursor-pointer hover:bg-indigo-50/50 transition-colors",
-                                        selectedThreadId === thread.thread_id ? "bg-white border-l-4 border-l-indigo-600 shadow-sm" : "border-l-4 border-l-transparent"
-                                    )}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h4 className={clsx("font-bold text-sm truncate pr-2", selectedThreadId === thread.thread_id ? "text-indigo-900" : "text-gray-900")}>
-                                            {thread.lead_name || 'Sin nombre'}
-                                        </h4>
-                                        <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                            {new Date(thread.last_message_at).toLocaleDateString()}
-                                        </span>
+                        <>
+                            {threads
+                                .sort((a, b) => {
+                                    const dateA = new Date(a.last_message_at).getTime()
+                                    const dateB = new Date(b.last_message_at).getTime()
+                                    return sortOrder === 'recent' ? dateB - dateA : dateA - dateB
+                                })
+                                .map(thread => (
+                                    <div
+                                        key={thread.thread_id}
+                                        onClick={() => setSelectedThreadId(thread.thread_id)}
+                                        className={clsx(
+                                            "p-4 border-b border-gray-100 cursor-pointer hover:bg-indigo-50/50 transition-colors",
+                                            selectedThreadId === thread.thread_id ? "bg-white border-l-4 border-l-indigo-600 shadow-sm" : "border-l-4 border-l-transparent"
+                                        )}
+                                    >
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h4 className={clsx("font-bold text-sm truncate pr-2", selectedThreadId === thread.thread_id ? "text-indigo-900" : "text-gray-900")}>
+                                                {thread.lead_name || 'Sin nombre'}
+                                            </h4>
+                                            <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                                {new Date(thread.last_message_at).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-slate-500 font-medium truncate mb-1">
+                                            {thread.subject}
+                                        </div>
+                                        <div className="flex items-center text-[10px] text-gray-400">
+                                            <div className={clsx("h-1.5 w-1.5 rounded-full mr-1", thread.thread_id.startsWith('virtual-') ? "bg-amber-400" : "bg-emerald-400")} title={thread.thread_id.startsWith('virtual-') ? "Email sin hilo (Legacy)" : "Hilo activo"} />
+                                            {thread.lead_email}
+                                        </div>
                                     </div>
-                                    <div className="text-xs text-slate-500 font-medium truncate mb-1">
-                                        {thread.subject}
-                                    </div>
-                                    <div className="flex items-center text-[10px] text-gray-400">
-                                        <div className={clsx("h-1.5 w-1.5 rounded-full mr-1", thread.thread_id.startsWith('virtual-') ? "bg-amber-400" : "bg-emerald-400")} title={thread.thread_id.startsWith('virtual-') ? "Email sin hilo (Legacy)" : "Hilo activo"} />
-                                        {thread.lead_email}
-                                    </div>
+                                ))}
+                            {hasMore && (
+                                <div className="p-4 text-center">
+                                    <button
+                                        onClick={() => {
+                                            const nextPage = page + 1
+                                            setPage(nextPage)
+                                            fetchThreads(false)
+                                        }}
+                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                                    >
+                                        Cargar más...
+                                    </button>
                                 </div>
-                            { hasMore && (
-                                    <div className="p-4 text-center">
-                                        <button
-                                            onClick={() => {
-                                                setPage(prev => prev + 1)
-                                                fetchThreads(false)
-                                            }}
-                                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
-                                        >
-                                            Cargar más...
-                                        </button>
-                                    </div>
-                                )}
+                            )}
+                        </>
                     )}
                 </div>
             </div>
