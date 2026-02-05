@@ -9,10 +9,10 @@ import { createClient } from '@/lib/auth/server'
  */
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const userId = params.id
+        const { id: userId } = await params
         const supabase = await createClient()
 
         // 1. Verify that the requester is an admin
