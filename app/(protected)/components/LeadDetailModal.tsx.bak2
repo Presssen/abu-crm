@@ -917,14 +917,6 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 leadId={leadId}
                 leadName={lead?.company_name}
             />
-
-            <ApolloEnrichmentModal
-                isOpen={showApolloModal}
-                onClose={() => setShowApolloModal(false)}
-                leadId={leadId}
-                domain={lead?.domain || ''}
-                onSuccess={() => fetchLeadDetails()}
-            />
         </div>
     )
 }
