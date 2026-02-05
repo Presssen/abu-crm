@@ -340,29 +340,29 @@ export default function MarathonPage() {
     return (
         <div className="flex flex-col h-full bg-gray-50/50">
             {/* Professional Control Bar */}
-            <div className="bg-white sticky top-0 z-30 py-4 px-6 border-b border-gray-200 flex items-center justify-between shrink-0">
+            <div className="bg-white sticky top-0 z-30 py-3 px-6 border-b border-gray-200 flex items-center justify-between shrink-0 shadow-sm">
                 <div>
                     <div className="flex items-center space-x-3">
                         <div className="p-1.5 bg-gray-900 rounded-lg shadow-sm">
                             <Zap className="h-4 w-4 text-white" />
                         </div>
-                        <h1 className="text-lg font-bold text-gray-900 tracking-tight">Marathon Control</h1>
+                        <h1 className="text-lg font-bold text-gray-900 tracking-tight">Marathon Mode</h1>
                         <div className="h-4 w-px bg-gray-200 mx-2" />
                         <span className="text-xs font-semibold text-gray-500">
-                            Meta: <span className="text-gray-900">{progress}</span> / {dailyGoal}
+                            Progreso: <span className="text-indigo-600 font-bold">{progress}</span> <span className="text-gray-300">/</span> {dailyGoal}
                         </span>
                     </div>
                 </div>
 
-                <div className="flex items-center bg-white border border-gray-200 rounded-lg p-1 space-x-1">
+                <div className="flex items-center bg-gray-100/50 p-1 rounded-lg space-x-1">
                     <button
                         onClick={handlePrev}
                         disabled={currentIndex === 0}
-                        className="p-1.5 rounded-md hover:bg-gray-50 text-gray-500 disabled:opacity-30 transition-all"
+                        className="p-1.5 rounded-md hover:bg-white hover:shadow-sm text-gray-500 disabled:opacity-30 transition-all"
                     >
                         <ChevronLeft size={16} />
                     </button>
-                    <div className="px-3 py-1 bg-gray-50 rounded-md">
+                    <div className="px-3">
                         <span className="text-xs font-bold text-gray-700 tabular-nums">
                             {currentIndex + 1} / {leads.length}
                         </span>
@@ -370,365 +370,348 @@ export default function MarathonPage() {
                     <button
                         onClick={handleNext}
                         disabled={currentIndex === leads.length - 1}
-                        className="p-1.5 rounded-md hover:bg-gray-50 text-gray-500 disabled:opacity-30 transition-all"
+                        className="p-1.5 rounded-md hover:bg-white hover:shadow-sm text-gray-500 disabled:opacity-30 transition-all"
                     >
                         <ChevronRight size={16} />
                     </button>
                 </div>
             </div>
 
-            {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto min-h-0">
-                <div className="max-w-7xl mx-auto p-6 space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                        <div className="lg:col-span-8 space-y-6 min-w-0">
+            {/* Main Content - Independent Scrolling Columns */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+                <div className="h-full max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12">
 
-                            {/* 1. COMPACT CORPORATE HEADER */}
-                            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden relative group p-6">
-                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                                    <div className="flex-1">
-                                        <div className="inline-flex items-center space-x-2 bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-3">
-                                            <Building2 size={10} />
-                                            <span>Prospect</span>
-                                        </div>
-                                        {isEditingLead ? (
-                                            <div className="space-y-3">
-                                                <input
-                                                    type="text"
-                                                    value={editForm.company_name}
-                                                    onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
-                                                    className="block w-full text-2xl font-bold bg-gray-50 border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-300"
-                                                    placeholder="Nombre de empresa"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={editForm.contact_name}
-                                                    onChange={(e) => setEditForm({ ...editForm, contact_name: e.target.value })}
-                                                    className="block w-full text-sm font-medium bg-gray-50 border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-300"
-                                                    placeholder="Persona de contacto"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={editForm.domain}
-                                                    onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })}
-                                                    className="block w-full text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-300"
-                                                    placeholder="Sitio web"
-                                                />
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Teléfonos (separar por :)</label>
-                                                        <input
-                                                            type="text"
-                                                            value={editForm.phone}
-                                                            onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                                            className="block w-full text-xs font-mono bg-gray-50 border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-300"
-                                                            placeholder="Sin teléfonos"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Emails (separar por :)</label>
-                                                        <input
-                                                            type="text"
-                                                            value={editForm.email}
-                                                            onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                                                            className="block w-full text-xs font-mono bg-gray-50 border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:border-indigo-300"
-                                                            placeholder="Sin emails"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={handleUpdateLead}
-                                                        className="px-4 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-all"
-                                                    >
-                                                        Guardar Datos
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setIsEditingLead(false)}
-                                                        className="px-4 py-1.5 bg-white border border-gray-200 text-gray-500 text-xs font-bold rounded-lg hover:bg-gray-50 transition-all"
-                                                    >
-                                                        Cancelar
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <div className="flex items-center justify-between group/title">
-                                                    <h2 className="text-3xl font-bold text-gray-900 tracking-tight leading-none mb-2">
-                                                        {currentLead.company_name}
-                                                    </h2>
-                                                    <button
-                                                        onClick={() => setIsEditingLead(true)}
-                                                        className="opacity-0 group-hover/title:opacity-100 p-1 hover:bg-gray-100 rounded text-gray-400 transition-all"
-                                                    >
-                                                        <Sparkles size={14} />
-                                                    </button>
-                                                </div>
-                                                <div className="flex items-center text-gray-500 font-medium text-sm">
-                                                    <User size={14} className="mr-1.5" />
-                                                    {currentLead.contact_name || 'Sin contacto'}
-                                                    {currentLead.contact_role && (
-                                                        <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold uppercase">
-                                                            {currentLead.contact_role}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="mt-3 grid grid-cols-2 gap-4">
-                                                    <div className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-tight">
-                                                        <Globe size={12} className="mr-1.5" />
-                                                        {currentLead.city ? `${currentLead.city}, ${currentLead.country || ''}` : currentLead.country || 'Sin ubicación'}
-                                                    </div>
-                                                    <div className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-tight">
-                                                        <Tag size={12} className="mr-1.5" />
-                                                        {currentLead.categories || 'Sin sector'}
-                                                    </div>
-                                                    <div className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-tight">
-                                                        <Calendar size={12} className="mr-1.5" />
-                                                        {new Date(currentLead.created_at).toLocaleDateString()}
-                                                    </div>
-                                                    <div className="flex items-center text-[11px] font-bold text-gray-400 uppercase tracking-tight">
-                                                        <Target size={12} className="mr-1.5" />
-                                                        {currentLead.status}
-                                                    </div>
-                                                </div>
-                                            </>
+                    {/* LEFT COLUMN: Lead Info & Context (Scrollable) */}
+                    <div className="lg:col-span-8 h-full overflow-y-auto p-6 space-y-6 border-r border-gray-200/50 bg-white">
+
+                        {/* 1. Header Card */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="inline-flex items-center space-x-2 bg-gray-50 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-gray-100">
+                                    <Building2 size={10} />
+                                    <span>Prospecto</span>
+                                </div>
+                                {currentLead.domain && !isEditingLead && (
+                                    <a
+                                        href={currentLead.domain.startsWith('http') ? currentLead.domain : `https://${currentLead.domain}`}
+                                        target="_blank"
+                                        className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1"
+                                    >
+                                        Visitar Web <ExternalLink size={12} />
+                                    </a>
+                                )}
+                            </div>
+
+                            {isEditingLead ? (
+                                <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                    <input
+                                        type="text"
+                                        value={editForm.company_name}
+                                        onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
+                                        className="block w-full text-xl font-bold bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        placeholder="Nombre de empresa"
+                                    />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input
+                                            type="text"
+                                            value={editForm.contact_name}
+                                            onChange={(e) => setEditForm({ ...editForm, contact_name: e.target.value })}
+                                            className="block w-full text-sm font-medium bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                            placeholder="Persona de contacto"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={editForm.contact_role}
+                                            onChange={(e) => setEditForm({ ...editForm, contact_role: e.target.value })}
+                                            className="block w-full text-sm font-medium bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                            placeholder="Cargo"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <button
+                                            onClick={handleUpdateLead}
+                                            className="px-4 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-all"
+                                        >
+                                            Guardar
+                                        </button>
+                                        <button
+                                            onClick={() => setIsEditingLead(false)}
+                                            className="px-4 py-1.5 bg-white border border-gray-200 text-gray-500 text-xs font-bold rounded-lg hover:bg-gray-50 transition-all"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <div className="flex items-start justify-between group">
+                                        <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight leading-tight mb-2">
+                                            {currentLead.company_name}
+                                        </h2>
+                                        <button
+                                            onClick={() => setIsEditingLead(true)}
+                                            className="p-2 opacity-0 group-hover:opacity-100 hover:bg-gray-50 rounded-lg text-gray-400 transition-all"
+                                        >
+                                            <Sparkles size={16} />
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center text-gray-600 font-medium text-lg mt-1">
+                                        <User size={18} className="mr-2 text-gray-400" />
+                                        {currentLead.contact_name || 'Sin contacto'}
+                                        {currentLead.contact_role && (
+                                            <span className="ml-3 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold uppercase border border-gray-200">
+                                                {currentLead.contact_role}
+                                            </span>
                                         )}
                                     </div>
+                                    <div className="mt-4 flex flex-wrap gap-3">
+                                        <div className="flex items-center text-xs font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                            <Globe size={12} className="mr-1.5 text-gray-400" />
+                                            {currentLead.city ? `${currentLead.city}, ${currentLead.country || ''}` : currentLead.country || 'Ubicación desconocida'}
+                                        </div>
+                                        <div className="flex items-center text-xs font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                            <Tag size={12} className="mr-1.5 text-gray-400" />
+                                            {currentLead.categories || 'Sin sector'}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
-                                    {currentLead.domain && !isEditingLead && (
-                                        <a
-                                            href={currentLead.domain.startsWith('http') ? currentLead.domain : `https://${currentLead.domain}`}
-                                            target="_blank"
-                                            className="flex items-center justify-between px-5 py-3 bg-gray-900 text-white rounded-lg hover:bg-black transition-all shadow-sm group/btn"
-                                        >
-                                            <div className="mr-6">
-                                                <span className="text-[10px] font-bold text-gray-400 uppercase block">Website</span>
-                                                <span className="text-sm font-semibold truncate max-w-[150px] block">{currentLead.domain}</span>
-                                            </div>
-                                            <ExternalLink size={16} className="text-gray-400 group-hover/btn:text-white transition-colors" />
-                                        </a>
+                        <div className="h-px w-full bg-gray-100" />
+
+                        {/* 2. Contact Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Phones */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                                        <Phone size={12} className="mr-1.5" /> Teléfonos
+                                    </h3>
+                                    <button
+                                        onClick={() => setIsEditingLead(true)}
+                                        className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
+                                    >
+                                        <Plus size={12} />
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    {phones.length > 0 ? phones.map((phone, idx) => (
+                                        <div key={idx} className="group flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:border-emerald-200 hover:shadow-sm transition-all">
+                                            <span className="text-sm font-bold text-gray-900 font-mono tracking-tight">{phone}</span>
+                                            <a
+                                                href={`tel:${phone}`}
+                                                className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
+                                            >
+                                                <Phone size={14} />
+                                            </a>
+                                        </div>
+                                    )) : (
+                                        <div className="p-3 border border-dashed border-gray-200 rounded-xl text-center">
+                                            <span className="text-xs text-gray-400 italic">Sin teléfonos registrados</span>
+                                        </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* 2. CONTACT CHANNELS (PHONES & EMAILS) */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-                                    <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
-                                        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide flex items-center">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2" />
-                                            Teléfonos Directos
-                                        </h3>
-                                        <button
-                                            onClick={() => {
-                                                setIsEditingLead(true)
-                                                setTimeout(() => (document.querySelector('input[placeholder="Sin teléfonos"]') as HTMLInputElement)?.focus(), 100)
-                                            }}
-                                            className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
-                                        >
-                                            <Plus size={14} />
-                                        </button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {phones.length > 0 ? phones.map((phone, idx) => (
-                                            <a
-                                                key={idx}
-                                                href={`tel:${phone}`}
-                                                className="bg-emerald-50/30 hover:bg-emerald-50 border border-emerald-100/50 hover:border-emerald-200 p-2.5 rounded-lg flex items-center justify-between transition-all group"
-                                            >
-                                                <span className="text-sm font-bold text-emerald-900 font-mono tracking-tight">{phone}</span>
-                                                <Phone size={14} className="text-emerald-600 group-hover:scale-110 transition-transform" />
-                                            </a>
-                                        )) : (
-                                            <p className="text-xs text-gray-400 italic text-center py-2">Sin teléfonos</p>
-                                        )}
-                                    </div>
+                            {/* Emails */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                                        <Mail size={12} className="mr-1.5" /> Emails
+                                    </h3>
+                                    <button
+                                        onClick={() => setIsEditingLead(true)}
+                                        className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
+                                    >
+                                        <Plus size={12} />
+                                    </button>
                                 </div>
-
-                                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-                                    <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
-                                        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide flex items-center">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2" />
-                                            Correos de Contacto
-                                        </h3>
-                                        <button
-                                            onClick={() => setIsEditingLead(true)}
-                                            className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
-                                        >
-                                            <Plus size={14} />
-                                        </button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {emails.length > 0 ? emails.map((email, idx) => (
-                                            <div
-                                                key={idx}
-                                                className="bg-blue-50/30 border border-blue-100/50 p-2.5 rounded-lg flex items-center justify-between group"
+                                <div className="space-y-2">
+                                    {emails.length > 0 ? emails.map((email, idx) => (
+                                        <div key={idx} className="group flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:border-blue-200 hover:shadow-sm transition-all">
+                                            <span className="text-sm font-medium text-gray-700 font-mono tracking-tight truncate mr-2 max-w-[180px]">{email}</span>
+                                            <button
+                                                onClick={() => {
+                                                    setEmailInitialTo(email)
+                                                    setIsEmailModalOpen(true)
+                                                }}
+                                                className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
                                             >
-                                                <span className="text-sm font-bold text-blue-900 font-mono tracking-tight truncate mr-2">{email}</span>
-                                                <button
-                                                    onClick={() => {
-                                                        setEmailInitialTo(email)
-                                                        setIsEmailModalOpen(true)
-                                                    }}
-                                                    className="text-blue-600 hover:text-blue-800 transition-colors"
-                                                >
-                                                    <Mail size={14} />
-                                                </button>
-                                            </div>
-                                        )) : (
-                                            <p className="text-xs text-gray-400 italic text-center py-2">Sin correos</p>
-                                        )}
-                                    </div>
+                                                <Mail size={14} />
+                                            </button>
+                                        </div>
+                                    )) : (
+                                        <div className="p-3 border border-dashed border-gray-200 rounded-xl text-center">
+                                            <span className="text-xs text-gray-400 italic">Sin emails registrados</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
+                        </div>
 
-                            {/* 3. UNIFIED ACTIVITY & NOTES */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 flex flex-col h-[300px]">
-                                    <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
-                                        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">Actividad Reciente</h3>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                                        {[...meetings, ...tasks, ...emailHistory, ...calls].sort((a, b) => new Date(b.created_at || b.sent_at || b.start_time).getTime() - new Date(a.created_at || a.sent_at || a.start_time).getTime()).map((activity, i) => {
+                        <div className="h-px w-full bg-gray-100" />
+
+                        {/* 3. Activity History */}
+                        <div>
+                            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Historial de Interacciones</h3>
+                            <div className="space-y-4">
+                                {[...meetings, ...tasks, ...emailHistory, ...calls].length > 0 ? (
+                                    [...meetings, ...tasks, ...emailHistory, ...calls]
+                                        .sort((a, b) => new Date(b.created_at || b.sent_at || b.start_time).getTime() - new Date(a.created_at || a.sent_at || a.start_time).getTime())
+                                        .map((activity, i) => {
                                             const isEmail = !!activity.subject
                                             const isMeeting = !!activity.start_time
                                             const isCall = !!activity.notes && !isEmail && !isMeeting && !activity.title
+                                            const date = new Date(activity.sent_at || activity.start_time || activity.created_at)
+
                                             return (
-                                                <div key={i} className="flex gap-3 text-sm">
+                                                <div key={i} className="flex gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white transition-all">
                                                     <div className={clsx(
-                                                        "mt-0.5 w-1.5 h-1.5 rounded-full shrink-0",
-                                                        isEmail ? "bg-blue-500" : isMeeting ? "bg-purple-500" : isCall ? "bg-emerald-500" : "bg-emerald-500"
-                                                    )} />
-                                                    <div>
-                                                        <p className="font-semibold text-gray-900 leading-tight text-xs">
-                                                            {activity.subject || activity.location || (isCall ? 'Llamada: ' + activity.notes : activity.title || 'Evento')}
-                                                        </p>
-                                                        <p className="text-[10px] text-gray-400 mt-0.5">
-                                                            {new Date(activity.sent_at || activity.start_time || activity.created_at).toLocaleDateString()}
+                                                        "mt-1 w-8 h-8 rounded-full flex items-center justify-center shrink-0 border",
+                                                        isEmail ? "bg-blue-50 border-blue-100 text-blue-600" :
+                                                            isMeeting ? "bg-purple-50 border-purple-100 text-purple-600" :
+                                                                isCall ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
+                                                                    "bg-gray-100 border-gray-200 text-gray-500"
+                                                    )}>
+                                                        {isEmail ? <Mail size={14} /> : isMeeting ? <Calendar size={14} /> : isCall ? <Phone size={14} /> : <CheckCircle2 size={14} />}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <p className="font-bold text-gray-900 text-sm">
+                                                                {activity.subject || activity.location || (isCall ? 'Llamada Registrada' : activity.title || 'Evento')}
+                                                            </p>
+                                                            <span className="text-[10px] font-medium text-gray-400 whitespace-nowrap ml-2">
+                                                                {date.toLocaleDateString()}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                                                            {isCall ? activity.notes : 'Interacción registrada en el sistema.'}
                                                         </p>
                                                     </div>
                                                 </div>
                                             )
-                                        })}
-                                        {meetings.length === 0 && tasks.length === 0 && emailHistory.length === 0 && (
-                                            <p className="text-sm text-gray-400 italic text-center py-10">Sin actividad registrada</p>
-                                        )}
+                                        })
+                                ) : (
+                                    <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                        <p className="text-sm text-gray-500 font-medium">Aún no hay actividad registrada</p>
+                                        <p className="text-xs text-gray-400 mt-1">Todas las llamadas y correos aparecerán aquí</p>
                                     </div>
-                                </div>
-
-                                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 flex flex-col h-[300px]">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">Notas Rápidas</h3>
-                                        {savingDetails && <span className="text-[10px] text-emerald-600 font-bold">Guardando...</span>}
-                                    </div>
-                                    <textarea
-                                        className="flex-1 w-full bg-yellow-50/50 border border-yellow-100 rounded-lg p-3 text-sm text-gray-700 focus:outline-none focus:border-yellow-300 resize-none"
-                                        placeholder="Escribe notas..."
-                                        defaultValue={currentLead.notes}
-                                        onBlur={(e) => {
-                                            handleAction('save_notes', e.target.value)
-                                        }}
-                                    />
-                                </div>
+                                )}
                             </div>
                         </div>
+
                     </div>
 
-                    {/* SIDEBAR */}
-                    <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-0">
-
-                        {/* ACTION PANEL */}
-                        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Acciones Rápidas</label>
-
-                            <button
-                                onClick={handleLogCall}
-                                className="w-full flex items-center justify-between p-4 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-black transition-all text-left shadow-lg shadow-gray-200 group"
-                            >
-                                <span className="flex items-center"><Phone size={16} className="mr-3 text-emerald-400" /> Llamada Realizada</span>
-                                <Plus size={14} className="text-gray-500" />
-                            </button>
-
-                            <button
-                                onClick={() => {
-                                    setTaskInitialTitle('Llamar para programar llamada')
-                                    setIsTaskModalOpen(true)
+                    {/* RIGHT COLUMN: Action Panel (Independent Scroll) */}
+                    <div className="lg:col-span-4 h-full bg-gray-50/50 border-l border-gray-200 flex flex-col min-h-0">
+                        {/* Notes Area - Now part of Action Panel for context */}
+                        <div className="p-6 border-b border-gray-200 bg-white flex-shrink-0">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Notas Rápidas</label>
+                                {savingDetails && <span className="text-[10px] text-emerald-600 font-bold animate-pulse">Guardando...</span>}
+                            </div>
+                            <textarea
+                                className="w-full h-32 bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-gray-700 placeholder-yellow-800/30 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 resize-none transition-shadow"
+                                placeholder="Escribe notas importantes de la llamada aquí..."
+                                defaultValue={currentLead.notes}
+                                onBlur={(e) => {
+                                    handleAction('save_notes', e.target.value)
                                 }}
-                                className="w-full flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all text-left group"
-                            >
-                                <span className="flex items-center"><Phone size={16} className="mr-3 text-gray-400 group-hover:text-gray-600" /> Programar Llamada</span>
-                                <Plus size={14} className="text-gray-300" />
-                            </button>
+                            />
+                        </div>
 
-                            <div className="h-px bg-gray-100 my-2" />
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
 
-                            <button
-                                onClick={() => setIsEmailModalOpen(true)}
-                                className="w-full flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all text-left group"
-                            >
-                                <span className="flex items-center"><Mail size={16} className="mr-3 text-gray-400 group-hover:text-gray-600" /> Nuevo Email</span>
-                                <Plus size={14} className="text-gray-300" />
-                            </button>
-                            <div className="grid grid-cols-2 gap-3">
+                            {/* Action Buttons */}
+                            <div className="space-y-3">
                                 <button
-                                    onClick={() => setIsMeetingModalOpen(true)}
-                                    className="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 hover:text-indigo-600 hover:border-indigo-100 transition-all"
+                                    onClick={handleLogCall}
+                                    className="w-full flex items-center justify-between p-4 bg-gray-900 text-white rounded-xl shadow-lg shadow-gray-200 hover:bg-black hover:scale-[1.02] active:scale-[0.98] transition-all group"
                                 >
-                                    <Calendar size={18} className="mb-1" />
-                                    <span className="text-xs font-semibold">Reunión</span>
+                                    <div className="flex items-center">
+                                        <div className="p-2 bg-emerald-500/20 rounded-lg mr-3">
+                                            <Phone size={18} className="text-emerald-400" />
+                                        </div>
+                                        <div className="text-left">
+                                            <span className="block text-sm font-bold">Registrar Llamada</span>
+                                            <span className="block text-[10px] text-gray-400 font-medium group-hover:text-gray-300">Marcar como contactado</span>
+                                        </div>
+                                    </div>
+                                    <ChevronRight size={16} className="text-gray-500 group-hover:text-white transition-colors" />
                                 </button>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setIsEmailModalOpen(true)}
+                                        className="flex flex-col items-center justify-center p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm transition-all group"
+                                    >
+                                        <Mail size={20} className="text-gray-400 group-hover:text-blue-500 mb-2 transition-colors" />
+                                        <span className="text-xs font-bold text-gray-700">Email</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setIsMeetingModalOpen(true)}
+                                        className="flex flex-col items-center justify-center p-4 bg-white border border-gray-200 rounded-xl hover:border-purple-200 hover:bg-purple-50/50 hover:shadow-sm transition-all group"
+                                    >
+                                        <Calendar size={20} className="text-gray-400 group-hover:text-purple-500 mb-2 transition-colors" />
+                                        <span className="text-xs font-bold text-gray-700">Reunión</span>
+                                    </button>
+                                </div>
+
                                 <button
                                     onClick={() => {
-                                        setTaskInitialTitle('')
+                                        setTaskInitialTitle('Volver a llamar')
                                         setIsTaskModalOpen(true)
                                     }}
-                                    className="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 hover:text-emerald-600 hover:border-emerald-100 transition-all"
+                                    className="w-full flex items-center justify-center p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all"
                                 >
-                                    <Clock size={18} className="mb-1" />
-                                    <span className="text-xs font-semibold">Tarea</span>
+                                    <Clock size={14} className="mr-2" />
+                                    Programar Recordatorio
                                 </button>
                             </div>
 
-                            <button
-                                onClick={handleEnrich}
-                                disabled={enriching || !currentLead.domain}
-                                className="w-full py-2 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all disabled:opacity-50 flex justify-center items-center"
-                            >
-                                {enriching ? <Loader2 size={12} className="animate-spin mr-2" /> : <Sparkles size={12} className="mr-2" />}
-                                {enriching ? 'Analizando...' : 'Auto-Enriquecer Lead'}
-                            </button>
-                        </div>
+                            <div className="h-px w-full bg-gray-200" />
 
-                        {/* DECISION PANEL */}
-                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Resolución</label>
-                            <button
-                                onClick={() => {
-                                    handleAction('qualify')
-                                }}
-                                className="w-full py-4 bg-gray-900 text-white rounded-lg shadow-sm hover:bg-black transition-all flex items-center justify-center space-x-3 mb-3 group"
-                            >
-                                <CheckCircle2 size={18} className="text-emerald-400" />
-                                <span className="font-bold text-sm tracking-wide">CUALIFICAR</span>
-                            </button>
-                            <div className="grid grid-cols-2 gap-3">
+                            {/* Automation */}
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3">Herramientas</label>
                                 <button
-                                    onClick={() => {
-                                        handleAction('disqualify')
-                                    }}
-                                    className="py-2.5 bg-white border border-gray-200 text-gray-500 rounded-lg text-xs font-bold hover:text-rose-600 hover:border-rose-200 transition-all"
+                                    onClick={handleEnrich}
+                                    disabled={enriching || !currentLead.domain}
+                                    className="w-full flex items-center justify-between p-3 bg-indigo-50 border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Descartar
-                                </button>
-                                <button
-                                    onClick={handleNext}
-                                    className="py-2.5 bg-white border border-gray-200 text-gray-500 rounded-lg text-xs font-bold hover:text-gray-900 hover:border-gray-300 transition-all"
-                                >
-                                    Saltar
+                                    <div className="flex items-center">
+                                        <Sparkles size={16} className={clsx("mr-2 text-indigo-600", enriching && "animate-spin")} />
+                                        <span className="text-xs font-bold text-indigo-700">
+                                            {enriching ? 'Investigando...' : 'Auto-Enriquecer Lead'}
+                                        </span>
+                                    </div>
+                                    {!enriching && <div className="bg-white px-1.5 py-0.5 rounded text-[9px] font-bold text-indigo-400 border border-indigo-100">AI</div>}
                                 </button>
                             </div>
+
+                            {/* Outcome Buttons - Sticky Bottom mobile, or just at bottom of flow */}
+                            <div className="pt-4 mt-auto">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3 opacity-0">Clasificación</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => handleAction('disqualify')}
+                                        className="py-3 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all"
+                                    >
+                                        Descartar
+                                    </button>
+                                    <button
+                                        onClick={handleNext}
+                                        className="py-3 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 hover:text-gray-900 transition-all"
+                                    >
+                                        Saltar
+                                    </button>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
+
                 </div>
             </div>
 

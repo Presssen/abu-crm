@@ -45,13 +45,21 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true)
     const [selectedDate, setSelectedDate] = useState(new Date())
     const [dateRange, setDateRange] = useState<DateRange>({
-        start: new Date(new Date().setHours(0, 0, 0, 0)),
+        start: new Date(new Date().setDate(new Date().getDate() - 30)),
         end: new Date(new Date().setHours(23, 59, 59, 999)),
-        label: 'Hoy'
+        label: 'Últimos 30 días'
     })
     const [showDatePicker, setShowDatePicker] = useState(false)
     const [dailyMeetings, setDailyMeetings] = useState<any[]>([])
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+    useEffect(() => {
+        const start = new Date()
+        start.setDate(start.getDate() - 30)
+        start.setHours(0, 0, 0, 0)
+        // Ensure accurate initial fetch
+        // fetchStats() and fetchDailyMeetings are called in the next useEffect
+    }, [])
 
     useEffect(() => {
         fetchStats()
@@ -105,17 +113,18 @@ export default function DashboardPage() {
                 calls: callsCount || 0
             })
 
-            // 3. Pipeline data (Current snapshot, doesn't depend on date filtering for total counts but could)
+            // 3. Pipeline data - Calculate percentages for Funnel
             const { data: pipelineData } = await supabase
                 .from('leads')
                 .select('status')
 
-            const stages = [
-                { name: 'Nuevos', status: 'new', color: 'bg-blue-500' },
-                { name: 'Contactados', status: 'contacted', color: 'bg-amber-500' },
-                { name: 'Demo Agendada', status: 'demo_scheduled', color: 'bg-indigo-500' },
-                { name: 'Propuesta Enviada', status: 'proposal_sent', color: 'bg-purple-500' },
-                { name: 'Ganados', status: 'won', color: 'bg-emerald-500' },
+            // Define stages in order
+            const stagesDef = [
+                { id: 'new', name: 'Nuevos', color: '#3B82F6' },
+                { id: 'contacted', name: 'Contactados', color: '#F59E0B' },
+                { id: 'demo_scheduled', name: 'Demo', color: '#6366F1' },
+                { id: 'proposal_sent', name: 'Propuesta', color: '#8B5CF6' },
+                { id: 'won', name: 'Ganados', color: '#10B981' },
             ]
 
             const counts = pipelineData?.reduce((acc: any, lead: any) => {
@@ -123,11 +132,13 @@ export default function DashboardPage() {
                 return acc
             }, {})
 
-            const total = pipelineData?.length || 1
-            setPipelineStats(stages.map(s => ({
+            const maxCount = Math.max(...stagesDef.map(s => counts[s.id] || 0), 1)
+
+            setPipelineStats(stagesDef.map(s => ({
                 ...s,
-                count: counts[s.status] || 0,
-                percent: Math.round(((counts[s.status] || 0) / total) * 100)
+                count: counts[s.id] || 0,
+                percent: Math.round(((counts[s.id] || 0) / maxCount) * 100), // Relative to max for bar visualization
+                totalPercent: Math.round(((counts[s.id] || 0) / (pipelineData?.length || 1)) * 100)
             })))
 
             // 4. Fetch Activities for Feed
@@ -423,27 +434,62 @@ export default function DashboardPage() {
 
                 {/* Right Column: Other Info */}
                 <div className="lg:col-span-4 space-y-8">
-                    {/* Pipeline Summary */}
-                    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
+                    {/* Pipeline Funnel Chart */}
+                    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col h-[400px]">
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-lg font-bold text-gray-900">Pipeline</h2>
-                            <Link href="/pipeline" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">Ver Kanban</Link>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">Embudo de Ventas</h2>
+                                <p className="text-xs text-gray-500">Conversión por etapa</p>
+                            </div>
+                            <Link href="/pipeline" className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors">
+                                Ver Tablero
+                            </Link>
                         </div>
-                        <div className="space-y-4">
-                            {pipelineStats.map((stage) => (
-                                <div key={stage.name} className="space-y-2">
-                                    <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
-                                        <span className="text-gray-500">{stage.name}</span>
-                                        <span className="text-gray-900">{stage.count}</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
-                                        <div
-                                            className={clsx("h-full rounded-full transition-all duration-1000", stage.color)}
-                                            style={{ width: `${stage.percent}%` }}
-                                        />
+
+                        <div className="flex-1 flex flex-col justify-center space-y-3 px-4">
+                            {pipelineStats.length > 0 ? pipelineStats.map((stage, idx) => (
+                                <div key={stage.name} className="relative group">
+                                    <div className="flex items-center gap-4">
+                                        {/* Label */}
+                                        <div className="w-24 text-right">
+                                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{stage.name}</p>
+                                        </div>
+
+                                        {/* Bar */}
+                                        <div className="flex-1 h-8 bg-gray-50 rounded-r-lg relative overflow-hidden flex items-center">
+                                            <div
+                                                className="h-full rounded-r-lg transition-all duration-1000 ease-out flex items-center"
+                                                style={{
+                                                    width: `${Math.max(stage.percent, 5)}%`,
+                                                    backgroundColor: stage.color
+                                                }}
+                                            >
+                                                <span className="ml-3 text-xs font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                    {stage.count} Leads
+                                                </span>
+                                            </div>
+                                            {/* Count floating if bar is small */}
+                                            <span
+                                                className="absolute right-3 text-xs font-bold text-gray-700 tabular-nums"
+                                                style={{ opacity: stage.percent > 90 ? 0 : 1 }}
+                                            >
+                                                {stage.count}
+                                            </span>
+                                        </div>
+
+                                        {/* Percentage */}
+                                        <div className="w-12 text-right">
+                                            <span className="text-xs font-bold text-gray-400">
+                                                {stage.totalPercent}%
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="text-center text-gray-400 py-10">
+                                    <p className="text-sm">Sin datos para mostrar</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
