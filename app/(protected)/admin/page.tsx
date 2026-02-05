@@ -442,14 +442,22 @@ function AdminContent() {
                                     <Zap className="text-emerald-600" size={24} />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold text-gray-900">Conectar AI de Google</h2>
-                                    <p className="text-sm text-gray-500">Configura la API Key de Google Gemini para el enriquecimiento automático de leads.</p>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-lg font-bold text-gray-900">Inteligencia Artificial</h2>
+                                        <span className={clsx(
+                                            "px-2.5 py-0.5 rounded-full text-xs font-bold border",
+                                            geminiKey ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-500 border-gray-200"
+                                        )}>
+                                            {geminiKey ? 'Activada' : 'Desactivada'}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-500">Configura la clave para el enriquecimiento automático de leads.</p>
                                 </div>
                             </div>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Gemini API Key</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Clave API</label>
                                 <div className="relative">
                                     <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                     <input
@@ -457,7 +465,7 @@ function AdminContent() {
                                         value={geminiKey}
                                         onChange={(e) => setGeminiKey(e.target.value)}
                                         className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        placeholder="AIza..."
+                                        placeholder="Ingresa la clave..."
                                     />
                                 </div>
                             </div>
@@ -480,14 +488,22 @@ function AdminContent() {
                                     <Search className="text-blue-600" size={24} />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold text-gray-900">Conectar Apollo.io</h2>
-                                    <p className="text-sm text-gray-500">Configura la API Key de Apollo para enriquecer leads con contactos verificados.</p>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-lg font-bold text-gray-900">Búsqueda Apollo</h2>
+                                        <span className={clsx(
+                                            "px-2.5 py-0.5 rounded-full text-xs font-bold border",
+                                            apolloKey ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-500 border-gray-200"
+                                        )}>
+                                            {apolloKey ? 'Activada' : 'Desactivada'}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-500">Configura la clave de Apollo para encontrar contactos verificados.</p>
                                 </div>
                             </div>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Apollo API Key</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Clave API</label>
                                 <div className="relative">
                                     <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                     <input
@@ -495,7 +511,7 @@ function AdminContent() {
                                         value={apolloKey}
                                         onChange={(e) => setApolloKey(e.target.value)}
                                         className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                        placeholder="Ingresa tu API key de Apollo..."
+                                        placeholder="Ingresa la clave de Apollo..."
                                     />
                                 </div>
                                 <p className="mt-2 text-xs text-gray-500">
