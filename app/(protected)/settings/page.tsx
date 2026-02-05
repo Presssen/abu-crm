@@ -58,7 +58,6 @@ function SettingsContent() {
     const [lastSynced, setLastSynced] = useState<string | null>(null)
     const [geminiKey, setGeminiKey] = useState('')
     const [apolloKey, setApolloKey] = useState('')
-    const [saving, setSaving] = useState(false)
 
     useEffect(() => {
         fetchSettings()
@@ -219,39 +218,6 @@ function SettingsContent() {
         }
     }
 
-    const saveGlobalIntegration = async (type: 'gemini_api' | 'apollo_api', key: string) => {
-        setSaving(true)
-        try {
-            const { data: existing } = await supabase
-                .from('integrations')
-                .select('id')
-                .eq('integration_type', type)
-                .eq('is_global', true)
-                .maybeSingle()
-
-            if (existing) {
-                await supabase.from('integrations').update({
-                    credentials: { api_key: key },
-                    is_active: true
-                }).eq('id', existing.id)
-            } else {
-                await supabase.from('integrations').insert([{
-                    owner_id: user.id,
-                    integration_type: type,
-                    provider: type === 'gemini_api' ? 'google' : 'apollo',
-                    credentials: { api_key: key },
-                    is_global: true,
-                    is_active: true
-                }])
-            }
-            alert('Configuración guardada correctamente')
-            fetchSettings()
-        } catch (error: any) {
-            alert('Error al guardar: ' + error.message)
-        } finally {
-            setSaving(false)
-        }
-    }
 
     const tabs = [
         { id: 'profile', label: 'Mi Perfil', icon: User },
@@ -515,36 +481,10 @@ function SettingsContent() {
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {profile?.role === 'admin' && (
-                                            <div className="space-y-4 pt-4 border-t border-gray-50">
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-bold text-gray-700">Clave API (Gemini)</label>
-                                                    <div className="relative">
-                                                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                                        <input
-                                                            type="password"
-                                                            value={geminiKey}
-                                                            onChange={(e) => setGeminiKey(e.target.value)}
-                                                            className="w-full pl-12 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                                                            placeholder="Ingresa la clave..."
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={() => saveGlobalIntegration('gemini_api', geminiKey)}
-                                                    disabled={saving}
-                                                    className="inline-flex items-center justify-center px-6 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
-                                                >
-                                                    <Save size={16} className="mr-2" />
-                                                    {saving ? 'Guardando...' : 'Guardar Configuración'}
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Apollo Search Card */}
-                                    <div className="bg-white border boundary-gray-200 rounded-2xl p-6 flex flex-col items-stretch gap-6 hover:shadow-md transition-shadow">
+                                    <div className="bg-white border border-gray-200 rounded-2xl p-6 flex flex-col items-stretch gap-6 hover:shadow-md transition-shadow">
                                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                             <div className="flex items-center gap-4">
                                                 <div className="h-16 w-16 bg-blue-50 rounded-2xl flex items-center justify-center flex-shrink-0">
@@ -566,38 +506,6 @@ function SettingsContent() {
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {profile?.role === 'admin' && (
-                                            <div className="space-y-4 pt-4 border-t border-gray-50">
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-bold text-gray-700">Clave API (Apollo)</label>
-                                                    <div className="relative">
-                                                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                                        <input
-                                                            type="password"
-                                                            value={apolloKey}
-                                                            onChange={(e) => setApolloKey(e.target.value)}
-                                                            className="w-full pl-12 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                                            placeholder="Ingresa la clave Apollo..."
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <button
-                                                        onClick={() => saveGlobalIntegration('apollo_api', apolloKey)}
-                                                        disabled={saving}
-                                                        className="inline-flex items-center justify-center px-6 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
-                                                    >
-                                                        <Save size={16} className="mr-2" />
-                                                        {saving ? 'Guardando...' : 'Guardar Configuración'}
-                                                    </button>
-                                                    <a href="https://app.apollo.io/#/settings/integrations/api" target="_blank" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                                                        <Settings size={12} />
-                                                        Obtener Clave en Apollo
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             )}

@@ -17,7 +17,8 @@ import {
     Target,
     Upload,
     Clock,
-    ShieldAlert
+    ShieldAlert,
+    Search
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -54,8 +55,8 @@ function AdminContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    type TabType = 'users' | 'marathon' | 'leads' | 'imports'
-    const activeTab = (searchParams.get('tab') as TabType) || 'users'
+    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports'
+    const activeTab = (searchParams.get('tab') as TabType) || 'integrations'
 
     const setActiveTab = (tab: TabType) => {
         const params = new URLSearchParams(searchParams.toString())
@@ -71,6 +72,8 @@ function AdminContent() {
     const [saving, setSaving] = useState(false)
 
     // Forms
+    const [geminiKey, setGeminiKey] = useState('')
+    const [apolloKey, setApolloKey] = useState('')
     const [marathonGoal, setMarathonGoal] = useState('20')
 
     // Selection & Filters
@@ -102,7 +105,38 @@ function AdminContent() {
     const fetchData = async () => {
         setLoading(true)
         try {
-            if (activeTab === 'marathon') {
+            if (activeTab === 'integrations') {
+                const { data, error } = await supabase
+                    .from('integrations')
+                    .select('*')
+                    .eq('is_global', true)
+                if (error) throw error
+                setIntegrations(data || [])
+
+                // Also fetch global marathon goal to use across tabs if needed
+                const { data: geminiKeyData } = await supabase
+                    .from('integrations')
+                    .select('*')
+                    .eq('integration_type', 'gemini_api')
+                    .eq('is_global', true)
+                    .maybeSingle()
+                if (geminiKeyData) setGeminiKey(geminiKeyData.credentials?.api_key || '')
+
+                const { data: apolloKeyData } = await supabase
+                    .from('integrations')
+                    .select('*')
+                    .eq('integration_type', 'apollo_api')
+                    .eq('is_global', true)
+                    .maybeSingle()
+                if (apolloKeyData) setApolloKey(apolloKeyData.credentials?.api_key || '')
+
+                const { data: mGoal } = await supabase
+                    .from('app_settings')
+                    .select('*')
+                    .eq('key', 'marathon_default_goal')
+                    .single()
+                if (mGoal) setMarathonGoal(mGoal?.value || '20')
+            } else if (activeTab === 'marathon') {
                 const { data, error } = await supabase
                     .from('app_settings')
                     .select('*')
@@ -139,6 +173,70 @@ function AdminContent() {
             console.error('Error fetching data:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const saveGeminiIntegration = async () => {
+        setSaving(true)
+        try {
+            const { data: userData } = await supabase.auth.getUser()
+            const ownerId = userData.user?.id
+
+            const existing = integrations.find(i => i.integration_type === 'gemini_api')
+
+            if (existing) {
+                await supabase.from('integrations').update({
+                    credentials: { api_key: geminiKey },
+                    is_active: true
+                }).eq('id', existing.id)
+            } else {
+                await supabase.from('integrations').insert([{
+                    owner_id: ownerId,
+                    integration_type: 'gemini_api',
+                    provider: 'google',
+                    credentials: { api_key: geminiKey },
+                    is_global: true,
+                    is_active: true
+                }])
+            }
+            alert('API Key de Gemini guardada correctamente')
+            fetchData()
+        } catch (error: any) {
+            alert('Error al guardar: ' + error.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const saveApolloIntegration = async () => {
+        setSaving(true)
+        try {
+            const { data: userData } = await supabase.auth.getUser()
+            const ownerId = userData.user?.id
+
+            const existing = integrations.find(i => i.integration_type === 'apollo_api')
+
+            if (existing) {
+                await supabase.from('integrations').update({
+                    credentials: { api_key: apolloKey },
+                    is_active: true
+                }).eq('id', existing.id)
+            } else {
+                await supabase.from('integrations').insert([{
+                    owner_id: ownerId,
+                    integration_type: 'apollo_api',
+                    provider: 'apollo',
+                    credentials: { api_key: apolloKey },
+                    is_global: true,
+                    is_active: true
+                }])
+            }
+            alert('API Key de Apollo guardada correctamente')
+            fetchData()
+        } catch (error: any) {
+            alert('Error al guardar: ' + error.message)
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -248,72 +346,46 @@ function AdminContent() {
         )
     }
 
-    const bulkDeleteLeads = async () => {
-        if (!selectedLeads.length) return
-
-        const confirmed = confirm(`¿Estás seguro de eliminar ${selectedLeads.length} leads? Esta acción no se puede deshacer.`)
-        if (!confirmed) return
-
-        setSaving(true)
-        try {
-            const { error } = await supabase.from('leads').delete().in('id', selectedLeads)
-            if (error) throw error
-
-            alert(`Se han eliminado ${selectedLeads.length} leads correctamente`)
-            setSelectedLeads([])
-            fetchData()
-        } catch (error: any) {
-            alert('Error al eliminar leads: ' + error.message)
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    const deleteImportBatch = async (batchId: string, totalLeads: number) => {
-        const confirmed = confirm(`¿Eliminar esta importación y sus ${totalLeads} leads asociados? Esta acción no se puede deshacer.`)
-        if (!confirmed) return
-
-        setSaving(true)
-        try {
-            // Delete all leads with this batch_id
-            const { error: leadsError } = await supabase
-                .from('leads')
-                .delete()
-                .eq('import_batch_id', batchId)
-
-            if (leadsError) throw leadsError
-
-            // Delete the batch record
-            const { error: batchError } = await supabase
-                .from('import_batches')
-                .delete()
-                .eq('id', batchId)
-
-            if (batchError) throw batchError
-
-            alert('Importación eliminada correctamente')
-            fetchData()
-        } catch (error: any) {
-            alert('Error al eliminar importación: ' + error.message)
-        } finally {
-            setSaving(false)
-        }
-    }
-
     const deleteLead = async (leadId: string) => {
-        if (!confirm('¿Estás seguro de eliminar este lead? Esta acción no se puede deshacer.')) return
-
-        setSaving(true) // Reuse saving state for UI indication if needed, or local loading
+        if (!confirm('¿Seguro que quieres borrar este lead?')) return
+        setSaving(true)
         try {
             const { error } = await supabase.from('leads').delete().eq('id', leadId)
             if (error) throw error
-
-            // Remove from local state immediately for better UX
-            setLeads(prev => prev.filter(l => l.id !== leadId))
-            setSelectedLeads(prev => prev.filter(id => id !== leadId))
-
+            fetchData()
         } catch (error: any) {
             alert('Error al eliminar lead: ' + error.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const bulkDeleteLeads = async (leadIds: string[]) => {
+        if (!leadIds.length) return
+        if (!confirm(`¿Seguro que quieres borrar ${leadIds.length} leads?`)) return
+        setSaving(true)
+        try {
+            const { error } = await supabase.from('leads').delete().in('id', leadIds)
+            if (error) throw error
+            alert(`${leadIds.length} leads eliminados`)
+            setSelectedLeads([])
+            fetchData()
+        } catch (error: any) {
+            alert('Error en borrado masivo: ' + error.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const deleteImportBatch = async (batchId: string) => {
+        if (!confirm('¿Seguro que quieres borrar esta importación? Esto eliminará TODOS los leads asociados.')) return
+        setSaving(true)
+        try {
+            const { error } = await supabase.from('import_batches').delete().eq('id', batchId)
+            if (error) throw error
+            fetchData()
+        } catch (error: any) {
+            alert('Error al eliminar importación: ' + error.message)
         } finally {
             setSaving(false)
         }
@@ -335,6 +407,7 @@ function AdminContent() {
             {/* Tabs */}
             <div className="border-b border-gray-100 flex space-x-8">
                 {[
+                    { id: 'integrations', label: 'Integraciones & IA', icon: Settings },
                     { id: 'users', label: 'Usuarios', icon: Users },
                     { id: 'leads', label: 'Gestión de Leads', icon: Target },
                     { id: 'imports', label: 'Historial de Importaciones', icon: Upload },
@@ -354,6 +427,108 @@ function AdminContent() {
                 ))}
             </div>
 
+            {/* INTEGRATIONS TAB */}
+            {activeTab === 'integrations' && (
+                <div className="space-y-8 max-w-4xl">
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-teal-50">
+                            <div className="flex items-center space-x-3">
+                                <div className="p-3 bg-white rounded-xl shadow-sm">
+                                    <Zap className="text-emerald-600" size={24} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-lg font-bold text-gray-900">Inteligencia Artificial</h2>
+                                        <span className={clsx(
+                                            "px-2.5 py-0.5 rounded-full text-xs font-bold border",
+                                            geminiKey ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-500 border-gray-200"
+                                        )}>
+                                            {geminiKey ? 'Activada' : 'Desactivada'}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-500">Configura la clave para el enriquecimiento automático de leads.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Clave API</label>
+                                <div className="relative">
+                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                    <input
+                                        type="password"
+                                        value={geminiKey}
+                                        onChange={(e) => setGeminiKey(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        placeholder="Ingresa la clave..."
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                onClick={saveGeminiIntegration}
+                                disabled={saving}
+                                className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                            >
+                                <Save size={18} className="mr-2" />
+                                {saving ? 'Guardando...' : 'Guardar API Key'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Apollo Integration */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                            <div className="flex items-center space-x-3">
+                                <div className="p-3 bg-white rounded-xl shadow-sm">
+                                    <Search className="text-blue-600" size={24} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-lg font-bold text-gray-900">Búsqueda Apollo</h2>
+                                        <span className={clsx(
+                                            "px-2.5 py-0.5 rounded-full text-xs font-bold border",
+                                            apolloKey ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-500 border-gray-200"
+                                        )}>
+                                            {apolloKey ? 'Activada' : 'Desactivada'}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-500">Configura la clave de Apollo para encontrar contactos verificados.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Clave API</label>
+                                <div className="relative">
+                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                    <input
+                                        type="password"
+                                        value={apolloKey}
+                                        onChange={(e) => setApolloKey(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Ingresa la clave de Apollo..."
+                                    />
+                                </div>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    Obtén tu API key desde{' '}
+                                    <a href="https://app.apollo.io/#/settings/integrations/api" target="_blank" className="text-blue-600 hover:underline">
+                                        Apollo Settings → API
+                                    </a>
+                                </p>
+                            </div>
+                            <button
+                                onClick={saveApolloIntegration}
+                                disabled={saving}
+                                className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                            >
+                                <Save size={18} className="mr-2" />
+                                {saving ? 'Guardando...' : 'Guardar API Key'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* MARATHON TAB */}
             {activeTab === 'marathon' && (
                 <div className="space-y-8 max-w-4xl">
@@ -364,21 +539,25 @@ function AdminContent() {
                                 Configuración Global Marathon
                             </h2>
                         </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Objetivo Diario por Defecto</label>
-                                <input
-                                    type="number"
-                                    value={marathonGoal}
-                                    onChange={(e) => setMarathonGoal(e.target.value)}
-                                    className="w-32 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                                />
+                        <div className="p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700">Objetivo Diario de Leads (Global)</label>
+                                    <input
+                                        type="number"
+                                        value={marathonGoal}
+                                        onChange={(e) => setMarathonGoal(e.target.value)}
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    />
+                                    <p className="text-xs text-gray-500">Cantidad por defecto para nuevos usuarios.</p>
+                                </div>
                             </div>
                             <button
                                 onClick={saveMarathonConfig}
                                 disabled={saving}
-                                className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50"
+                                className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
                             >
+                                <Save size={18} className="mr-2" />
                                 {saving ? 'Guardando...' : 'Guardar Configuración'}
                             </button>
                         </div>
@@ -388,27 +567,34 @@ function AdminContent() {
 
             {/* USERS TAB */}
             {activeTab === 'users' && (
-                <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50 border-b border-gray-100">
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Usuario</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Estado</th>
-                                <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase">Bloqueo</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Rol</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Marathon Mode</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Meta Diaria</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Acciones</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuario</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Estado</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Bloqueo</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Rol</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Marathon</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Meta Diaria</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider"></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {profiles.map((profile) => (
-                                <tr key={profile.id} className="hover:bg-gray-50/50">
+                        <tbody className="divide-y divide-gray-50">
+                            {profiles.map(profile => (
+                                <tr key={profile.id} className="hover:bg-gray-50/50 transition-colors">
                                     <td className="px-6 py-4">
-                                        <div className="font-medium text-gray-900">{profile.email}</div>
-                                        <div className="text-xs text-gray-400 font-mono">{profile.id.slice(0, 8)}...</div>
+                                        <div className="flex items-center space-x-3">
+                                            <div className="h-10 w-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-700 font-bold">
+                                                {profile.email[0].toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-bold text-gray-900">{profile.email}</div>
+                                                <div className="text-[10px] text-gray-400">{new Date(profile.created_at).toLocaleDateString()}</div>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-6 py-4 text-center">
                                         <button
                                             onClick={() => updateUserProfile(profile.id, { is_approved: !profile.is_approved })}
                                             className={clsx(
@@ -498,99 +684,88 @@ function AdminContent() {
 
             {/* LEADS TAB */}
             {activeTab === 'leads' && (
-                <div className="space-y-4">
-                    {/* Filters & Bulk Actions */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-6">
-                        <div className="flex flex-wrap gap-4 items-end">
-                            <div className="flex-1 min-w-[200px]">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">País</label>
-                                <select
-                                    value={filters.country}
-                                    onChange={(e) => setFilters({ ...filters, country: e.target.value })}
-                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
-                                >
-                                    <option value="">Todos los países</option>
-                                    {countries.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                            <div className="flex-1 min-w-[200px]">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Categoría</label>
-                                <select
-                                    value={filters.categories}
-                                    onChange={(e) => setFilters({ ...filters, categories: e.target.value })}
-                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
-                                >
-                                    <option value="">Todas las categorías</option>
-                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                            <div className="flex-1 min-w-[150px]">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Asignación</label>
-                                <select
-                                    value={filters.owner}
-                                    onChange={(e) => setFilters({ ...filters, owner: e.target.value })}
-                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
-                                >
-                                    <option value="all">Todos</option>
-                                    <option value="assigned">Asignados</option>
-                                    <option value="unassigned">Sin asignar (Marathon)</option>
-                                </select>
-                            </div>
-                            <button
-                                onClick={() => setFilters({ country: '', categories: '', status: '', owner: 'all' })}
-                                className="px-4 py-2 text-sm font-bold text-gray-400 hover:text-gray-600"
+                <div className="space-y-6">
+                    {/* Filters */}
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-wrap gap-4 items-end">
+                        <div className="space-y-1.5 flex-1 min-w-[200px]">
+                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">País</label>
+                            <select
+                                value={filters.country}
+                                onChange={(e) => setFilters({ ...filters, country: e.target.value })}
+                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                             >
-                                Limpiar
-                            </button>
+                                <option value="">Todos los países</option>
+                                {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
                         </div>
-
-                        {/* Bulk Action Bar */}
-                        <div className={clsx(
-                            "flex items-center justify-between p-4 rounded-2xl border transition-all",
-                            selectedLeads.length > 0 ? "bg-indigo-50 border-indigo-100" : "bg-gray-50 border-gray-100 opacity-50"
-                        )}>
-                            <div className="flex items-center space-x-4">
-                                <span className="text-sm font-bold text-indigo-900">
-                                    {selectedLeads.length} leads seleccionados
-                                </span>
-                            </div>
-                            <div className="flex items-center space-x-3">
-                                <select
-                                    value={bulkOwnerId}
-                                    onChange={(e) => setBulkOwnerId(e.target.value)}
-                                    className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm"
-                                    disabled={selectedLeads.length === 0}
-                                >
-                                    <option value="">Seleccionar destinatario...</option>
-                                    <option value="null">Pool Marathon (Sin asignar)</option>
-                                    {profiles.map(p => (
-                                        <option key={p.id} value={p.id}>{p.email}</option>
-                                    ))}
-                                </select>
-                                <button
-                                    onClick={() => bulkUpdateLeads(selectedLeads, bulkOwnerId === 'null' ? null : bulkOwnerId)}
-                                    disabled={selectedLeads.length === 0 || !bulkOwnerId}
-                                    className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 shadow-lg shadow-indigo-100"
-                                >
-                                    Asignar Masivamente
-                                </button>
-                                <button
-                                    onClick={bulkDeleteLeads}
-                                    disabled={selectedLeads.length === 0 || saving}
-                                    className="px-6 py-2 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 disabled:opacity-50 shadow-lg shadow-rose-100 flex items-center gap-2"
-                                >
-                                    <Trash2 size={16} />
-                                    Eliminar Seleccionados
-                                </button>
-                            </div>
+                        <div className="space-y-1.5 flex-1 min-w-[200px]">
+                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Categoría</label>
+                            <select
+                                value={filters.categories}
+                                onChange={(e) => setFilters({ ...filters, categories: e.target.value })}
+                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                            >
+                                <option value="">Todas las categorías</option>
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1.5 flex-1 min-w-[200px]">
+                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Responsable</label>
+                            <select
+                                value={filters.owner}
+                                onChange={(e) => setFilters({ ...filters, owner: e.target.value })}
+                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="assigned">Asignados</option>
+                                <option value="unassigned">Sin asignar</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 border-b border-gray-200">
+                    {/* Bulk Actions */}
+                    {selectedLeads.length > 0 && (
+                        <div className="bg-indigo-600 p-4 rounded-2xl shadow-lg flex items-center justify-between text-white animate-in slide-in-from-top-4">
+                            <div className="flex items-center space-x-4">
+                                <span className="font-bold">{selectedLeads.length} leads seleccionados</span>
+                                <div className="h-6 w-[1px] bg-indigo-500" />
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm opacity-80">Asignar a:</span>
+                                    <select
+                                        value={bulkOwnerId}
+                                        onChange={(e) => setBulkOwnerId(e.target.value)}
+                                        className="bg-indigo-700 border border-indigo-500 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-white/20"
+                                    >
+                                        <option value="">Pool (Sin asignar)</option>
+                                        {profiles.map(p => (
+                                            <option key={p.id} value={p.id}>{p.email}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={() => bulkUpdateLeads(selectedLeads, bulkOwnerId || null)}
+                                        disabled={saving}
+                                        className="bg-white text-indigo-600 px-4 py-1 rounded-lg text-sm font-bold hover:bg-indigo-50 transition-colors"
+                                    >
+                                        Aplicar
+                                    </button>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => bulkDeleteLeads(selectedLeads)}
+                                className="bg-rose-500 hover:bg-rose-600 px-4 py-1 rounded-lg text-sm font-bold transition-colors flex items-center"
+                            >
+                                <Trash2 size={16} className="mr-2" />
+                                Borrar seleccionados
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Leads Table */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 border-b border-gray-100">
                                 <tr>
-                                    <th className="px-6 py-4 text-left">
+                                    <th className="px-6 py-4 w-10">
                                         <input
                                             type="checkbox"
                                             checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
@@ -598,14 +773,14 @@ function AdminContent() {
                                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                         />
                                     </th>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Empresa / Lead</th>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Detalles</th>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Asignado a</th>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Acciones</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Empresa</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">País / Categoría</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Responsable</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredLeads.map((lead) => (
+                            <tbody className="divide-y divide-gray-50">
+                                {filteredLeads.map(lead => (
                                     <tr key={lead.id} className={clsx(
                                         "hover:bg-gray-50/50 transition-colors",
                                         selectedLeads.includes(lead.id) && "bg-indigo-50/30"
@@ -620,119 +795,86 @@ function AdminContent() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-bold text-gray-900">{lead.company_name}</div>
-                                            <div className="text-xs text-gray-400">{lead.contact_name}</div>
+                                            <div className="text-xs text-gray-400 truncate max-w-[200px]">{lead.website}</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="text-xs text-gray-600 line-clamp-1">
-                                                {lead.country || 'N/A'} • {lead.categories || 'N/A'} • {lead.domain || 'N/A'}
-                                            </div>
+                                            <div className="text-sm text-gray-600">{lead.country || 'N/A'}</div>
+                                            <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{lead.categories || 'Sin categoría'}</div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <select
                                                 value={lead.owner_id || ''}
                                                 onChange={(e) => reassignLead(lead.id, e.target.value || null)}
-                                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium"
+                                                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm"
                                             >
-                                                <option value="">Pool Marathon (Sin asignar)</option>
+                                                <option value="">Pool (Sin asignar)</option>
                                                 {profiles.map(p => (
                                                     <option key={p.id} value={p.id}>{p.email}</option>
                                                 ))}
                                             </select>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center space-x-2">
-                                                <button
-                                                    onClick={() => reassignLead(lead.id, null)}
-                                                    className="px-3 py-1.5 bg-amber-50 text-amber-600 text-xs font-bold rounded-lg hover:bg-amber-100 border border-amber-100 transition-all flex items-center space-x-1"
-                                                    title="Liberar lead al pool"
-                                                >
-                                                    <Zap size={14} />
-                                                    <span>Liberar</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => deleteLead(lead.id)}
-                                                    className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                                    title="Eliminar lead"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
+                                        <td className="px-6 py-4 text-right">
+                                            <button
+                                                onClick={() => deleteLead(lead.id)}
+                                                className="text-gray-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition-all"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                        {filteredLeads.length === 0 && (
-                            <div className="p-12 text-center">
-                                <p className="text-gray-400 font-medium">No se encontraron leads con los filtros actuales.</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
 
             {/* IMPORTS TAB */}
             {activeTab === 'imports' && (
-                <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50 border-b border-gray-100">
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Fecha</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Usuario</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Detalles</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Estado</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Leads</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Acciones</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Archivo / Fuente</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">País</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Leads</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Importado por</th>
+                                <th className="px-6 py-4 text-right"></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {importBatches.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                        No hay historial de importaciones.
+                        <tbody className="divide-y divide-gray-50">
+                            {importBatches.map(batch => (
+                                <tr key={batch.id} className="hover:bg-gray-50/50 transition-colors">
+                                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                        {new Date(batch.created_at).toLocaleString()}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="text-sm font-bold text-gray-900">{batch.filename || 'Importación Manual'}</div>
+                                        <div className="text-[10px] text-gray-400 uppercase tracking-tight">{batch.source_type}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="px-2 py-1 bg-gray-100 rounded-lg text-xs font-bold text-gray-600 border border-gray-200">
+                                            {batch.country || 'Universal'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="font-bold text-indigo-600">{batch.leads_count} leads</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                        {batch.profiles?.email}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button
+                                            onClick={() => deleteImportBatch(batch.id)}
+                                            className="text-gray-400 hover:text-rose-600 p-2 rounded-lg transition-all"
+                                            title="Borrar importación y sus leads"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
                                     </td>
                                 </tr>
-                            ) : (
-                                importBatches.map((batch) => (
-                                    <tr key={batch.id} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm font-medium text-gray-900">
-                                                {new Date(batch.created_at).toLocaleDateString()}
-                                            </div>
-                                            <div className="text-xs text-gray-400">
-                                                {new Date(batch.created_at).toLocaleTimeString()}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">{batch.profiles?.email || 'Desconocido'}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">{batch.file_name || 'Sin nombre'}</div>
-                                            <div className="text-xs text-gray-500">{batch.country || 'Sin país'}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={clsx(
-                                                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                                                batch.status === 'completed' ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-                                            )}>
-                                                {batch.status === 'completed' ? 'Completado' : 'Fallido'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm font-bold text-gray-900">{batch.total_leads}</span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => deleteImportBatch(batch.id, batch.total_leads)}
-                                                className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                                title="Eliminar importación y leads asociados"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
+                            ))}
                         </tbody>
                     </table>
                 </div>
