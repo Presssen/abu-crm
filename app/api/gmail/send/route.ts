@@ -161,15 +161,14 @@ export async function POST(request: Request) {
                 .from('leads')
                 .update({
                     last_activity_at: new Date().toISOString(),
-                    // Only move to contacted if it was 'new'
                     status: 'contacted'
                 })
                 .eq('id', lead_id)
-                .eq('status', 'new')
+                .in('status', ['new', 'contacted'])
 
             if (updateError) console.error('Error updating lead status:', updateError)
 
-            // Always update last_activity_at regardless of status
+            // Always update last_activity_at (fallback/safety)
             await supabase
                 .from('leads')
                 .update({ last_activity_at: new Date().toISOString() })

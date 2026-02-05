@@ -140,9 +140,9 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                         status: 'contacted'
                     })
                     .eq('id', formData.lead_id)
-                    .eq('status', 'new')
+                    .in('status', ['new', 'contacted'])
 
-                // Always update last_activity_at regardless of status
+                // Always update last_activity_at (fallback/safety)
                 await supabase
                     .from('leads')
                     .update({ last_activity_at: new Date().toISOString() })

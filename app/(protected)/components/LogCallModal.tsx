@@ -47,9 +47,9 @@ export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadN
                         status: 'contacted'
                     })
                     .eq('id', leadId)
-                    .eq('status', 'new')
+                    .in('status', ['new', 'contacted'])
 
-                // Always update last_activity_at regardless of status
+                // Always update last_activity_at (fallback/safety)
                 await supabase
                     .from('leads')
                     .update({ last_activity_at: new Date().toISOString() })

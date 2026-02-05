@@ -208,15 +208,16 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
             if (formData.send_confirmation && lead?.email) {
                 const meetLinkHtml = googleMeetLink ? `\n\nEnlace de la reunión: ${googleMeetLink}` : ''
 
-                await supabase.from('emails').insert([{
-                    owner_id: ownerId,
-                    lead_id: lead.id,
-                    to_email: lead.email,
-                    subject: `Confirmación de Reunión: ${lead.company_name}`,
-                    body: `Hola ${lead.contact_name},\n\nTe confirmo nuestra reunión programada para el día ${selectedDate.toLocaleDateString()} a las ${selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.\n\nLugar: ${formData.location || (googleMeetLink ? 'Google Meet' : 'Online')}${meetLinkHtml}\n\nNotas: ${formData.notes || 'N/A'}\n\nSaludos.`,
-                    status: 'sent',
-                    sent_at: new Date().toISOString()
-                }])
+                await fetch('/api/gmail/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        lead_id: lead.id,
+                        to: lead.email,
+                        subject: `Confirmación de Reunión: ${lead.company_name}`,
+                        body: `Hola ${lead.contact_name || 'hola'},\n\nTe confirmo nuestra reunión programada para el día ${selectedDate.toLocaleDateString()} a las ${selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.\n\nLugar: ${formData.location || (googleMeetLink ? 'Google Meet' : 'Online')}${meetLinkHtml}\n\nNotas: ${formData.notes || 'N/A'}\n\nSaludos.`,
+                    })
+                })
             }
 
             // 4. Update Lead Status & Last Activity
@@ -231,7 +232,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                     .eq('id', formData.lead_id)
                     .in('status', ['new', 'contacted'])
 
-                // Always update last_activity_at regardless of status
+                // Always update last_activity_at regardless of status (if not already covered)
                 await supabase
                     .from('leads')
                     .update({ last_activity_at: new Date().toISOString() })
