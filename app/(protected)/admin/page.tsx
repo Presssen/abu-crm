@@ -17,8 +17,7 @@ import {
     Target,
     Upload,
     Clock,
-    ShieldAlert,
-    Search
+    ShieldAlert
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -55,8 +54,8 @@ function AdminContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports'
-    const activeTab = (searchParams.get('tab') as TabType) || 'integrations'
+    type TabType = 'users' | 'marathon' | 'leads' | 'imports'
+    const activeTab = (searchParams.get('tab') as TabType) || 'users'
 
     const setActiveTab = (tab: TabType) => {
         const params = new URLSearchParams(searchParams.toString())
@@ -72,8 +71,6 @@ function AdminContent() {
     const [saving, setSaving] = useState(false)
 
     // Forms
-    const [geminiKey, setGeminiKey] = useState('')
-    const [apolloKey, setApolloKey] = useState('')
     const [marathonGoal, setMarathonGoal] = useState('20')
 
     // Selection & Filters
@@ -105,38 +102,7 @@ function AdminContent() {
     const fetchData = async () => {
         setLoading(true)
         try {
-            if (activeTab === 'integrations') {
-                const { data, error } = await supabase
-                    .from('integrations')
-                    .select('*')
-                    .eq('is_global', true)
-                if (error) throw error
-                setIntegrations(data || [])
-
-                // Also fetch global marathon goal to use across tabs if needed
-                const { data: geminiKeyData } = await supabase
-                    .from('integrations')
-                    .select('*')
-                    .eq('integration_type', 'gemini_api')
-                    .eq('is_global', true)
-                    .single()
-                if (geminiKeyData) setGeminiKey(geminiKeyData.credentials?.api_key || '')
-
-                const { data: apolloKeyData } = await supabase
-                    .from('integrations')
-                    .select('*')
-                    .eq('integration_type', 'apollo_api')
-                    .eq('is_global', true)
-                    .single()
-                if (apolloKeyData) setApolloKey(apolloKeyData.credentials?.api_key || '')
-
-                const { data: mGoal } = await supabase
-                    .from('app_settings')
-                    .select('*')
-                    .eq('key', 'marathon_default_goal')
-                    .single()
-                if (mGoal) setMarathonGoal(mGoal.value)
-            } else if (activeTab === 'marathon') {
+            if (activeTab === 'marathon') {
                 const { data, error } = await supabase
                     .from('app_settings')
                     .select('*')
@@ -176,65 +142,22 @@ function AdminContent() {
         }
     }
 
-    const saveGeminiIntegration = async () => {
+    const deleteUser = async (userId: string) => {
+        if (!confirm('¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer y borrará permanentemente la cuenta del usuario.')) return
+
         setSaving(true)
         try {
-            const { data: userData } = await supabase.auth.getUser()
-            const ownerId = userData.user?.id
+            const res = await fetch(`/api/admin/users/${userId}`, {
+                method: 'DELETE'
+            })
 
-            const existing = integrations.find(i => i.integration_type === 'gemini_api')
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Error al eliminar usuario')
 
-            if (existing) {
-                await supabase.from('integrations').update({
-                    credentials: { api_key: geminiKey },
-                    is_active: true
-                }).eq('id', existing.id)
-            } else {
-                await supabase.from('integrations').insert([{
-                    owner_id: ownerId,
-                    integration_type: 'gemini_api',
-                    provider: 'google',
-                    credentials: { api_key: geminiKey },
-                    is_global: true,
-                    is_active: true
-                }])
-            }
-            alert('API Key de Gemini guardada correctamente')
-            fetchData()
+            alert('Usuario eliminado correctamente')
+            setProfiles(prev => prev.filter(p => p.id !== userId))
         } catch (error: any) {
-            alert('Error al guardar: ' + error.message)
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    const saveApolloIntegration = async () => {
-        setSaving(true)
-        try {
-            const { data: userData } = await supabase.auth.getUser()
-            const ownerId = userData.user?.id
-
-            const existing = integrations.find(i => i.integration_type === 'apollo_api')
-
-            if (existing) {
-                await supabase.from('integrations').update({
-                    credentials: { api_key: apolloKey },
-                    is_active: true
-                }).eq('id', existing.id)
-            } else {
-                await supabase.from('integrations').insert([{
-                    owner_id: ownerId,
-                    integration_type: 'apollo_api',
-                    provider: 'apollo',
-                    credentials: { api_key: apolloKey },
-                    is_global: true,
-                    is_active: true
-                }])
-            }
-            alert('API Key de Apollo guardada correctamente')
-            fetchData()
-        } catch (error: any) {
-            alert('Error al guardar: ' + error.message)
+            alert('Error al eliminar: ' + error.message)
         } finally {
             setSaving(false)
         }
@@ -412,11 +335,10 @@ function AdminContent() {
             {/* Tabs */}
             <div className="border-b border-gray-100 flex space-x-8">
                 {[
-                    { id: 'integrations', label: 'Integraciones & IA', icon: Settings },
-                    { id: 'marathon', label: 'Marathon Config', icon: Zap },
                     { id: 'users', label: 'Usuarios', icon: Users },
                     { id: 'leads', label: 'Gestión de Leads', icon: Target },
                     { id: 'imports', label: 'Historial de Importaciones', icon: Upload },
+                    { id: 'marathon', label: 'Marathon Config', icon: Zap },
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -431,108 +353,6 @@ function AdminContent() {
                     </button>
                 ))}
             </div>
-
-            {/* INTEGRATIONS TAB */}
-            {activeTab === 'integrations' && (
-                <div className="space-y-8 max-w-4xl">
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-teal-50">
-                            <div className="flex items-center space-x-3">
-                                <div className="p-3 bg-white rounded-xl shadow-sm">
-                                    <Zap className="text-emerald-600" size={24} />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <h2 className="text-lg font-bold text-gray-900">Inteligencia Artificial</h2>
-                                        <span className={clsx(
-                                            "px-2.5 py-0.5 rounded-full text-xs font-bold border",
-                                            geminiKey ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-500 border-gray-200"
-                                        )}>
-                                            {geminiKey ? 'Activada' : 'Desactivada'}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-gray-500">Configura la clave para el enriquecimiento automático de leads.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Clave API</label>
-                                <div className="relative">
-                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                    <input
-                                        type="password"
-                                        value={geminiKey}
-                                        onChange={(e) => setGeminiKey(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        placeholder="Ingresa la clave..."
-                                    />
-                                </div>
-                            </div>
-                            <button
-                                onClick={saveGeminiIntegration}
-                                disabled={saving}
-                                className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
-                            >
-                                <Save size={18} className="mr-2" />
-                                {saving ? 'Guardando...' : 'Guardar API Key'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Apollo Integration */}
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                            <div className="flex items-center space-x-3">
-                                <div className="p-3 bg-white rounded-xl shadow-sm">
-                                    <Search className="text-blue-600" size={24} />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <h2 className="text-lg font-bold text-gray-900">Búsqueda Apollo</h2>
-                                        <span className={clsx(
-                                            "px-2.5 py-0.5 rounded-full text-xs font-bold border",
-                                            apolloKey ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-500 border-gray-200"
-                                        )}>
-                                            {apolloKey ? 'Activada' : 'Desactivada'}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-gray-500">Configura la clave de Apollo para encontrar contactos verificados.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Clave API</label>
-                                <div className="relative">
-                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                    <input
-                                        type="password"
-                                        value={apolloKey}
-                                        onChange={(e) => setApolloKey(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                        placeholder="Ingresa la clave de Apollo..."
-                                    />
-                                </div>
-                                <p className="mt-2 text-xs text-gray-500">
-                                    Obtén tu API key desde{' '}
-                                    <a href="https://app.apollo.io/#/settings/integrations/api" target="_blank" className="text-blue-600 hover:underline">
-                                        Apollo Settings → API
-                                    </a>
-                                </p>
-                            </div>
-                            <button
-                                onClick={saveApolloIntegration}
-                                disabled={saving}
-                                className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
-                            >
-                                <Save size={18} className="mr-2" />
-                                {saving ? 'Guardando...' : 'Guardar API Key'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* MARATHON TAB */}
             {activeTab === 'marathon' && (
@@ -661,7 +481,11 @@ function AdminContent() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <button className="text-gray-400 hover:text-rose-600 transition-colors">
+                                        <button
+                                            onClick={() => deleteUser(profile.id)}
+                                            className="text-gray-400 hover:text-rose-600 transition-colors"
+                                            title="Eliminar usuario"
+                                        >
                                             <Trash2 size={18} />
                                         </button>
                                     </td>
