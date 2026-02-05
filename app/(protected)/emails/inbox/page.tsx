@@ -49,11 +49,20 @@ export default function InboxPage() {
     // Fetch unique threads from emails table
     const [sortOrder, setSortOrder] = useState<'recent' | 'oldest'>('recent')
 
-    const fetchThreads = async () => {
-        setLoading(true)
+    const [page, setPage] = useState(1)
+    const [hasMore, setHasMore] = useState(true)
+
+    const fetchThreads = async (resetPage = false) => {
+        if (resetPage) {
+            setLoading(true)
+            setPage(1)
+        }
         try {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
+
+            const currentPage = resetPage ? 1 : page
+            const pageSize = 25
 
             const { data: emails, error } = await supabase
                 .from('emails')
@@ -68,46 +77,41 @@ export default function InboxPage() {
                 `)
                 .eq('owner_id', user.id)
                 .order('sent_at', { ascending: false })
+                .range((currentPage - 1) * pageSize, currentPage * pageSize - 1)
 
             if (error) throw error
 
+            if (!emails || emails.length < pageSize) {
+                setHasMore(false)
+            } else {
+                setHasMore(true)
+            }
+
             const threadMap = new Map<string, Thread>()
 
-            emails?.forEach((email: any) => {
-                // FALLBACK: If thread_id is null, use email ID as a fake thread ID
-                // ensuring it starts with a prefix to avoid collision if needed, 
-                // but Gmail IDs are unique enough.
-                const effectiveThreadId = email.thread_id || `virtual-${email.id}`
+            // If not resetting, we want to merge with existing threads preferably, 
+            // but for a Map-based de-duplication, we can just process all.
+            // Let's keep it simple: if resetting, new map; if not, merge.
+            const newThreads = resetPage ? [] : [...threads]
+            const existingMap = new Map(newThreads.map(t => [t.thread_id, t]))
 
-                if (!threadMap.has(effectiveThreadId)) {
-                    threadMap.set(effectiveThreadId, {
+            emails?.forEach((email: any) => {
+                const effectiveThreadId = email.thread_id || `virtual-${email.id}`
+                if (!existingMap.has(effectiveThreadId)) {
+                    existingMap.set(effectiveThreadId, {
                         thread_id: effectiveThreadId,
                         subject: email.subject,
-                        body: email.body, // Store body for legacy fallback
+                        body: email.body,
                         last_message_at: email.sent_at,
                         lead_name: email.leads?.company_name,
                         lead_email: email.leads?.email,
                         lead_id: email.lead_id,
                         message_count: 1
                     })
-                } else {
-                    const t = threadMap.get(effectiveThreadId)!
-                    t.message_count++
-                    if (new Date(email.sent_at) > new Date(t.last_message_at)) {
-                        t.last_message_at = email.sent_at
-                        t.subject = email.subject
-                        // Keep original body or update? Usually subject is enough for list, 
-                        // but for fallback view we might want the latest or first? 
-                        // Let's keep the first one or latest. 
-                        // Simplest is to keep the one that started the "thread" (which is virtual)
-                        // but actually strict order might vary. Let's just update body too to latest.
-                        t.body = email.body
-                    }
                 }
             })
 
-            const threadsArray = Array.from(threadMap.values())
-            setThreads(threadsArray)
+            setThreads(Array.from(existingMap.values()))
         } catch (error) {
             console.error('Error fetching threads:', error)
         } finally {
@@ -183,24 +187,39 @@ export default function InboxPage() {
     }
 
     const getBody = (payload: any) => {
-        // Simple decoder for base64 body
-        // Gmail API structure can be complex (multipart)
         let data = ''
+        let isHtml = false
         if (payload.body?.data) {
             data = payload.body.data
         } else if (payload.parts) {
-            // Find text/html or text/plain
-            const part = payload.parts.find((p: any) => p.mimeType === 'text/html') || payload.parts.find((p: any) => p.mimeType === 'text/plain')
-            if (part && part.body?.data) {
-                data = part.body.data
+            const htmlPart = payload.parts.find((p: any) => p.mimeType === 'text/html')
+            const plainPart = payload.parts.find((p: any) => p.mimeType === 'text/plain')
+
+            if (htmlPart && htmlPart.body?.data) {
+                data = htmlPart.body.data
+                isHtml = true
+            } else if (plainPart && plainPart.body?.data) {
+                data = plainPart.body.data
             }
         }
 
         if (!data) return '(Sin contenido o formato no soportado)'
 
         try {
-            return atob(data.replace(/-/g, '+').replace(/_/g, '/'))
+            // Robust UTF-8 Base64 decoding
+            const decoded = decodeURIComponent(
+                atob(data.replace(/-/g, '+').replace(/_/g, '/'))
+                    .split('')
+                    .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                    .join('')
+            )
+
+            if (!isHtml) {
+                return decoded.replace(/\n/g, '<br/>')
+            }
+            return decoded
         } catch (e) {
+            console.error('Decoding error:', e)
             return '(Error al decodificar mensaje)'
         }
     }
@@ -272,7 +291,19 @@ export default function InboxPage() {
                                         {thread.lead_email}
                                     </div>
                                 </div>
-                            ))
+                            { hasMore && (
+                                    <div className="p-4 text-center">
+                                        <button
+                                            onClick={() => {
+                                                setPage(prev => prev + 1)
+                                                fetchThreads(false)
+                                            }}
+                                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                                        >
+                                            Cargar más...
+                                        </button>
+                                    </div>
+                                )}
                     )}
                 </div>
             </div>

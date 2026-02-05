@@ -45,19 +45,27 @@ export default function PipelinePage() {
 
     const fetchLeads = async () => {
         setLoading(true)
+        setLeads([]) // Clear existing
         try {
-            // Fetch leads immediately
+            const { data: { user } } = await supabase.auth.getUser()
+
+            // Simple select to guarantee visibility
             const { data, error } = await supabase
                 .from('leads')
-                .select('*, profiles:won_by(first_name, last_name)')
+                .select('*')
+                .order('created_at', { ascending: false })
 
-            if (error) throw error
+            if (error) {
+                console.error('Supabase Error:', error)
+                throw error
+            }
 
             // Debugging: Log unique statuses found
             if (data) {
                 const statuses = Array.from(new Set(data.map(l => l.status)))
                 console.log('Fetched leads count:', data.length)
                 console.log('Unique statuses found:', statuses)
+                console.log('Current User ID:', user?.id)
             }
 
             setLeads(data || [])
@@ -300,7 +308,8 @@ export default function PipelinePage() {
             <div className="fixed bottom-0 left-0 right-0 bg-black/80 text-white p-2 text-xs font-mono z-50 flex justify-between px-6">
                 <div>
                     <strong>DEBUG:</strong> Leads Fetched: {leads.length} |
-                    Statuses: {Array.from(new Set(leads.map(l => l.status || 'null'))).join(', ')}
+                    Statuses: {Array.from(new Set(leads.map(l => l.status || 'null'))).join(', ')} |
+                    UID: {supabase.auth.getUser().then(res => res.data.user?.id.substring(0, 8) || 'none')}
                 </div>
                 <div>
                     Loading: {loading ? 'Yes' : 'No'}
