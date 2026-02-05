@@ -295,6 +295,17 @@ export default function PipelinePage() {
                     leadId={selectedLeadId}
                 />
             )}
+
+            {/* Debug Info - Remove in production */}
+            <div className="fixed bottom-0 left-0 right-0 bg-black/80 text-white p-2 text-xs font-mono z-50 flex justify-between px-6">
+                <div>
+                    <strong>DEBUG:</strong> Leads Fetched: {leads.length} |
+                    Statuses: {Array.from(new Set(leads.map(l => l.status || 'null'))).join(', ')}
+                </div>
+                <div>
+                    Loading: {loading ? 'Yes' : 'No'}
+                </div>
+            </div>
         </div>
     )
 }
