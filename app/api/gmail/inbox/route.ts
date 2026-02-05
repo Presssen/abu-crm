@@ -19,12 +19,12 @@ export async function GET(request: Request) {
 
         const { access_token } = integration.credentials
 
-        // Fetch unread threads
-        const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/threads?q=label:unread', {
+        // Fetch threads in INBOX
+        const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/threads?q=label:inbox', {
             headers: { 'Authorization': `Bearer ${access_token}` }
         })
 
-        if (!res.ok) throw new Error('Failed to fetch from Gmail')
+        if (!res.ok) throw new Error('Failed to fetch from Gmail inbox')
 
         const data = await res.json()
         const threadIds = (data.threads || []).map((t: any) => t.id)

@@ -33,6 +33,7 @@ import CreateMeetingModal from '../components/CreateMeetingModal'
 import CreateTaskModal from '../components/CreateTaskModal'
 import LogCallModal from '../components/LogCallModal'
 import { useNotification } from '../components/ui/NotificationProvider'
+import MobileMarathon from '../components/MobileMarathon'
 
 interface Lead {
     id: string
@@ -88,6 +89,17 @@ export default function MarathonPage() {
         categories: '',
         status: ''
     })
+
+    const [isMobile, setIsMobile] = useState(false)
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 1024)
+        }
+        checkMobile()
+        window.addEventListener('resize', checkMobile)
+        return () => window.removeEventListener('resize', checkMobile)
+    }, [])
 
     useEffect(() => {
         fetchLeads()
@@ -336,6 +348,65 @@ export default function MarathonPage() {
     // Parse emails and phones (split by :)
     const emails = currentLead.email ? currentLead.email.split(':').map(e => e.trim()).filter(Boolean) : []
     const phones = currentLead.phone ? currentLead.phone.split(':').map(p => p.trim()).filter(Boolean) : []
+
+    if (isMobile) {
+        return (
+            <>
+                <MobileMarathon
+                    lead={currentLead}
+                    currentIndex={currentIndex}
+                    totalLeads={leads.length}
+                    onNext={handleNext}
+                    onPrev={handlePrev}
+                    onEnrich={handleEnrich}
+                    onLogCall={handleLogCall}
+                    onSendEmail={(email) => {
+                        setEmailInitialTo(email)
+                        setIsEmailModalOpen(true)
+                    }}
+                    onScheduleMeeting={() => setIsMeetingModalOpen(true)}
+                    onScheduleTask={(title) => {
+                        setTaskInitialTitle(title)
+                        setIsTaskModalOpen(true)
+                    }}
+                    onAction={handleAction}
+                    enriching={enriching}
+                    saving={savingDetails}
+                />
+
+                <SendEmailModal
+                    isOpen={isEmailModalOpen}
+                    onClose={() => setIsEmailModalOpen(false)}
+                    onSuccess={() => fetchActivity(currentLead.id)}
+                    initialLeadId={currentLead.id}
+                    initialTo={emailInitialTo || emails[0] || ''}
+                />
+
+                <CreateMeetingModal
+                    isOpen={isMeetingModalOpen}
+                    onClose={() => setIsMeetingModalOpen(false)}
+                    onSuccess={() => fetchActivity(currentLead.id)}
+                    initialLeadId={currentLead.id}
+                />
+
+                <CreateTaskModal
+                    isOpen={isTaskModalOpen}
+                    onClose={() => setIsTaskModalOpen(false)}
+                    onSuccess={() => fetchActivity(currentLead.id)}
+                    initialLeadId={currentLead.id}
+                    initialTitle={taskInitialTitle}
+                />
+
+                <LogCallModal
+                    isOpen={isLogCallModalOpen}
+                    onClose={() => setIsLogCallModalOpen(false)}
+                    onSuccess={() => fetchActivity(currentLead.id)}
+                    leadId={currentLead.id}
+                    leadName={currentLead.company_name}
+                />
+            </>
+        )
+    }
 
     return (
         <div className="flex flex-col h-full bg-gray-50/50">

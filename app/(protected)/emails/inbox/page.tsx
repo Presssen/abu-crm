@@ -10,7 +10,8 @@ import {
     Search,
     RefreshCw,
     Reply,
-    MailOpen
+    MailOpen,
+    Archive
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import SendEmailModal from '../../components/SendEmailModal'
@@ -50,6 +51,8 @@ export default function InboxPage() {
     const [showReplyModal, setShowReplyModal] = useState(false)
     const [showMeetingModal, setShowMeetingModal] = useState(false)
     const [unreadThreads, setUnreadThreads] = useState<Set<string>>(new Set())
+    const [inboxThreadIds, setInboxThreadIds] = useState<Set<string>>(new Set())
+    const [filterUnread, setFilterUnread] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const scrollToBottom = () => {
@@ -129,8 +132,9 @@ export default function InboxPage() {
 
             setThreads(Array.from(existingMap.values()))
 
-            // Fetch unread threads from Gmail
+            // Fetch status from Gmail
             fetchUnreadStatus()
+            fetchInboxStatus()
         } catch (error) {
             console.error('Error fetching threads:', error)
         } finally {
@@ -147,6 +151,38 @@ export default function InboxPage() {
             }
         } catch (error) {
             console.error('Error fetching unread status:', error)
+        }
+    }
+
+    const fetchInboxStatus = async () => {
+        try {
+            const res = await fetch('/api/gmail/inbox')
+            const data = await res.json()
+            if (data.threadIds) {
+                setInboxThreadIds(new Set(data.threadIds))
+            }
+        } catch (error) {
+            console.error('Error fetching inbox status:', error)
+        }
+    }
+
+    const archiveThread = async (threadId: string) => {
+        try {
+            const res = await fetch('/api/gmail/archive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ threadId })
+            })
+            if (res.ok) {
+                setInboxThreadIds(prev => {
+                    const next = new Set(prev)
+                    next.delete(threadId)
+                    return next
+                })
+                if (selectedThreadId === threadId) setSelectedThreadId(null)
+            }
+        } catch (error) {
+            console.error('Error archiving:', error)
         }
     }
 
@@ -299,8 +335,20 @@ export default function InboxPage() {
                             {/* Simple icon switch or just same icon with tooltip */}
                             <Calendar size={16} className={sortOrder === 'recent' ? "" : "transform rotate-180"} />
                         </button>
-                        <button onClick={() => fetchThreads(true)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-indigo-600 transition-colors">
+                        <button onClick={() => fetchThreads(true)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-indigo-600 transition-colors mr-1">
                             <RefreshCw size={16} />
+                        </button>
+                        <button
+                            onClick={() => setFilterUnread(!filterUnread)}
+                            className={clsx(
+                                "flex items-center space-x-1 px-2 py-1 rounded-full text-[10px] font-bold transition-all border",
+                                filterUnread
+                                    ? "bg-indigo-600 text-white border-indigo-600"
+                                    : "bg-gray-50 text-gray-500 border-gray-200 hover:border-indigo-300"
+                            )}
+                        >
+                            <Mail size={12} />
+                            <span>{filterUnread ? "Solo No Leídos" : "Filtrar No Leídos"}</span>
                         </button>
                     </div>
                 </div>
@@ -320,6 +368,13 @@ export default function InboxPage() {
                     ) : (
                         <>
                             {threads
+                                .filter(t => {
+                                    // If we haven't loaded inbox IDs yet (initial load), show all
+                                    // Once loaded, filter by inbox label
+                                    if (inboxThreadIds.size === 0 && loading) return true
+                                    return inboxThreadIds.has(t.thread_id) || t.thread_id.startsWith('virtual-')
+                                })
+                                .filter(t => filterUnread ? unreadThreads.has(t.thread_id) : true)
                                 .sort((a, b) => {
                                     const dateA = new Date(a.last_message_at).getTime()
                                     const dateB = new Date(b.last_message_at).getTime()
@@ -418,6 +473,14 @@ export default function InboxPage() {
                                 </div>
                             </div>
                             <div className="flex space-x-2">
+                                <button
+                                    onClick={() => selectedThreadId && archiveThread(selectedThreadId)}
+                                    className="flex items-center px-4 py-2 border border-gray-200 text-gray-500 text-sm font-bold rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all shadow-sm bg-white"
+                                    title="Archivar conversación"
+                                >
+                                    <Archive size={16} className="mr-2" />
+                                    Archivar
+                                </button>
                                 <button
                                     onClick={() => setShowReplyModal(true)}
                                     className="flex items-center px-4 py-2 border border-gray-200 text-gray-600 text-sm font-bold rounded-xl hover:bg-gray-50 transition-all shadow-sm bg-white"

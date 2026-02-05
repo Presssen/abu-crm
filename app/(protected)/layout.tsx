@@ -18,7 +18,9 @@ import {
     Shield,
     Menu,
     X,
-    Zap
+    Zap,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -35,6 +37,19 @@ export default function ProtectedLayout({
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [user, setUser] = useState<any>(null)
     const [userRole, setUserRole] = useState<string | null>(null)
+    const [isCollapsed, setIsCollapsed] = useState(false)
+
+    // Load collapse state from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('sidebar_collapsed')
+        if (saved === 'true') setIsCollapsed(true)
+    }, [])
+
+    const toggleSidebar = () => {
+        const newState = !isCollapsed
+        setIsCollapsed(newState)
+        localStorage.setItem('sidebar_collapsed', String(newState))
+    }
 
     // Fetch user and profile
     useEffect(() => {
@@ -97,19 +112,30 @@ export default function ProtectedLayout({
 
             {/* Sidebar */}
             <div className={clsx(
-                "fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out md:translate-x-0",
+                "fixed inset-y-0 left-0 z-40 bg-white border-r border-gray-200 transform transition-all duration-300 ease-in-out md:translate-x-0",
+                isCollapsed ? "w-20" : "w-64",
                 isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="flex flex-col h-full">
-                    <div className="flex items-center px-6 py-6 border-b border-gray-100">
-                        <img
-                            src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"
-                            alt="ABU Logo"
-                            className="h-10 w-auto object-contain mr-2"
-                        />
-                        <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                            ABU CRM
-                        </span>
+                    <div className={clsx("flex items-center px-6 py-6 border-b border-gray-100", isCollapsed ? "justify-center" : "justify-between")}>
+                        <div className="flex items-center overflow-hidden">
+                            <img
+                                src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"
+                                alt="ABU Logo"
+                                className="h-10 w-auto object-contain mr-2 shrink-0"
+                            />
+                            {!isCollapsed && (
+                                <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent truncate">
+                                    ABU CRM
+                                </span>
+                            )}
+                        </div>
+                        <button
+                            onClick={toggleSidebar}
+                            className="hidden md:flex p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600 transition-colors"
+                        >
+                            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                        </button>
                     </div>
 
                     <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
@@ -129,11 +155,12 @@ export default function ProtectedLayout({
                                 >
                                     <item.icon
                                         className={clsx(
-                                            "mr-3 h-5 w-5 transition-colors",
+                                            "h-5 w-5 transition-colors shrink-0",
+                                            !isCollapsed && "mr-3",
                                             isActive ? "text-indigo-600" : "text-gray-400"
                                         )}
                                     />
-                                    {item.name}
+                                    {!isCollapsed && <span>{item.name}</span>}
                                 </Link>
                             )
                         })}
@@ -141,32 +168,40 @@ export default function ProtectedLayout({
 
                     <div className="p-4 border-t border-gray-100 flex flex-col space-y-4">
                         {user && (
-                            <div className="px-4 py-2 bg-gray-50 rounded-xl">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Iniciado sesión como</p>
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-bold text-gray-900 truncate">
-                                        {user.profile?.first_name ? `${user.profile.first_name} ${user.profile.last_name || ''}` : user.email}
+                            <div className={clsx("px-4 py-2 bg-gray-50 rounded-xl transition-all", isCollapsed ? "items-center" : "")}>
+                                {!isCollapsed && <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Iniciado sesión como</p>}
+                                <div className={clsx("flex flex-col", isCollapsed ? "items-center" : "")}>
+                                    <span className={clsx("text-sm font-bold text-gray-900 truncate", isCollapsed ? "w-8 overflow-hidden text-center" : "")}>
+                                        {isCollapsed ? (user.profile?.first_name?.charAt(0) || user.email?.charAt(0)) : (user.profile?.first_name ? `${user.profile.first_name} ${user.profile.last_name || ''}` : user.email)}
                                     </span>
-                                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
-                                        {userRole === 'admin' ? 'Administrador' : 'Usuario'}
-                                    </span>
+                                    {!isCollapsed && (
+                                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
+                                            {userRole === 'admin' ? 'Administrador' : 'Usuario'}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         )}
                         <button
                             onClick={handleLogout}
                             disabled={loading}
-                            className="flex items-center w-full px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors group"
+                            className={clsx(
+                                "flex items-center w-full px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors group",
+                                isCollapsed ? "justify-center" : ""
+                            )}
                         >
-                            <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" />
-                            {loading ? 'Cerrando sesión...' : 'Cerrar sesión'}
+                            <LogOut className={clsx("h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors shrink-0", !isCollapsed && "mr-3")} />
+                            {!isCollapsed && <span>{loading ? 'Cerrando...' : 'Cerrar sesión'}</span>}
                         </button>
                     </div>
                 </div>
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0 md:pl-64 h-full">
+            <div className={clsx(
+                "flex-1 flex flex-col min-w-0 h-full transition-all duration-300",
+                isCollapsed ? "md:pl-20" : "md:pl-64"
+            )}>
                 <main className="flex-1 overflow-hidden flex flex-col">
                     <NotificationProvider>
                         {children}
