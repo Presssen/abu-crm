@@ -7,6 +7,7 @@ import {
     Plus,
     Building2,
     Mail,
+    Phone,
     User,
     ChevronRight
 } from 'lucide-react'
@@ -29,9 +30,15 @@ interface Lead {
     company_name: string
     contact_name: string
     email: string
+    phone?: string
     status: string
     won_by?: string
     won_at?: string
+    lead_contacts?: {
+        email: string
+        phone: string
+        is_primary: boolean
+    }[]
 }
 
 export default function PipelinePage() {
@@ -50,9 +57,10 @@ export default function PipelinePage() {
             const { data: { user } } = await supabase.auth.getUser()
 
             // Simple select to guarantee visibility
+            // Fetch leads with their primary contacts
             const { data, error } = await supabase
                 .from('leads')
-                .select('*')
+                .select('*, lead_contacts(email, phone, is_primary)')
                 .order('created_at', { ascending: false })
 
             if (error) {
@@ -212,16 +220,16 @@ export default function PipelinePage() {
                                                 }
                                             }}
                                             className={clsx(
-                                                "group bg-white p-4 rounded-xl border transition-all cursor-pointer",
-                                                lead.status === 'won' ? "border-emerald-200 shadow-sm shadow-emerald-50" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200",
+                                                "group bg-white p-3 rounded-xl border transition-all cursor-pointer",
+                                                lead.status === 'won' ? "border-emerald-200 shadow-sm" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200",
                                                 draggedLead?.id === lead.id ? "opacity-50 ring-2 ring-indigo-400" : ""
                                             )}
                                         >
-                                            <div className="flex items-start justify-between mb-3">
-                                                <div className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div className="text-xs font-bold text-gray-900 group-hover:text-indigo-600 transition-colors truncate pr-4">
                                                     {lead.company_name}
                                                 </div>
-                                                <div className="flex items-center space-x-1">
+                                                <div className="flex items-center space-x-1 shrink-0">
                                                     {lead.status !== 'won' && (
                                                         <button
                                                             onClick={() => handleUpdateStatus(lead.id, 'won')}
@@ -235,34 +243,34 @@ export default function PipelinePage() {
                                                 </div>
                                             </div>
 
-                                            <div className="space-y-2">
-                                                <div className="text-xs text-gray-500 flex items-center">
-                                                    <User className="h-3 w-3 mr-1.5 text-gray-400" />
-                                                    {lead.contact_name || 'Sin contacto'}
-                                                </div>
-                                                <div className="text-xs text-gray-500 flex items-center">
-                                                    <Mail className="h-3 w-3 mr-1.5 text-gray-400" />
-                                                    {lead.email || 'Sin email'}
-                                                </div>
-                                                {lead.status === 'won' && (lead as any).profiles && (
-                                                    <div className="mt-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg flex items-center">
-                                                        🏆 Éxito por: {(lead as any).profiles.first_name || ''} {(lead as any).profiles.last_name || ''}
-                                                    </div>
-                                                )}
-                                            </div>
+                                            {(() => {
+                                                const primaryContact = lead.lead_contacts?.find(c => c.is_primary)
+                                                const displayEmail = primaryContact?.email || lead.email
+                                                const displayPhone = primaryContact?.phone || lead.phone
 
-                                            <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
-                                                <div className="flex -space-x-1">
-                                                    <div className="h-6 w-6 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-gray-400 uppercase">
-                                                        {lead.contact_name?.charAt(0) || lead.company_name?.charAt(0) || '?'}
+                                                return (
+                                                    <div className="space-y-1.5">
+                                                        {displayEmail && (
+                                                            <div className="text-[11px] text-gray-500 flex items-center">
+                                                                <Mail className="h-3 w-3 mr-1.5 text-gray-400 shrink-0" />
+                                                                <span className="truncate">{displayEmail}</span>
+                                                            </div>
+                                                        )}
+                                                        {displayPhone && (
+                                                            <div className="text-[11px] text-gray-500 flex items-center">
+                                                                <Phone size={12} className="h-3 w-3 mr-1.5 text-gray-400 shrink-0" />
+                                                                <span className="truncate">{displayPhone}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
+                                                )
+                                            })()}
+
+                                            {lead.status === 'won' && (lead as any).profiles && (
+                                                <div className="mt-2 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg flex items-center w-fit">
+                                                    🏆 {(lead as any).profiles.first_name || ''}
                                                 </div>
-                                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                                                    {lead.status === 'won' && lead.won_at
-                                                        ? new Date(lead.won_at as string).toLocaleDateString()
-                                                        : 'Activo'}
-                                                </div>
-                                            </div>
+                                            )}
                                         </div>
                                     ))
                                 )}
@@ -304,17 +312,6 @@ export default function PipelinePage() {
                 />
             )}
 
-            {/* Debug Info - Remove in production */}
-            <div className="fixed bottom-0 left-0 right-0 bg-black/80 text-white p-2 text-xs font-mono z-50 flex justify-between px-6">
-                <div>
-                    <strong>DEBUG:</strong> Leads Fetched: {leads.length} |
-                    Statuses: {Array.from(new Set(leads.map(l => l.status || 'null'))).join(', ')} |
-                    UID: {leads.length > 0 ? 'Loaded' : 'Check Console'}
-                </div>
-                <div>
-                    Loading: {loading ? 'Yes' : 'No'}
-                </div>
-            </div>
         </div>
     )
 }
