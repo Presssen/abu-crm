@@ -48,6 +48,7 @@ export default function InboxPage() {
     const [loadingMessages, setLoadingMessages] = useState(false)
     const [showReplyModal, setShowReplyModal] = useState(false)
     const [showMeetingModal, setShowMeetingModal] = useState(false)
+    const [unreadThreads, setUnreadThreads] = useState<Set<string>>(new Set())
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const scrollToBottom = () => {
@@ -126,10 +127,25 @@ export default function InboxPage() {
             })
 
             setThreads(Array.from(existingMap.values()))
+
+            // Fetch unread threads from Gmail
+            fetchUnreadStatus()
         } catch (error) {
             console.error('Error fetching threads:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const fetchUnreadStatus = async () => {
+        try {
+            const res = await fetch('/api/gmail/unread')
+            const data = await res.json()
+            if (data.threadIds) {
+                setUnreadThreads(new Set(data.threadIds))
+            }
+        } catch (error) {
+            console.error('Error fetching unread status:', error)
         }
     }
 
@@ -182,11 +198,34 @@ export default function InboxPage() {
             const data = await res.json()
             if (data.messages) {
                 setMessages(data.messages)
+
+                // If the thread was unread, mark it as read
+                if (unreadThreads.has(threadId)) {
+                    markAsRead(threadId)
+                }
             }
         } catch (error) {
             console.error('Error fetching thread detail:', error)
         } finally {
+            setLoading(false)
             setLoadingMessages(false)
+        }
+    }
+
+    const markAsRead = async (threadId: string) => {
+        try {
+            await fetch('/api/gmail/read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ threadId })
+            })
+            setUnreadThreads(prev => {
+                const next = new Set(prev)
+                next.delete(threadId)
+                return next
+            })
+        } catch (error) {
+            console.error('Error marking as read:', error)
         }
     }
 
@@ -294,11 +333,16 @@ export default function InboxPage() {
                                             <h4 className={clsx("font-bold text-sm truncate pr-2", selectedThreadId === thread.thread_id ? "text-indigo-900" : "text-gray-900")}>
                                                 {thread.lead_name || 'Sin nombre'}
                                             </h4>
-                                            <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                                {new Date(thread.last_message_at).toLocaleDateString()}
-                                            </span>
+                                            <div className="flex items-center space-x-2">
+                                                {unreadThreads.has(thread.thread_id) && (
+                                                    <span className="h-2 w-2 bg-indigo-600 rounded-full shadow-[0_0_8px_rgba(79,70,229,0.5)]" title="Mensaje Nuevo" />
+                                                )}
+                                                <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                                    {new Date(thread.last_message_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-slate-500 font-medium truncate mb-1">
+                                        <div className={clsx("text-xs truncate mb-1", unreadThreads.has(thread.thread_id) ? "text-indigo-600 font-bold" : "text-slate-500 font-medium")}>
                                             {thread.subject}
                                         </div>
                                         <div className="flex items-center text-[10px] text-gray-400">
@@ -397,6 +441,7 @@ export default function InboxPage() {
                             toEmail={selectedThreadData?.lead_email}
                             subject={selectedThreadData?.subject}
                             threadId={selectedThreadData?.thread_id}
+                            parentMessageId={messages.length > 0 ? getHeader(messages[messages.length - 1].payload.headers, 'Message-ID') : undefined}
                             onSuccess={() => {
                                 if (selectedThreadId) fetchThreadDetail(selectedThreadId)
                             }}

@@ -3,7 +3,8 @@ import { createClient } from '@/lib/auth/server'
 
 export async function POST(request: Request) {
     try {
-        const { to, subject, body, lead_id, threadId } = await request.json()
+        const bodyData = await request.json()
+        const { to, subject, body, lead_id, threadId, parentMessageId } = bodyData
 
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -36,10 +37,30 @@ export async function POST(request: Request) {
         const sendEmail = async (token: string) => {
             // Construct MIME message
             const formattedBody = body.replace(/\n/g, '<br>')
-            const str = [
+
+            // Handle Subject for threading
+            let finalSubject = subject
+            if (threadId && !finalSubject.toLowerCase().startsWith('re:')) {
+                finalSubject = `Re: ${finalSubject}`
+            }
+
+            const headers = [
                 `To: ${to}`,
-                `Subject: ${subject}`,
+                `Subject: ${finalSubject}`,
                 `Content-Type: text/html; charset=utf-8`,
+            ]
+
+            if (parentMessageId) {
+                // Ensure Message-ID is wrapped in <>
+                const formattedParentId = parentMessageId.startsWith('<') && parentMessageId.endsWith('>')
+                    ? parentMessageId
+                    : `<${parentMessageId}>`
+                headers.push(`In-Reply-To: ${formattedParentId}`)
+                headers.push(`References: ${formattedParentId}`)
+            }
+
+            const str = [
+                ...headers,
                 '',
                 formattedBody
             ].join('\n')

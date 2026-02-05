@@ -10,6 +10,7 @@ interface InlineReplyProps {
     toEmail?: string
     subject?: string
     threadId?: string
+    parentMessageId?: string
     onSuccess: () => void
     onOpenMeetingModal: () => void
 }
@@ -19,6 +20,7 @@ export default function InlineReply({
     toEmail,
     subject,
     threadId,
+    parentMessageId,
     onSuccess,
     onOpenMeetingModal
 }: InlineReplyProps) {
@@ -40,7 +42,8 @@ export default function InlineReply({
                     to: toEmail,
                     subject: subject || 'Respuesta',
                     body: body,
-                    threadId: threadId
+                    threadId: threadId,
+                    parentMessageId: parentMessageId
                 })
             })
 
