@@ -41,6 +41,17 @@ export async function POST(request: Request) {
             throw new Error('Failed to archive thread in Gmail')
         }
 
+        // Also mark as archived in our local database to hide from CRM view
+        const { error: dbError } = await supabase
+            .from('emails')
+            .update({ archived: true })
+            .eq('thread_id', threadId)
+
+        if (dbError) {
+            console.error('Error updating local archive status:', dbError)
+            // We don't fail the request if local update fails, but we log it
+        }
+
         return NextResponse.json({ success: true })
     } catch (error: any) {
         console.error('Error in archive route:', error)

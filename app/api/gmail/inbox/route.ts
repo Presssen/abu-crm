@@ -19,15 +19,32 @@ export async function GET(request: Request) {
 
         const { access_token } = integration.credentials
 
-        // Fetch threads in INBOX
-        const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/threads?q=label:inbox', {
-            headers: { 'Authorization': `Bearer ${access_token}` }
-        })
+        // Fetch threads in INBOX with pagination (up to 2500)
+        let threadIds: string[] = []
+        let nextPageToken: string | undefined = undefined
+        let loops = 0
+        const MAX_LOOPS = 5
 
-        if (!res.ok) throw new Error('Failed to fetch from Gmail inbox')
+        do {
+            const queryParams = new URLSearchParams({
+                q: 'label:inbox',
+                maxResults: '500'
+            })
+            if (nextPageToken) queryParams.append('pageToken', nextPageToken)
 
-        const data = await res.json()
-        const threadIds = (data.threads || []).map((t: any) => t.id)
+            const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads?${queryParams.toString()}`, {
+                headers: { 'Authorization': `Bearer ${access_token}` }
+            })
+
+            if (!res.ok) throw new Error('Failed to fetch from Gmail inbox')
+
+            const data = await res.json()
+            if (data.threads) {
+                threadIds = [...threadIds, ...data.threads.map((t: any) => t.id)]
+            }
+            nextPageToken = data.nextPageToken
+            loops++
+        } while (nextPageToken && loops < MAX_LOOPS)
 
         return NextResponse.json({ threadIds })
     } catch (error: any) {

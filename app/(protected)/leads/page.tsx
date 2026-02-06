@@ -12,7 +12,9 @@ import {
     Building2,
     Clock,
     User,
-    Zap
+    Zap,
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import CreateLeadModal from '../components/CreateLeadModal'
@@ -72,6 +74,11 @@ export default function LeadsPage() {
     const [statusFilter, setStatusFilter] = useState('all')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+
+    // Pagination
+    const [page, setPage] = useState(1)
+    const [hasMore, setHasMore] = useState(false)
+    const PAGE_SIZE = 25
 
     // Action Modals State
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
@@ -136,9 +143,21 @@ export default function LeadsPage() {
                 query = query.or(`company_name.ilike.%${search}%,contact_name.ilike.%${search}%,email.ilike.%${search}%,domain.ilike.%${search}%`)
             }
 
-            const { data, error } = await query
+            const from = (page - 1) * PAGE_SIZE
+            const to = from + PAGE_SIZE - 1
+
+            // Get one more to check if there are more pages
+            const { data, error } = await query.range(from, to + 1)
+
             if (error) throw error
-            setLeads(data || [])
+
+            if (data && data.length > PAGE_SIZE) {
+                setHasMore(true)
+                setLeads(data.slice(0, PAGE_SIZE))
+            } else {
+                setHasMore(false)
+                setLeads(data || [])
+            }
         } catch (error) {
             console.error('Error fetching leads:', error)
         } finally {
@@ -161,10 +180,18 @@ export default function LeadsPage() {
     }
 
     useEffect(() => {
+        setPage(1)
         fetchLeads()
+    }, [statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter])
+
+    useEffect(() => {
+        fetchLeads()
+    }, [page])
+
+    useEffect(() => {
         checkAdminStatus()
         fetchProfiles()
-    }, [statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter])
+    }, [])
 
     const checkAdminStatus = async () => {
         const { data: { user } } = await supabase.auth.getUser()
@@ -474,6 +501,54 @@ export default function LeadsPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-xl sm:px-6">
+                <div className="flex flex-1 justify-between sm:hidden">
+                    <button
+                        onClick={() => setPage(Math.max(1, page - 1))}
+                        disabled={page === 1}
+                        className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                        Anterior
+                    </button>
+                    <button
+                        onClick={() => setPage(page + 1)}
+                        disabled={!hasMore}
+                        className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                        Siguiente
+                    </button>
+                </div>
+                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                    <div>
+                        <p className="text-sm text-gray-700">
+                            Página <span className="font-medium">{page}</span>
+                        </p>
+                    </div>
+                    <div>
+                        <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                            <button
+                                onClick={() => setPage(Math.max(1, page - 1))}
+                                disabled={page === 1}
+                                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                            >
+                                <span className="sr-only">Anterior</span>
+                                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                            </button>
+                            <button
+                                onClick={() => setPage(page + 1)}
+                                disabled={!hasMore}
+                                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                            >
+                                <span className="sr-only">Siguiente</span>
+                                <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
             <CreateLeadModal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}

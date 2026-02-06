@@ -54,6 +54,7 @@ export default function InboxPage() {
     const [showMeetingModal, setShowMeetingModal] = useState(false)
     const [unreadThreads, setUnreadThreads] = useState<Set<string>>(new Set())
     const [inboxThreadIds, setInboxThreadIds] = useState<Set<string>>(new Set())
+    const [inboxLoaded, setInboxLoaded] = useState(false)
     const [filterUnread, setFilterUnread] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -97,6 +98,7 @@ export default function InboxPage() {
                     leads (company_name, email)
                 `)
                 .eq('owner_id', user.id)
+                .is('archived', false) // Only show unarchived emails
                 .order('sent_at', { ascending: false })
                 .range((currentPage - 1) * pageSize, currentPage * pageSize - 1)
 
@@ -141,6 +143,7 @@ export default function InboxPage() {
             ])
         } catch (error) {
             console.error('Error fetching threads:', error)
+            // If main fetch fails, ensures we don't stick in loading state
         } finally {
             setLoading(false)
         }
@@ -167,6 +170,8 @@ export default function InboxPage() {
             }
         } catch (error) {
             console.error('Error fetching inbox status:', error)
+        } finally {
+            setInboxLoaded(true)
         }
     }
 
@@ -380,8 +385,11 @@ export default function InboxPage() {
                             {threads
                                 .filter(t => {
                                     // If we haven't loaded inbox IDs yet (initial load), show all
-                                    // Once loaded, filter by inbox label
-                                    if (inboxThreadIds.size === 0 && loading) return true
+                                    // If inbox status failed to load (safety), show all
+                                    if (!inboxLoaded) return true
+
+                                    // If loaded, filter by inbox label
+                                    // Also checking for 'virtual-' legacy threads to be safe
                                     return inboxThreadIds.has(t.thread_id) || t.thread_id.startsWith('virtual-')
                                 })
                                 .filter(t => filterUnread ? unreadThreads.has(t.thread_id) : true)
