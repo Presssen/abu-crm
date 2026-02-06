@@ -53,9 +53,19 @@ export default function MeetingsPage() {
     const fetchMeetings = async () => {
         setLoading(true)
         try {
-            const { data, error } = await supabase
+            const { data: { user } } = await supabase.auth.getUser()
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+            const isAdmin = profile?.role === 'admin'
+
+            let query = supabase
                 .from('meetings')
                 .select('*, leads(company_name)')
+
+            if (!isAdmin && user) {
+                query = query.eq('owner_id', user.id)
+            }
+
+            const { data, error } = await query
             if (error) throw error
             setMeetings(data || [])
         } catch (error) {

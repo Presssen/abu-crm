@@ -115,12 +115,10 @@ export default function LeadsPage() {
             if (!isAdmin) {
                 query = query.not('status', 'in', '("won","lost")')
 
-                // If marathon mode is enabled for the user, only show leads they own
-                if (profile?.marathon_enabled) {
-                    const { data: { user } } = await supabase.auth.getUser()
-                    if (user) {
-                        query = query.eq('owner_id', user.id)
-                    }
+                // Each user only sees their leads (created by them or assigned by admin)
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    query = query.eq('owner_id', user.id)
                 }
             }
 

@@ -75,38 +75,60 @@ export default function DashboardPage() {
             const startStr = dateRange.start.toISOString()
             const endStr = dateRange.end.toISOString()
 
+            const { data: { user } } = await supabase.auth.getUser()
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+            const isAdmin = profile?.role === 'admin'
+
             // 1. Leads counts
-            const { count: totalLeads } = await supabase
+            let totalLeadsQuery = supabase
                 .from('leads')
                 .select('*', { count: 'exact', head: true })
                 .gte('created_at', startStr)
                 .lte('created_at', endStr)
 
-            const { count: wonLeads } = await supabase
+            let wonLeadsQuery = supabase
                 .from('leads')
                 .select('*', { count: 'exact', head: true })
                 .eq('status', 'won')
                 .gte('won_at', startStr)
                 .lte('won_at', endStr)
 
+            if (!isAdmin && user) {
+                totalLeadsQuery = totalLeadsQuery.eq('owner_id', user.id)
+                wonLeadsQuery = wonLeadsQuery.eq('owner_id', user.id)
+            }
+
+            const { count: totalLeads } = await totalLeadsQuery
+            const { count: wonLeads } = await wonLeadsQuery
+
             // 2. Activities counts
-            const { count: meetingsCount } = await supabase
+            let meetingsQuery = supabase
                 .from('meetings')
                 .select('*', { count: 'exact', head: true })
                 .gte('created_at', startStr)
                 .lte('created_at', endStr)
 
-            const { count: emailsCount } = await supabase
+            let emailsQuery = supabase
                 .from('emails')
                 .select('*', { count: 'exact', head: true })
                 .gte('created_at', startStr)
                 .lte('created_at', endStr)
 
-            const { count: callsCount } = await supabase
+            let callsQuery = supabase
                 .from('calls')
                 .select('*', { count: 'exact', head: true })
                 .gte('created_at', startStr)
                 .lte('created_at', endStr)
+
+            if (!isAdmin && user) {
+                meetingsQuery = meetingsQuery.eq('owner_id', user.id)
+                emailsQuery = emailsQuery.eq('owner_id', user.id)
+                callsQuery = callsQuery.eq('owner_id', user.id)
+            }
+
+            const { count: meetingsCount } = await meetingsQuery
+            const { count: emailsCount } = await emailsQuery
+            const { count: callsCount } = await callsQuery
 
             setStats({
                 totalLeads: totalLeads || 0,
@@ -117,9 +139,15 @@ export default function DashboardPage() {
             })
 
             // 3. Pipeline data - Calculate percentages for Funnel
-            const { data: pipelineData } = await supabase
+            let pipelineQuery = supabase
                 .from('leads')
                 .select('status')
+
+            if (!isAdmin && user) {
+                pipelineQuery = pipelineQuery.eq('owner_id', user.id)
+            }
+
+            const { data: pipelineData } = await pipelineQuery
 
             // Define stages in order
             const stagesDef = [
@@ -145,11 +173,23 @@ export default function DashboardPage() {
             })))
 
             // 4. Fetch Activities for Feed
+            let emailsActQuery = supabase.from('emails').select('id, subject, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5)
+            let meetingsActQuery = supabase.from('meetings').select('id, location, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5)
+            let callsActQuery = supabase.from('calls').select('id, notes, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5)
+            let leadsActQuery = supabase.from('leads').select('id, company_name, created_at').order('created_at', { ascending: false }).limit(5)
+
+            if (!isAdmin && user) {
+                emailsActQuery = emailsActQuery.eq('owner_id', user.id)
+                meetingsActQuery = meetingsActQuery.eq('owner_id', user.id)
+                callsActQuery = callsActQuery.eq('owner_id', user.id)
+                leadsActQuery = leadsActQuery.eq('owner_id', user.id)
+            }
+
             const [emailsAct, meetingsAct, callsAct, leadsAct] = await Promise.all([
-                supabase.from('emails').select('id, subject, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5),
-                supabase.from('meetings').select('id, location, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5),
-                supabase.from('calls').select('id, notes, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5),
-                supabase.from('leads').select('id, company_name, created_at').order('created_at', { ascending: false }).limit(5)
+                emailsActQuery,
+                meetingsActQuery,
+                callsActQuery,
+                leadsActQuery
             ])
 
             const activities: any[] = []
@@ -182,12 +222,22 @@ export default function DashboardPage() {
         const endOfDay = new Date(date)
         endOfDay.setHours(23, 59, 59, 999)
 
-        const { data, error } = await supabase
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+        const isAdmin = profile?.role === 'admin'
+
+        let query = supabase
             .from('meetings')
             .select('*, leads(company_name)')
             .gte('start_time', startOfDay.toISOString())
             .lte('start_time', endOfDay.toISOString())
             .order('start_time', { ascending: true })
+
+        if (!isAdmin && user) {
+            query = query.eq('owner_id', user.id)
+        }
+
+        const { data, error } = await query
 
         if (!error) {
             setDailyMeetings(data || [])

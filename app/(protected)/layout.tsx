@@ -152,7 +152,7 @@ export default function ProtectedLayout({
                         </button>
                     )}
 
-                    <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+                    <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto hide-scrollbar">
                         {fullNavigation.map((item) => {
                             const isActive = pathname === item.href
                             return (
@@ -161,7 +161,8 @@ export default function ProtectedLayout({
                                     href={item.href}
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className={clsx(
-                                        "flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200",
+                                        "flex items-center text-sm font-medium rounded-xl transition-all duration-200",
+                                        isCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "px-4 py-3",
                                         isActive
                                             ? "bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100/50"
                                             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"

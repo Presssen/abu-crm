@@ -32,10 +32,18 @@ export default function TemplatesPage() {
     const fetchTemplates = async () => {
         setLoading(true)
         try {
-            const { data, error } = await supabase
-                .from('email_templates')
-                .select('*')
-                .order('name')
+            const { data: { user } } = await supabase.auth.getUser()
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+            const isAdmin = profile?.role === 'admin'
+
+            let query = supabase.from('email_templates').select('*')
+
+            if (!isAdmin && user) {
+                // Show templates owned by user OR global templates
+                query = query.or(`owner_id.eq.${user.id},is_global.eq.true`)
+            }
+
+            const { data, error } = await query.order('name')
             if (error) throw error
             setTemplates(data || [])
         } catch (error) {

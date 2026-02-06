@@ -164,13 +164,22 @@ export default function MarathonPage() {
     const fetchLeads = async () => {
         setLoading(true)
         try {
-            // Fetch leads that are 'new' or specific statuses for marathon
-            // Ordering by random() for variety, or you could use created_at
-            const { data, error } = await supabase
+            const { data: { user } } = await supabase.auth.getUser()
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+            const isAdmin = profile?.role === 'admin'
+
+            // Fetch leads that are 'new'
+            let query = supabase
                 .from('leads')
                 .select('*')
                 .eq('status', 'new')
-                .limit(50) // Fetch a batch
+
+            // If not admin, only show leads owned by the user
+            if (!isAdmin && user) {
+                query = query.eq('owner_id', user.id)
+            }
+
+            const { data, error } = await query.limit(50)
 
             if (error) throw error
 

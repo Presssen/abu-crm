@@ -56,12 +56,23 @@ export default function PipelinePage() {
         try {
             const { data: { user } } = await supabase.auth.getUser()
 
+            // Fetch profile to check admin status
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+            const isAdmin = profile?.role === 'admin'
+
             // Simple select to guarantee visibility
             // Fetch leads with their primary contacts
-            const { data, error } = await supabase
+            let query = supabase
                 .from('leads')
                 .select('*, lead_contacts(email, phone, is_primary)')
                 .order('created_at', { ascending: false })
+
+            // Each user only sees their leads (created by them or assigned by admin)
+            if (!isAdmin && user) {
+                query = query.eq('owner_id', user.id)
+            }
+
+            const { data, error } = await query
 
             if (error) {
                 console.error('Supabase Error:', error)
