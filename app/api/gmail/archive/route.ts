@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         if (!res.ok) {
             const err = await res.json()
             console.error('Archive error:', err)
-            throw new Error('Failed to archive thread in Gmail')
+            throw new Error(err.error?.message || JSON.stringify(err) || 'Failed to archive thread in Gmail')
         }
 
         // Also mark as archived in our local database to hide from CRM view

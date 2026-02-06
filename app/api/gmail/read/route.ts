@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         if (!res.ok) {
             const err = await res.json()
             console.error('Modify error:', err)
-            throw new Error('Failed to modify thread in Gmail')
+            throw new Error(err.error?.message || JSON.stringify(err) || 'Failed to modify thread in Gmail')
         }
 
         return NextResponse.json({ success: true })

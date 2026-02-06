@@ -266,11 +266,17 @@ export default function InboxPage() {
 
     const markAsReadStatus = async (threadId: string, isUnread: boolean) => {
         try {
-            await fetch('/api/gmail/read', {
+            const res = await fetch('/api/gmail/read', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ threadId, unread: isUnread })
             })
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}))
+                throw new Error(errData.error || 'Failed to update status')
+            }
+
             setUnreadThreads(prev => {
                 const next = new Set(prev)
                 if (isUnread) {
@@ -281,8 +287,9 @@ export default function InboxPage() {
                 return next
             })
             showSuccess(isUnread ? 'Marcado como no leído' : 'Marcado como leído')
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error updating read status:', error)
+            showError(`Error: ${error.message || 'No se pudo actualizar el estado'}`)
             showError('Error al actualizar estado')
         }
     }
