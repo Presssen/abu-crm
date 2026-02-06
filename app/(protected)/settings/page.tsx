@@ -219,6 +219,85 @@ function SettingsContent() {
     }
 
 
+    const [updating, setUpdating] = useState(false)
+    const [firstName, setFirstName] = useState('')
+    const [lastName, setLastName] = useState('')
+    const [uploadingPhoto, setUploadingPhoto] = useState(false)
+
+    useEffect(() => {
+        if (profile) {
+            setFirstName(profile.first_name || '')
+            setLastName(profile.last_name || '')
+        }
+    }, [profile])
+
+    const handleSaveProfile = async () => {
+        setUpdating(true)
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    first_name: firstName,
+                    last_name: lastName
+                })
+                .eq('id', user.id)
+
+            if (error) throw error
+            alert('Perfil actualizado correctamente')
+            fetchSettings()
+        } catch (error: any) {
+            console.error('Error updating profile:', error)
+            alert('Error al actualizar: ' + error.message)
+        } finally {
+            setUpdating(false)
+        }
+    }
+
+    const handleUploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        // 1MB limit
+        if (file.size > 1024 * 1024) {
+            alert('La foto es demasiado grande. Máximo 1MB.')
+            return
+        }
+
+        setUploadingPhoto(true)
+        try {
+            const fileExt = file.name.split('.').pop()
+            const filePath = `${user.id}-${Math.random()}.${fileExt}`
+
+            // Upload to 'avatars' bucket
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file)
+
+            if (uploadError) throw uploadError
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath)
+
+            // Update profile with avatar_url
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ avatar_url: publicUrl })
+                .eq('id', user.id)
+
+            if (updateError) throw updateError
+
+            alert('Foto actualizada')
+            fetchSettings()
+        } catch (error: any) {
+            console.error('Error uploading avatar:', error)
+            alert('Error al subir la foto: ' + error.message)
+        } finally {
+            setUploadingPhoto(false)
+        }
+    }
+
     const tabs = [
         { id: 'profile', label: 'Mi Perfil', icon: User },
         { id: 'integrations', label: 'Integraciones', icon: Laptop },
@@ -280,13 +359,28 @@ function SettingsContent() {
                                     <div className="border-b border-gray-100 pb-8">
                                         <h2 className="text-xl font-bold text-gray-900 mb-6">Información Personal</h2>
                                         <div className="flex items-center gap-6">
-                                            <div className="h-24 w-24 rounded-full bg-indigo-50 border-4 border-white shadow-lg flex items-center justify-center text-3xl font-bold text-indigo-600">
-                                                {profile?.first_name?.charAt(0) || user?.email?.charAt(0)}
-                                            </div>
+                                            {profile?.avatar_url ? (
+                                                <img
+                                                    src={profile.avatar_url}
+                                                    alt="Avatar"
+                                                    className="h-24 w-24 rounded-full object-cover border-4 border-white shadow-lg"
+                                                />
+                                            ) : (
+                                                <div className="h-24 w-24 rounded-full bg-indigo-50 border-4 border-white shadow-lg flex items-center justify-center text-3xl font-bold text-indigo-600">
+                                                    {firstName?.charAt(0) || user?.email?.charAt(0)}
+                                                </div>
+                                            )}
                                             <div>
-                                                <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                                                    Cambiar Foto
-                                                </button>
+                                                <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors inline-block">
+                                                    {uploadingPhoto ? 'Subiendo...' : 'Cambiar Foto'}
+                                                    <input
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept="image/*"
+                                                        onChange={handleUploadAvatar}
+                                                        disabled={uploadingPhoto}
+                                                    />
+                                                </label>
                                                 <p className="mt-2 text-xs text-gray-400">JPG, GIF o PNG. Max 1MB.</p>
                                             </div>
                                         </div>
@@ -297,7 +391,8 @@ function SettingsContent() {
                                             <label className="text-sm font-semibold text-gray-700">Nombre</label>
                                             <input
                                                 type="text"
-                                                defaultValue={profile?.first_name}
+                                                value={firstName}
+                                                onChange={(e) => setFirstName(e.target.value)}
                                                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
                                             />
                                         </div>
@@ -305,7 +400,8 @@ function SettingsContent() {
                                             <label className="text-sm font-semibold text-gray-700">Apellidos</label>
                                             <input
                                                 type="text"
-                                                defaultValue={profile?.last_name}
+                                                value={lastName}
+                                                onChange={(e) => setLastName(e.target.value)}
                                                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
                                             />
                                         </div>
@@ -324,8 +420,12 @@ function SettingsContent() {
                                     </div>
 
                                     <div className="flex justify-end pt-4">
-                                        <button className="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors">
-                                            Guardar Cambios
+                                        <button
+                                            onClick={handleSaveProfile}
+                                            disabled={updating}
+                                            className="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                        >
+                                            {updating ? 'Guardando...' : 'Guardar Cambios'}
                                         </button>
                                     </div>
                                 </div>

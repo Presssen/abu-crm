@@ -182,16 +182,29 @@ export default function ProtectedLayout({
 
                     <div className="p-4 border-t border-gray-100 flex flex-col space-y-4">
                         {user && (
-                            <div className={clsx("px-4 py-2 bg-gray-50 rounded-xl transition-all", isCollapsed ? "items-center" : "")}>
-                                {!isCollapsed && <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Iniciado sesión como</p>}
-                                <div className={clsx("flex flex-col", isCollapsed ? "items-center" : "")}>
-                                    <span className={clsx("text-sm font-bold text-gray-900 truncate", isCollapsed ? "w-8 overflow-hidden text-center" : "")}>
-                                        {isCollapsed ? (user.profile?.first_name?.charAt(0) || user.email?.charAt(0)) : (user.profile?.first_name ? `${user.profile.first_name} ${user.profile.last_name || ''}` : user.email)}
-                                    </span>
+                            <div className={clsx("px-4 py-2 bg-gray-50 rounded-xl transition-all", isCollapsed ? "flex justify-center" : "")}>
+                                {!isCollapsed && <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Iniciado sesión como</p>}
+                                <div className={clsx("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
+                                    {user.profile?.avatar_url ? (
+                                        <img
+                                            src={user.profile.avatar_url}
+                                            alt="Avatar"
+                                            className={clsx("rounded-full object-cover border-2 border-white shadow-sm", isCollapsed ? "h-8 w-8" : "h-10 w-10")}
+                                        />
+                                    ) : (
+                                        <div className={clsx("rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-600 border-2 border-white shadow-sm", isCollapsed ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm")}>
+                                            {user.profile?.first_name?.charAt(0) || user.email?.charAt(0)}
+                                        </div>
+                                    )}
                                     {!isCollapsed && (
-                                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
-                                            {userRole === 'admin' ? 'Administrador' : 'Usuario'}
-                                        </span>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-sm font-bold text-gray-900 truncate">
+                                                {user.profile?.first_name ? `${user.profile.first_name} ${user.profile.last_name || ''}` : user.email}
+                                            </span>
+                                            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
+                                                {userRole === 'admin' ? 'Administrador' : 'Usuario'}
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
                             </div>
