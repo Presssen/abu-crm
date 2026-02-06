@@ -191,7 +191,9 @@ export default function InboxPage() {
                 if (selectedThreadId === threadId) setSelectedThreadId(null)
                 showSuccess('Conversación archivada')
             } else {
-                showError('No se pudo archivar la conversación')
+                const errData = await res.json().catch(() => ({}))
+                console.error('Archive failed:', errData)
+                showError(`Error: ${errData.error || 'No se pudo archivar'}`)
             }
         } catch (error) {
             console.error('Error archiving:', error)
