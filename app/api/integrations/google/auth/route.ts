@@ -18,6 +18,7 @@ export async function GET(request: Request) {
     if (type === 'gmail') {
         scopes.push('https://www.googleapis.com/auth/gmail.send')
         scopes.push('https://www.googleapis.com/auth/gmail.readonly')
+        scopes.push('https://www.googleapis.com/auth/gmail.modify') // Required for archiving and read/unread
     } else if (type === 'calendar') {
         scopes.push('https://www.googleapis.com/auth/calendar.events')
         scopes.push('https://www.googleapis.com/auth/calendar.readonly')
