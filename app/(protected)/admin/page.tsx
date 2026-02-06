@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/auth/client'
+import FlowBuilder from './components/FlowBuilder'
 import {
     Settings,
     Mail,
@@ -18,7 +19,10 @@ import {
     Upload,
     Clock,
     ShieldAlert,
-    Search
+    Search,
+    Workflow,
+    ArrowRight,
+    PlusCircle
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -55,7 +59,7 @@ function AdminContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports'
+    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports' | 'flows'
     const activeTab = (searchParams.get('tab') as TabType) || 'integrations'
 
     const setActiveTab = (tab: TabType) => {
@@ -411,6 +415,7 @@ function AdminContent() {
                     { id: 'users', label: 'Usuarios', icon: Users },
                     { id: 'leads', label: 'Gestión de Leads', icon: Target },
                     { id: 'imports', label: 'Historial de Importaciones', icon: Upload },
+                    { id: 'flows', label: 'Flujos (Alpha)', icon: Workflow },
                     { id: 'marathon', label: 'Marathon Config', icon: Zap },
                 ].map(tab => (
                     <button
@@ -878,6 +883,11 @@ function AdminContent() {
                         </tbody>
                     </table>
                 </div>
+            )}
+
+            {/* FLOWS TAB */}
+            {activeTab === 'flows' && (
+                <FlowBuilder />
             )}
         </div>
     )
