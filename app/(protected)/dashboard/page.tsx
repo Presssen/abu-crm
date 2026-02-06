@@ -24,6 +24,7 @@ import {
 import { clsx } from 'clsx'
 import Link from 'next/link'
 import CreateMeetingModal from '../components/CreateMeetingModal'
+import EventDetailModal from '../components/EventDetailModal'
 
 type DateRange = {
     start: Date;
@@ -52,6 +53,8 @@ export default function DashboardPage() {
     const [showDatePicker, setShowDatePicker] = useState(false)
     const [dailyMeetings, setDailyMeetings] = useState<any[]>([])
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
     useEffect(() => {
         const start = new Date()
@@ -398,6 +401,10 @@ export default function DashboardPage() {
                                 dailyMeetings.map((meeting) => (
                                     <div
                                         key={meeting.id}
+                                        onClick={() => {
+                                            setSelectedEventId(meeting.id)
+                                            setIsDetailModalOpen(true)
+                                        }}
                                         className="group flex gap-4 p-4 rounded-xl border border-gray-100 hover:border-indigo-100 hover:bg-indigo-50/10 transition-all cursor-pointer"
                                     >
                                         <div className="flex flex-col items-center justify-center min-w-[70px] border-r border-gray-100 pr-4">
@@ -525,6 +532,13 @@ export default function DashboardPage() {
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
                 onSuccess={() => fetchDailyMeetings(selectedDate)}
+            />
+
+            <EventDetailModal
+                isOpen={isDetailModalOpen}
+                onClose={() => setIsDetailModalOpen(false)}
+                eventId={selectedEventId || ''}
+                onDelete={() => fetchDailyMeetings(selectedDate)}
             />
         </div>
     )
