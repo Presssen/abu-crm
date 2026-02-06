@@ -341,10 +341,10 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            {/* Main Sections */}
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-                {/* Agenda de Hoy */}
-                <div className="lg:col-span-8 space-y-6">
+            {/* Main Sections Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* 1. Agenda (Previamente era col-span-8, ahora col-span-12 para protagonismo) */}
+                <div className="lg:col-span-12">
                     <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col h-[500px]">
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center space-x-4">
@@ -439,10 +439,9 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Right Column: Other Info */}
-                <div className="lg:col-span-4 space-y-8">
-                    {/* Pipeline Funnel Chart */}
-                    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col h-[400px]">
+                {/* 2. Pipeline Funnel (Lado a lado con Actividad) */}
+                <div className="lg:col-span-6">
+                    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col h-[450px]">
                         <div className="flex items-center justify-between mb-6">
                             <div>
                                 <h2 className="text-lg font-bold text-gray-900">Embudo de Ventas</h2>
@@ -454,15 +453,12 @@ export default function DashboardPage() {
                         </div>
 
                         <div className="flex-1 flex flex-col justify-center space-y-3 px-4">
-                            {pipelineStats.length > 0 ? pipelineStats.map((stage, idx) => (
+                            {pipelineStats.length > 0 ? pipelineStats.map((stage) => (
                                 <div key={stage.name} className="relative group">
                                     <div className="flex items-center gap-4">
-                                        {/* Label */}
                                         <div className="w-24 text-right">
                                             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{stage.name}</p>
                                         </div>
-
-                                        {/* Bar */}
                                         <div className="flex-1 h-8 bg-gray-50 rounded-r-lg relative overflow-hidden flex items-center">
                                             <div
                                                 className="h-full rounded-r-lg transition-all duration-1000 ease-out flex items-center"
@@ -475,7 +471,6 @@ export default function DashboardPage() {
                                                     {stage.count} Leads
                                                 </span>
                                             </div>
-                                            {/* Count floating if bar is small */}
                                             <span
                                                 className="absolute right-3 text-xs font-bold text-gray-700 tabular-nums"
                                                 style={{ opacity: stage.percent > 90 ? 0 : 1 }}
@@ -483,8 +478,6 @@ export default function DashboardPage() {
                                                 {stage.count}
                                             </span>
                                         </div>
-
-                                        {/* Percentage */}
                                         <div className="w-12 text-right">
                                             <span className="text-xs font-bold text-gray-400">
                                                 {stage.totalPercent}%
@@ -499,29 +492,44 @@ export default function DashboardPage() {
                             )}
                         </div>
                     </div>
+                </div>
 
-                    {/* Actividad Reciente Placeholder */}
-                    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 overflow-hidden">
+                {/* 3. Actividad Reciente (Equilibrado con Funnel) */}
+                <div className="lg:col-span-6">
+                    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col h-[450px]">
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-lg font-bold text-gray-900">Actividad</h2>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">Actividad Reciente</h2>
+                                <p className="text-xs text-gray-500">Últimas acciones realizadas</p>
+                            </div>
                         </div>
-                        <div className="space-y-6">
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-5 custom-scrollbar">
                             {recentActivity.length > 0 ? recentActivity.map((act) => (
-                                <div key={act.id + act.type} className="flex items-start space-x-3 group">
+                                <div key={act.id + act.type} className="flex items-start space-x-4 group p-2 hover:bg-gray-50 rounded-xl transition-all cursor-default">
                                     <div className={clsx(
-                                        "mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 shadow-sm transition-transform group-hover:scale-150",
-                                        act.type === 'lead' ? "bg-blue-500" :
-                                            act.type === 'meeting' ? "bg-indigo-500" :
-                                                act.type === 'email' ? "bg-purple-500" :
-                                                    "bg-rose-500"
-                                    )} />
-                                    <div>
-                                        <p className="text-[11px] font-bold text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors">{act.title}</p>
-                                        <p className="text-[9px] text-gray-400 mt-0.5 uppercase font-medium">{new Date(act.date).toLocaleDateString()} • {new Date(act.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                        "mt-1 p-2 rounded-lg shadow-sm transition-transform group-hover:scale-110",
+                                        act.type === 'lead' ? "bg-blue-50 text-blue-600" :
+                                            act.type === 'meeting' ? "bg-indigo-50 text-indigo-600" :
+                                                act.type === 'email' ? "bg-purple-50 text-purple-600" :
+                                                    "bg-rose-50 text-rose-600"
+                                    )}>
+                                        {act.type === 'lead' ? <Users size={14} /> :
+                                            act.type === 'meeting' ? <Calendar size={14} /> :
+                                                act.type === 'email' ? <Mail size={14} /> :
+                                                    <PhoneCall size={14} />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors">{act.title}</p>
+                                        <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-wider flex items-center">
+                                            <Clock size={10} className="mr-1" />
+                                            {new Date(act.date).toLocaleDateString()} • {new Date(act.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
                                     </div>
                                 </div>
                             )) : (
-                                <p className="text-xs text-gray-400 italic py-4">Sin actividad reciente registrada.</p>
+                                <div className="flex flex-col items-center justify-center h-full text-center opacity-60">
+                                    <p className="text-sm font-medium text-gray-500 italic">Sin actividad reciente registrada.</p>
+                                </div>
                             )}
                         </div>
                     </div>
