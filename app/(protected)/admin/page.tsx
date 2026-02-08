@@ -59,7 +59,7 @@ function AdminContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports' | 'flows'
+    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports' | 'flows' | 'shopify'
     const activeTab = (searchParams.get('tab') as TabType) || 'integrations'
 
     const setActiveTab = (tab: TabType) => {
@@ -79,6 +79,7 @@ function AdminContent() {
     const [geminiKey, setGeminiKey] = useState('')
     const [apolloKey, setApolloKey] = useState('')
     const [marathonGoal, setMarathonGoal] = useState('20')
+    const [shopifyConfig, setShopifyConfig] = useState({ apiKey: '', sharedSecret: '', webhookSecret: '' })
 
     // Selection & Filters
     const [selectedLeads, setSelectedLeads] = useState<string[]>([])
@@ -172,6 +173,21 @@ function AdminContent() {
                     .order('created_at', { ascending: false })
                 if (error) throw error
                 setImportBatches(data || [])
+            } else if (activeTab === 'shopify') {
+                const { data } = await supabase
+                    .from('integrations')
+                    .select('*')
+                    .eq('integration_type', 'shopify_api')
+                    .eq('is_global', true)
+                    .maybeSingle()
+
+                if (data) {
+                    setShopifyConfig({
+                        apiKey: data.credentials?.api_key || '',
+                        sharedSecret: data.credentials?.shared_secret || '',
+                        webhookSecret: data.credentials?.webhook_secret || ''
+                    })
+                }
             }
         } catch (error) {
             console.error('Error fetching data:', error)
@@ -417,6 +433,7 @@ function AdminContent() {
                     { id: 'imports', label: 'Historial de Importaciones', icon: Upload },
                     { id: 'flows', label: 'Flujos (Alpha)', icon: Workflow },
                     { id: 'marathon', label: 'Marathon Config', icon: Zap },
+                    { id: 'shopify', label: 'API Shopify', icon: Store },
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -888,6 +905,117 @@ function AdminContent() {
             {/* FLOWS TAB */}
             {activeTab === 'flows' && (
                 <FlowBuilder />
+            )}
+
+            {/* SHOPIFY TAB */}
+            {activeTab === 'shopify' && (
+                <div className="space-y-8 max-w-4xl">
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-violet-50">
+                            <div className="flex items-center space-x-3">
+                                <div className="p-3 bg-white rounded-xl shadow-sm">
+                                    <Store className="text-indigo-600" size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-gray-900">Aplicación Shopify</h2>
+                                    <p className="text-sm text-gray-500">Conecta tu App de Shopify para recibir instalaciones y facturación.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700">API Key</label>
+                                    <input
+                                        type="text"
+                                        value={shopifyConfig.apiKey}
+                                        onChange={(e) => setShopifyConfig({ ...shopifyConfig, apiKey: e.target.value })}
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="Tu API Key de Shopify"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700">API Secret Key</label>
+                                    <input
+                                        type="password"
+                                        value={shopifyConfig.sharedSecret}
+                                        onChange={(e) => setShopifyConfig({ ...shopifyConfig, sharedSecret: e.target.value })}
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="••••••••••••••••"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700">Webhook Secret</label>
+                                <input
+                                    type="password"
+                                    value={shopifyConfig.webhookSecret}
+                                    onChange={(e) => setShopifyConfig({ ...shopifyConfig, webhookSecret: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    placeholder="••••••••••••••••"
+                                />
+                                <p className="text-[10px] text-gray-400">Este secreto se utiliza para verificar la autenticidad de los webhooks de Shopify.</p>
+                            </div>
+
+                            <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex items-start space-x-3">
+                                <div className="p-1 bg-amber-100 rounded-md text-amber-700">
+                                    <Settings size={14} />
+                                </div>
+                                <div className="text-xs text-amber-800 leading-relaxed">
+                                    <p className="font-bold mb-1">Configuración del Webhook en Shopify:</p>
+                                    <p>URL del Webhook: <code className="bg-white/50 px-1 rounded">{window.location.origin}/api/shopify/webhook</code></p>
+                                    <p className="mt-1">Temas recomendados: <code className="bg-white/50 px-1 rounded">app/uninstalled</code>, <code className="bg-white/50 px-1 rounded">app_subscriptions/update</code></p>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={async () => {
+                                    setSaving(true)
+                                    try {
+                                        const { data: userData } = await supabase.auth.getUser()
+                                        const ownerId = userData.user?.id
+
+                                        const { data: existing } = await supabase
+                                            .from('integrations')
+                                            .select('id')
+                                            .eq('integration_type', 'shopify_api')
+                                            .eq('is_global', true)
+                                            .maybeSingle()
+
+                                        const payload = {
+                                            owner_id: ownerId,
+                                            integration_type: 'shopify_api',
+                                            provider: 'shopify',
+                                            credentials: {
+                                                api_key: shopifyConfig.apiKey,
+                                                shared_secret: shopifyConfig.sharedSecret,
+                                                webhook_secret: shopifyConfig.webhookSecret
+                                            },
+                                            is_global: true,
+                                            is_active: true
+                                        }
+
+                                        if (existing) {
+                                            await supabase.from('integrations').update(payload).eq('id', existing.id)
+                                        } else {
+                                            await supabase.from('integrations').insert([payload])
+                                        }
+                                        alert('Configuración de Shopify guardada correctamente')
+                                    } catch (err: any) {
+                                        alert('Error al guardar: ' + err.message)
+                                    } finally {
+                                        setSaving(false)
+                                    }
+                                }}
+                                disabled={saving}
+                                className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                            >
+                                <Save size={18} className="mr-2" />
+                                {saving ? 'Guardando...' : 'Guardar Configuración'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     )

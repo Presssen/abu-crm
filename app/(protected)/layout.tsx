@@ -90,13 +90,14 @@ export default function ProtectedLayout({
         { name: 'Tasks', href: '/tasks', icon: CheckSquare },
         { name: 'Meetings', href: '/meetings', icon: Calendar },
         { name: 'Emails', href: '/emails', icon: Mail },
+        { name: 'Finances', href: '/finances', icon: LayoutDashboard }, // Using LayoutDashboard for now, or could use DollarSign if imported
         { name: 'Settings', href: '/settings', icon: Settings },
     ]
 
-    // Add Admin tab only for admin users
+    // Add Admin and Finances tabs only for admin users
     const fullNavigation = userRole === 'admin'
         ? [...navigation, { name: 'Admin', href: '/admin', icon: Shield }]
-        : navigation
+        : navigation.filter(n => n.name !== 'Finances')
 
     return (
         <div className="flex h-screen overflow-hidden bg-white">
