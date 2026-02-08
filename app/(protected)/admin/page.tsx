@@ -23,7 +23,8 @@ import {
     Workflow,
     ArrowRight,
     PlusCircle,
-    Store
+    Store,
+    Info
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -60,7 +61,7 @@ function AdminContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports' | 'flows' | 'shopify'
+    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports' | 'flows'
     const activeTab = (searchParams.get('tab') as TabType) || 'integrations'
 
     const setActiveTab = (tab: TabType) => {
@@ -136,6 +137,20 @@ function AdminContent() {
                     .maybeSingle()
                 if (apolloKeyData) setApolloKey(apolloKeyData.credentials?.api_key || '')
 
+                const { data: shopifyData } = await supabase
+                    .from('integrations')
+                    .select('*')
+                    .eq('integration_type', 'shopify_api')
+                    .eq('is_global', true)
+                    .maybeSingle()
+                if (shopifyData) {
+                    setShopifyConfig({
+                        apiKey: shopifyData.credentials?.api_key || '',
+                        sharedSecret: shopifyData.credentials?.shared_secret || '',
+                        webhookSecret: shopifyData.credentials?.webhook_secret || ''
+                    })
+                }
+
                 const { data: mGoal } = await supabase
                     .from('app_settings')
                     .select('*')
@@ -174,21 +189,6 @@ function AdminContent() {
                     .order('created_at', { ascending: false })
                 if (error) throw error
                 setImportBatches(data || [])
-            } else if (activeTab === 'shopify') {
-                const { data } = await supabase
-                    .from('integrations')
-                    .select('*')
-                    .eq('integration_type', 'shopify_api')
-                    .eq('is_global', true)
-                    .maybeSingle()
-
-                if (data) {
-                    setShopifyConfig({
-                        apiKey: data.credentials?.api_key || '',
-                        sharedSecret: data.credentials?.shared_secret || '',
-                        webhookSecret: data.credentials?.webhook_secret || ''
-                    })
-                }
             }
         } catch (error) {
             console.error('Error fetching data:', error)
@@ -434,7 +434,6 @@ function AdminContent() {
                     { id: 'imports', label: 'Historial de Importaciones', icon: Upload },
                     { id: 'flows', label: 'Flujos (Alpha)', icon: Workflow },
                     { id: 'marathon', label: 'Marathon Config', icon: Zap },
-                    { id: 'shopify', label: 'API Shopify', icon: Store },
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -452,101 +451,233 @@ function AdminContent() {
 
             {/* INTEGRATIONS TAB */}
             {activeTab === 'integrations' && (
-                <div className="space-y-8 max-w-4xl">
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-teal-50">
-                            <div className="flex items-center space-x-3">
-                                <div className="p-3 bg-white rounded-xl shadow-sm">
-                                    <Zap className="text-emerald-600" size={24} />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <h2 className="text-lg font-bold text-gray-900">Inteligencia Artificial</h2>
-                                        <span className={clsx(
-                                            "px-2.5 py-0.5 rounded-full text-xs font-bold border",
-                                            geminiKey ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-500 border-gray-200"
-                                        )}>
-                                            {geminiKey ? 'Activada' : 'Desactivada'}
-                                        </span>
+                <div className="space-y-6 max-w-5xl">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Gemini Card */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+                            <div className="p-6 border-b border-gray-50 bg-gray-50/50">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm text-emerald-600">
+                                            <Zap size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-900">Google Gemini AI</h3>
+                                            <p className="text-xs text-gray-500">Enriquecimiento de leads</p>
+                                        </div>
                                     </div>
-                                    <p className="text-sm text-gray-500">Configura la clave para el enriquecimiento automático de leads.</p>
+                                    <span className={clsx(
+                                        "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                                        geminiKey ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-gray-50 text-gray-400 border-gray-100"
+                                    )}>
+                                        {geminiKey ? 'Activo' : 'Inactivo'}
+                                    </span>
                                 </div>
                             </div>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Clave API</label>
-                                <div className="relative">
-                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                    <input
-                                        type="password"
-                                        value={geminiKey}
-                                        onChange={(e) => setGeminiKey(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        placeholder="Ingresa la clave..."
-                                    />
-                                </div>
-                            </div>
-                            <button
-                                onClick={saveGeminiIntegration}
-                                disabled={saving}
-                                className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
-                            >
-                                <Save size={18} className="mr-2" />
-                                {saving ? 'Guardando...' : 'Guardar API Key'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Apollo Integration */}
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                            <div className="flex items-center space-x-3">
-                                <div className="p-3 bg-white rounded-xl shadow-sm">
-                                    <Search className="text-blue-600" size={24} />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <h2 className="text-lg font-bold text-gray-900">Búsqueda Apollo</h2>
-                                        <span className={clsx(
-                                            "px-2.5 py-0.5 rounded-full text-xs font-bold border",
-                                            apolloKey ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-500 border-gray-200"
-                                        )}>
-                                            {apolloKey ? 'Activada' : 'Desactivada'}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-gray-500">Configura la clave de Apollo para encontrar contactos verificados.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Clave API</label>
-                                <div className="relative">
-                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                    <input
-                                        type="password"
-                                        value={apolloKey}
-                                        onChange={(e) => setApolloKey(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                        placeholder="Ingresa la clave de Apollo..."
-                                    />
-                                </div>
-                                <p className="mt-2 text-xs text-gray-500">
-                                    Obtén tu API key desde{' '}
-                                    <a href="https://app.apollo.io/#/settings/integrations/api" target="_blank" className="text-blue-600 hover:underline">
-                                        Apollo Settings → API
-                                    </a>
+                            <div className="p-6 space-y-4 flex-1">
+                                <p className="text-xs text-gray-600 leading-relaxed">
+                                    Utiliza inteligencia artificial para analizar sitios web de leads y extraer información valiosa automáticamente.
                                 </p>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">API Key</label>
+                                    <div className="relative">
+                                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
+                                        <input
+                                            type="password"
+                                            value={geminiKey}
+                                            onChange={(e) => setGeminiKey(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                            placeholder="Introduce tu clave..."
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                            <button
-                                onClick={saveApolloIntegration}
-                                disabled={saving}
-                                className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
-                            >
-                                <Save size={18} className="mr-2" />
-                                {saving ? 'Guardando...' : 'Guardar API Key'}
-                            </button>
+                            <div className="p-4 bg-gray-50/30 border-t border-gray-100 text-right">
+                                <button
+                                    onClick={saveGeminiIntegration}
+                                    disabled={saving}
+                                    className="px-4 py-2 bg-gray-900 text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition-all disabled:opacity-50"
+                                >
+                                    {saving ? 'Guardando...' : 'Guardar Cambios'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Apollo Card */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+                            <div className="p-6 border-b border-gray-50 bg-gray-50/50">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm text-blue-600">
+                                            <Search size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-900">Apollo.io</h3>
+                                            <p className="text-xs text-gray-500">Contactos Verificados</p>
+                                        </div>
+                                    </div>
+                                    <span className={clsx(
+                                        "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                                        apolloKey ? "bg-blue-50 text-blue-700 border-blue-100" : "bg-gray-50 text-gray-400 border-gray-100"
+                                    )}>
+                                        {apolloKey ? 'Activo' : 'Inactivo'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="p-6 space-y-4 flex-1">
+                                <p className="text-xs text-gray-600 leading-relaxed">
+                                    Encuentra correos electrónicos y teléfonos de contacto verificados directamente desde la base de datos de Apollo.
+                                </p>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">API Key</label>
+                                    <div className="relative">
+                                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
+                                        <input
+                                            type="password"
+                                            value={apolloKey}
+                                            onChange={(e) => setApolloKey(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            placeholder="Introduce tu clave Apollo..."
+                                        />
+                                    </div>
+                                    <div className="flex items-center space-x-1 text-[10px] text-gray-400">
+                                        <Info size={12} />
+                                        <span>Consigue tu clave en Apollo Settings → API</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-gray-50/30 border-t border-gray-100 text-right">
+                                <button
+                                    onClick={saveApolloIntegration}
+                                    disabled={saving}
+                                    className="px-4 py-2 bg-gray-900 text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition-all disabled:opacity-50"
+                                >
+                                    {saving ? 'Guardando...' : 'Guardar Cambios'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Shopify Card */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col md:col-span-2">
+                            <div className="p-6 border-b border-gray-50 bg-gray-50/50">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm text-indigo-600">
+                                            <Store size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-900">Ecosistema Shopify</h3>
+                                            <p className="text-xs text-gray-500">Webhooks de Instalaciones y Facturación</p>
+                                        </div>
+                                    </div>
+                                    <span className={clsx(
+                                        "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                                        shopifyConfig.apiKey ? "bg-indigo-50 text-indigo-700 border-indigo-100" : "bg-gray-50 text-gray-400 border-gray-100"
+                                    )}>
+                                        {shopifyConfig.apiKey ? 'Configurado' : 'Pendiente'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div className="space-y-6">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">API Key</label>
+                                        <input
+                                            type="text"
+                                            value={shopifyConfig.apiKey}
+                                            onChange={(e) => setShopifyConfig({ ...shopifyConfig, apiKey: e.target.value })}
+                                            className="w-full px-4 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                            placeholder="API Key de tu App"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Secret Key</label>
+                                            <input
+                                                type="password"
+                                                value={shopifyConfig.sharedSecret}
+                                                onChange={(e) => setShopifyConfig({ ...shopifyConfig, sharedSecret: e.target.value })}
+                                                className="w-full px-4 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                                placeholder="••••••••"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Webhook Secret</label>
+                                            <input
+                                                type="password"
+                                                value={shopifyConfig.webhookSecret}
+                                                onChange={(e) => setShopifyConfig({ ...shopifyConfig, webhookSecret: e.target.value })}
+                                                className="w-full px-4 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                                placeholder="••••••••"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                                    <h4 className="text-xs font-bold text-gray-900 mb-3 flex items-center">
+                                        <Settings size={14} className="mr-2 text-gray-400" />
+                                        Instrucciones de Configuración
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <p className="text-[11px] text-gray-600 leading-relaxed">
+                                            Copia esta URL en tu Panel de Partners de Shopify → App Setup → Webhooks:
+                                        </p>
+                                        <div className="bg-white p-2.5 rounded-lg border border-gray-200 font-mono text-[10px] text-indigo-600 break-all select-all cursor-pointer hover:bg-gray-50 transition-all">
+                                            {typeof window !== 'undefined' ? `${window.location.origin}/api/shopify/webhook` : 'Cargando...'}
+                                        </div>
+                                        <div className="flex items-start space-x-2 text-[10px] text-gray-500 bg-white/50 p-2 rounded-lg border border-gray-100">
+                                            <Info size={14} className="mt-0.5 text-indigo-400 shrink-0" />
+                                            <p>Suscríbete a los temas <span className="font-bold">app/uninstalled</span> y <span className="font-bold">app_subscriptions/update</span> para sincronizar datos.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-gray-50/30 border-t border-gray-100 text-right">
+                                <button
+                                    onClick={async () => {
+                                        setSaving(true)
+                                        try {
+                                            const { data: userData } = await supabase.auth.getUser()
+                                            const ownerId = userData.user?.id
+
+                                            const { data: existing } = await supabase
+                                                .from('integrations')
+                                                .select('id')
+                                                .eq('integration_type', 'shopify_api')
+                                                .eq('is_global', true)
+                                                .maybeSingle()
+
+                                            const payload = {
+                                                owner_id: ownerId,
+                                                integration_type: 'shopify_api',
+                                                provider: 'shopify',
+                                                credentials: {
+                                                    api_key: shopifyConfig.apiKey,
+                                                    shared_secret: shopifyConfig.sharedSecret,
+                                                    webhook_secret: shopifyConfig.webhookSecret
+                                                },
+                                                is_global: true,
+                                                is_active: true
+                                            }
+
+                                            if (existing) {
+                                                await supabase.from('integrations').update(payload).eq('id', existing.id)
+                                            } else {
+                                                await supabase.from('integrations').insert([payload])
+                                            }
+                                            alert('Configuración de Shopify guardada correctamente')
+                                        } catch (err: any) {
+                                            alert('Error al guardar: ' + err.message)
+                                        } finally {
+                                            setSaving(false)
+                                        }
+                                    }}
+                                    disabled={saving}
+                                    className="px-6 py-2 bg-gray-900 text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition-all disabled:opacity-50"
+                                >
+                                    {saving ? 'Guardando...' : 'Guardar Configuración Shopify'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -906,117 +1037,6 @@ function AdminContent() {
             {/* FLOWS TAB */}
             {activeTab === 'flows' && (
                 <FlowBuilder />
-            )}
-
-            {/* SHOPIFY TAB */}
-            {activeTab === 'shopify' && (
-                <div className="space-y-8 max-w-4xl">
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-violet-50">
-                            <div className="flex items-center space-x-3">
-                                <div className="p-3 bg-white rounded-xl shadow-sm">
-                                    <Store className="text-indigo-600" size={24} />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-900">Aplicación Shopify</h2>
-                                    <p className="text-sm text-gray-500">Conecta tu App de Shopify para recibir instalaciones y facturación.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">API Key</label>
-                                    <input
-                                        type="text"
-                                        value={shopifyConfig.apiKey}
-                                        onChange={(e) => setShopifyConfig({ ...shopifyConfig, apiKey: e.target.value })}
-                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="Tu API Key de Shopify"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">API Secret Key</label>
-                                    <input
-                                        type="password"
-                                        value={shopifyConfig.sharedSecret}
-                                        onChange={(e) => setShopifyConfig({ ...shopifyConfig, sharedSecret: e.target.value })}
-                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="••••••••••••••••"
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700">Webhook Secret</label>
-                                <input
-                                    type="password"
-                                    value={shopifyConfig.webhookSecret}
-                                    onChange={(e) => setShopifyConfig({ ...shopifyConfig, webhookSecret: e.target.value })}
-                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    placeholder="••••••••••••••••"
-                                />
-                                <p className="text-[10px] text-gray-400">Este secreto se utiliza para verificar la autenticidad de los webhooks de Shopify.</p>
-                            </div>
-
-                            <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex items-start space-x-3">
-                                <div className="p-1 bg-amber-100 rounded-md text-amber-700">
-                                    <Settings size={14} />
-                                </div>
-                                <div className="text-xs text-amber-800 leading-relaxed">
-                                    <p className="font-bold mb-1">Configuración del Webhook en Shopify:</p>
-                                    <p>URL del Webhook: <code className="bg-white/50 px-1 rounded">{window.location.origin}/api/shopify/webhook</code></p>
-                                    <p className="mt-1">Temas recomendados: <code className="bg-white/50 px-1 rounded">app/uninstalled</code>, <code className="bg-white/50 px-1 rounded">app_subscriptions/update</code></p>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={async () => {
-                                    setSaving(true)
-                                    try {
-                                        const { data: userData } = await supabase.auth.getUser()
-                                        const ownerId = userData.user?.id
-
-                                        const { data: existing } = await supabase
-                                            .from('integrations')
-                                            .select('id')
-                                            .eq('integration_type', 'shopify_api')
-                                            .eq('is_global', true)
-                                            .maybeSingle()
-
-                                        const payload = {
-                                            owner_id: ownerId,
-                                            integration_type: 'shopify_api',
-                                            provider: 'shopify',
-                                            credentials: {
-                                                api_key: shopifyConfig.apiKey,
-                                                shared_secret: shopifyConfig.sharedSecret,
-                                                webhook_secret: shopifyConfig.webhookSecret
-                                            },
-                                            is_global: true,
-                                            is_active: true
-                                        }
-
-                                        if (existing) {
-                                            await supabase.from('integrations').update(payload).eq('id', existing.id)
-                                        } else {
-                                            await supabase.from('integrations').insert([payload])
-                                        }
-                                        alert('Configuración de Shopify guardada correctamente')
-                                    } catch (err: any) {
-                                        alert('Error al guardar: ' + err.message)
-                                    } finally {
-                                        setSaving(false)
-                                    }
-                                }}
-                                disabled={saving}
-                                className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
-                            >
-                                <Save size={18} className="mr-2" />
-                                {saving ? 'Guardando...' : 'Guardar Configuración'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
             )}
         </div>
     )
