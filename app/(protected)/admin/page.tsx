@@ -22,7 +22,8 @@ import {
     Search,
     Workflow,
     ArrowRight,
-    PlusCircle
+    PlusCircle,
+    Store
 } from 'lucide-react'
 import { clsx } from 'clsx'
 

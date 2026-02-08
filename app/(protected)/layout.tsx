@@ -20,7 +20,8 @@ import {
     X,
     Zap,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    DollarSign
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -90,7 +91,7 @@ export default function ProtectedLayout({
         { name: 'Tasks', href: '/tasks', icon: CheckSquare },
         { name: 'Meetings', href: '/meetings', icon: Calendar },
         { name: 'Emails', href: '/emails', icon: Mail },
-        { name: 'Finances', href: '/finances', icon: LayoutDashboard }, // Using LayoutDashboard for now, or could use DollarSign if imported
+        { name: 'Finances', href: '/finances', icon: DollarSign },
         { name: 'Settings', href: '/settings', icon: Settings },
     ]
 
