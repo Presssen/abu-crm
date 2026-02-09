@@ -76,11 +76,40 @@ export default function FinancesPage() {
             const uninstalled = installsData?.filter(i => i.status === 'uninstalled').length || 0
             const revenue = paymentsData?.reduce((acc, p) => acc + (Number(p.amount) || 0), 0) || 0
 
+            // Calculate Monthly Growth
+            const now = new Date()
+            const currentMonth = now.getMonth()
+            const currentYear = now.getFullYear()
+
+            const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
+            const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
+
+            const currentMonthRevenue = paymentsData
+                ?.filter(p => {
+                    const d = new Date(p.created_at)
+                    return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+                })
+                .reduce((acc, p) => acc + (Number(p.amount) || 0), 0) || 0
+
+            const lastMonthRevenue = paymentsData
+                ?.filter(p => {
+                    const d = new Date(p.created_at)
+                    return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear
+                })
+                .reduce((acc, p) => acc + (Number(p.amount) || 0), 0) || 0
+
+            let growth = 0
+            if (lastMonthRevenue > 0) {
+                growth = Math.round(((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
+            } else if (currentMonthRevenue > 0) {
+                growth = 100
+            }
+
             setStats({
                 totalRevenue: revenue,
                 activeInstalls: active,
                 totalUninstalls: uninstalled,
-                monthlyGrowth: 15 // Mock growth for now
+                monthlyGrowth: growth
             })
         } catch (error) {
             console.error('Error fetching finances data:', error)
@@ -108,7 +137,7 @@ export default function FinancesPage() {
                     icon={DollarSign}
                     color="text-emerald-600"
                     bg="bg-emerald-50"
-                    trend="+12%"
+                    trend={stats.monthlyGrowth !== 0 ? `${stats.monthlyGrowth > 0 ? '+' : ''}${stats.monthlyGrowth}%` : undefined}
                 />
                 <StatCard
                     title="Instalaciones Activas"
