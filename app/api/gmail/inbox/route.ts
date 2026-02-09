@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/auth/server'
+import { callGmailApi } from '@/lib/gmail'
 
 export async function GET(request: Request) {
     try {
@@ -7,17 +8,6 @@ export async function GET(request: Request) {
         const { data: { user } } = await supabase.auth.getUser()
 
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-        const { data: integration } = await supabase
-            .from('integrations')
-            .select('*')
-            .eq('owner_id', user.id)
-            .eq('integration_type', 'google_mail')
-            .single()
-
-        if (!integration) return NextResponse.json({ error: 'Gmail no conectado' }, { status: 400 })
-
-        const { access_token } = integration.credentials
 
         // Fetch threads in INBOX with pagination (up to 2500)
         let threadIds: string[] = []
@@ -32,9 +22,7 @@ export async function GET(request: Request) {
             })
             if (nextPageToken) queryParams.append('pageToken', nextPageToken)
 
-            const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads?${queryParams.toString()}`, {
-                headers: { 'Authorization': `Bearer ${access_token}` }
-            })
+            const res = await callGmailApi(`threads?${queryParams.toString()}`, {}, user.id)
 
             if (!res.ok) throw new Error('Failed to fetch from Gmail inbox')
 

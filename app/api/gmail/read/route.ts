@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/auth/server'
+import { callGmailApi } from '@/lib/gmail'
 
 export async function POST(request: Request) {
     try {
@@ -11,30 +12,15 @@ export async function POST(request: Request) {
 
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-        const { data: integration } = await supabase
-            .from('integrations')
-            .select('*')
-            .eq('owner_id', user.id)
-            .eq('integration_type', 'google_mail')
-            .single()
-
-        if (!integration) return NextResponse.json({ error: 'Gmail no conectado' }, { status: 400 })
-
-        const { access_token } = integration.credentials
-
         // To make unread status persistent and reliable for Gmail search,
         // we apply/remove the UNREAD label from the THREAD directly.
-        const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`, {
+        const res = await callGmailApi(`threads/${threadId}/modify`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${access_token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
+            body: {
                 addLabelIds: unread ? ['UNREAD'] : [],
                 removeLabelIds: unread ? [] : ['UNREAD']
-            })
-        })
+            }
+        }, user.id)
 
         if (!res.ok) {
             const err = await res.json()
