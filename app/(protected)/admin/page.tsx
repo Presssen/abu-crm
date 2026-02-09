@@ -61,7 +61,7 @@ function AdminContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    type TabType = 'integrations' | 'users' | 'marathon' | 'leads' | 'imports' | 'flows'
+    type TabType = 'integrations' | 'users' | 'leads' | 'imports' | 'flows'
     const activeTab = (searchParams.get('tab') as TabType) || 'integrations'
 
     const setActiveTab = (tab: TabType) => {
@@ -157,20 +157,21 @@ function AdminContent() {
                     .eq('key', 'marathon_default_goal')
                     .single()
                 if (mGoal) setMarathonGoal(mGoal?.value || '20')
-            } else if (activeTab === 'marathon') {
-                const { data, error } = await supabase
-                    .from('app_settings')
-                    .select('*')
-                    .eq('key', 'marathon_default_goal')
-                    .single()
-                if (data) setMarathonGoal(data.value)
             } else if (activeTab === 'users') {
-                const { data, error } = await supabase
+                const { data: profilesData, error } = await supabase
                     .from('profiles')
                     .select('*')
                     .order('created_at', { ascending: false })
                 if (error) throw error
-                setProfiles(data || [])
+                setProfiles(profilesData || [])
+
+                // Also fetch global marathon goal for the inline config
+                const { data: mGoal } = await supabase
+                    .from('app_settings')
+                    .select('*')
+                    .eq('key', 'marathon_default_goal')
+                    .single()
+                if (mGoal) setMarathonGoal(mGoal?.value || '20')
             } else if (activeTab === 'leads') {
                 const { data, error } = await supabase
                     .from('leads')
@@ -433,7 +434,6 @@ function AdminContent() {
                     { id: 'leads', label: 'Gestión de Leads', icon: Target },
                     { id: 'imports', label: 'Historial de Importaciones', icon: Upload },
                     { id: 'flows', label: 'Flujos (Alpha)', icon: Workflow },
-                    { id: 'marathon', label: 'Marathon Config', icon: Zap },
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -683,156 +683,153 @@ function AdminContent() {
                 </div>
             )}
 
-            {/* MARATHON TAB */}
-            {activeTab === 'marathon' && (
-                <div className="space-y-8 max-w-4xl">
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100">
-                            <h2 className="text-lg font-bold text-gray-900 flex items-center">
-                                <Target className="mr-2 text-indigo-600" />
-                                Configuración Global Marathon
-                            </h2>
+
+            {/* USERS TAB */}
+            {activeTab === 'users' && (
+                <div className="space-y-4">
+                    {/* Marathon Global Config - Discreet & Professional */}
+                    <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between shadow-sm max-w-3xl">
+                        <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                                <Zap size={16} />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-gray-900">Configuración Marathon</h3>
+                                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-tight">Meta diaria global por defecto</p>
+                            </div>
                         </div>
-                        <div className="p-6 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">Objetivo Diario de Leads (Global)</label>
-                                    <input
-                                        type="number"
-                                        value={marathonGoal}
-                                        onChange={(e) => setMarathonGoal(e.target.value)}
-                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    />
-                                    <p className="text-xs text-gray-500">Cantidad por defecto para nuevos usuarios.</p>
-                                </div>
+                        <div className="flex items-center space-x-3">
+                            <div className="w-24">
+                                <input
+                                    type="number"
+                                    value={marathonGoal}
+                                    onChange={(e) => setMarathonGoal(e.target.value)}
+                                    className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none text-center"
+                                />
                             </div>
                             <button
                                 onClick={saveMarathonConfig}
                                 disabled={saving}
-                                className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                                className="px-4 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-gray-800 transition-all disabled:opacity-50"
                             >
-                                <Save size={18} className="mr-2" />
-                                {saving ? 'Guardando...' : 'Guardar Configuración'}
+                                {saving ? '...' : 'Actualizar'}
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
 
-            {/* USERS TAB */}
-            {activeTab === 'users' && (
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                    <table className="w-full text-left">
-                        <thead className="bg-gray-50 border-b border-gray-100">
-                            <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuario</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Estado</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Bloqueo</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Rol</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Marathon</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Meta Diaria</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {profiles.map(profile => (
-                                <tr key={profile.id} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="h-10 w-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-700 font-bold">
-                                                {profile.email[0].toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <div className="text-sm font-bold text-gray-900">{profile.email}</div>
-                                                <div className="text-[10px] text-gray-400">{new Date(profile.created_at).toLocaleDateString()}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <button
-                                            onClick={() => updateUserProfile(profile.id, { is_approved: !profile.is_approved })}
-                                            className={clsx(
-                                                "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold transition-all border",
-                                                profile.is_approved
-                                                    ? "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100"
-                                                    : "bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100"
-                                            )}
-                                        >
-                                            {profile.is_approved ? (
-                                                <><CheckCircle size={14} className="mr-1" /> Aprobado</>
-                                            ) : (
-                                                <><Clock size={14} className="mr-1" /> Pendiente</>
-                                            )}
-                                        </button>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <button
-                                            onClick={() => updateUserProfile(profile.id, { is_blocked: !profile.is_blocked })}
-                                            className={clsx(
-                                                "p-2 rounded-xl transition-all border",
-                                                profile.is_blocked
-                                                    ? "bg-rose-600 text-white border-rose-600 shadow-lg shadow-rose-100"
-                                                    : "bg-white text-gray-400 border-gray-100 hover:text-rose-600 hover:border-rose-100"
-                                            )}
-                                            title={profile.is_blocked ? "Desbloquear usuario" : "Bloquear usuario"}
-                                        >
-                                            <ShieldAlert size={18} />
-                                        </button>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <select
-                                            value={profile.role}
-                                            onChange={(e) => updateUserProfile(profile.id, { role: e.target.value })}
-                                            className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium"
-                                        >
-                                            <option value="user">Comercial</option>
-                                            <option value="business_developer">Bus. Dev</option>
-                                            <option value="admin">Administrador</option>
-                                        </select>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <button
-                                            onClick={() => updateUserProfile(profile.id, { marathon_enabled: !profile.marathon_enabled })}
-                                            className={clsx(
-                                                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
-                                                profile.marathon_enabled ? "bg-indigo-600" : "bg-gray-200"
-                                            )}
-                                        >
-                                            <span className={clsx(
-                                                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                                                profile.marathon_enabled ? "translate-x-6" : "translate-x-1"
-                                            )} />
-                                        </button>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <input
-                                            type="number"
-                                            defaultValue={profile.daily_lead_goal !== null && profile.daily_lead_goal !== undefined
-                                                ? profile.daily_lead_goal
-                                                : marathonGoal}
-                                            onBlur={(e) => {
-                                                const val = parseInt(e.target.value)
-                                                if (!isNaN(val)) updateUserProfile(profile.id, { daily_lead_goal: val })
-                                            }}
-                                            className="w-20 px-3 py-1 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-1 focus:ring-indigo-500 outline-none"
-                                        />
-                                        <div className="text-[10px] text-gray-400 mt-1">
-                                            {profile.daily_lead_goal ? 'Personalizado' : 'Global'}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <button
-                                            onClick={() => deleteUser(profile.id)}
-                                            className="text-gray-400 hover:text-rose-600 transition-colors"
-                                            title="Eliminar usuario"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </td>
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 border-b border-gray-100">
+                                <tr>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Usuario</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Estado</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Bloqueo</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Rol</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Marathon</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Meta Diaria</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider"></th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {profiles.map(profile => (
+                                    <tr key={profile.id} className="hover:bg-gray-50/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="h-10 w-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-700 font-bold">
+                                                    {profile.email[0].toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-bold text-gray-900">{profile.email}</div>
+                                                    <div className="text-[10px] text-gray-400">{new Date(profile.created_at).toLocaleDateString()}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <button
+                                                onClick={() => updateUserProfile(profile.id, { is_approved: !profile.is_approved })}
+                                                className={clsx(
+                                                    "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold transition-all border",
+                                                    profile.is_approved
+                                                        ? "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100"
+                                                        : "bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100"
+                                                )}
+                                            >
+                                                {profile.is_approved ? (
+                                                    <><CheckCircle size={14} className="mr-1" /> Aprobado</>
+                                                ) : (
+                                                    <><Clock size={14} className="mr-1" /> Pendiente</>
+                                                )}
+                                            </button>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <button
+                                                onClick={() => updateUserProfile(profile.id, { is_blocked: !profile.is_blocked })}
+                                                className={clsx(
+                                                    "p-2 rounded-xl transition-all border",
+                                                    profile.is_blocked
+                                                        ? "bg-rose-600 text-white border-rose-600 shadow-lg shadow-rose-100"
+                                                        : "bg-white text-gray-400 border-gray-100 hover:text-rose-600 hover:border-rose-100"
+                                                )}
+                                                title={profile.is_blocked ? "Desbloquear usuario" : "Bloquear usuario"}
+                                            >
+                                                <ShieldAlert size={18} />
+                                            </button>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <select
+                                                value={profile.role}
+                                                onChange={(e) => updateUserProfile(profile.id, { role: e.target.value })}
+                                                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium"
+                                            >
+                                                <option value="user">Comercial</option>
+                                                <option value="business_developer">Bus. Dev</option>
+                                                <option value="admin">Administrador</option>
+                                            </select>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <button
+                                                onClick={() => updateUserProfile(profile.id, { marathon_enabled: !profile.marathon_enabled })}
+                                                className={clsx(
+                                                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                                                    profile.marathon_enabled ? "bg-indigo-600" : "bg-gray-200"
+                                                )}
+                                            >
+                                                <span className={clsx(
+                                                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                                                    profile.marathon_enabled ? "translate-x-6" : "translate-x-1"
+                                                )} />
+                                            </button>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <input
+                                                type="number"
+                                                defaultValue={profile.daily_lead_goal !== null && profile.daily_lead_goal !== undefined
+                                                    ? profile.daily_lead_goal
+                                                    : marathonGoal}
+                                                onBlur={(e) => {
+                                                    const val = parseInt(e.target.value)
+                                                    if (!isNaN(val)) updateUserProfile(profile.id, { daily_lead_goal: val })
+                                                }}
+                                                className="w-20 px-3 py-1 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-1 focus:ring-indigo-500 outline-none"
+                                            />
+                                            <div className="text-[10px] text-gray-400 mt-1">
+                                                {profile.daily_lead_goal ? 'Personalizado' : 'Global'}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <button
+                                                onClick={() => deleteUser(profile.id)}
+                                                className="text-gray-400 hover:text-rose-600 transition-colors"
+                                                title="Eliminar usuario"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
