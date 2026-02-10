@@ -25,11 +25,13 @@
     var container = document.createElement('div');
     container.id = 'abu-chat-container';
     container.style.position = 'fixed';
-    container.style.bottom = '20px';
-    container.style.right = '20px';
+    container.style.bottom = '24px';
+    container.style.right = '24px';
     container.style.zIndex = '2147483647'; // Max safe integer
     container.style.width = '64px';
     container.style.height = '64px';
+    container.style.boxShadow = '0 8px 25px rgba(0,0,0,0.2)'; // Launcher shadow
+    container.style.borderRadius = '32px'; // Rounded for launcher
     container.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
 
     // Create iframe
@@ -64,15 +66,19 @@
                 container.style.height = '650px';
                 container.style.maxWidth = '90vw';
                 container.style.maxHeight = '90vh';
-                container.style.bottom = '10px';
-                container.style.right = '10px';
+                container.style.bottom = '24px';
+                container.style.right = '24px';
+                container.style.boxShadow = '0 20px 50px rgba(0,0,0,0.25)'; // Open state shadow
+                container.style.borderRadius = '16px'; // Rounded for open chat
                 iframe.style.boxShadow = '0 10px 40px rgba(0,0,0,0.15)';
                 iframe.style.borderRadius = '16px';
             } else {
                 container.style.width = '64px';
                 container.style.height = '64px';
-                container.style.bottom = '20px';
-                container.style.right = '20px';
+                container.style.bottom = '24px';
+                container.style.right = '24px';
+                container.style.boxShadow = '0 8px 25px rgba(0,0,0,0.2)'; // Back to launcher shadow
+                container.style.borderRadius = '32px'; // Back to launcher radius
                 iframe.style.boxShadow = 'none';
                 iframe.style.borderRadius = '32px';
             }

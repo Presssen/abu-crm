@@ -179,7 +179,7 @@ export default function ChatWidget() {
     return (
         <div className="flex flex-col h-full w-full bg-transparent relative font-sans select-none" style={{ '--primary-chat': settings.primary_color } as any}>
             {isOpen && (
-                <div className="flex flex-col h-full w-full shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-2xl overflow-hidden border border-gray-200/50 bg-white animate-in fade-in zoom-in duration-300">
+                <div className="flex flex-col h-full w-full rounded-2xl overflow-hidden border border-gray-200/50 bg-white animate-in fade-in zoom-in duration-300">
                     {/* Header */}
                     <div className="p-4 text-white flex justify-between items-center shadow-md z-10 relative" style={{ backgroundColor: settings.primary_color }}>
                         <div className="min-w-0 flex-1">
@@ -205,8 +205,8 @@ export default function ChatWidget() {
                         {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.sender_type === 'visitor' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
                                 <div className={`max-w-[85%] rounded-[1.25rem] px-4 py-2.5 text-[13px] leading-relaxed shadow-sm ${m.sender_type === 'visitor'
-                                        ? 'text-white rounded-br-none font-medium'
-                                        : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none shadow-[4px_4px_10px_rgba(0,0,0,0.02)]'
+                                    ? 'text-white rounded-br-none font-medium'
+                                    : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none shadow-[4px_4px_10px_rgba(0,0,0,0.02)]'
                                     }`} style={m.sender_type === 'visitor' ? { backgroundColor: settings.primary_color } : {}}>
                                     {m.content}
                                 </div>
@@ -247,7 +247,7 @@ export default function ChatWidget() {
             {!isOpen && (
                 <button
                     onClick={toggleChat}
-                    className="w-full h-full rounded-full shadow-[0_8px_25px_rgba(0,0,0,0.2)] flex items-center justify-center text-white transition-all hover:scale-110 active:scale-90 absolute inset-0 border-2 border-white/20 overflow-hidden ring-4 ring-black/5"
+                    className="w-full h-full rounded-full flex items-center justify-center text-white transition-all hover:scale-110 active:scale-90 absolute inset-0 border-2 border-white/20 overflow-hidden ring-4 ring-black/5"
                     style={{ backgroundColor: settings.primary_color }}
                 >
                     <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent pointer-events-none" />
