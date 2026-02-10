@@ -560,17 +560,62 @@ window.addEventListener('message', (event) => {
                                 </form>
 
                                 {/* Preview Column */}
-                                <div className="sticky top-0 bg-gray-50 rounded-2xl p-8 border border-gray-200 flex flex-col items-center gap-4">
-                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Vista Previa en Vivo</span>
-                                    <div className="w-[350px] h-[600px] bg-white rounded-3xl shadow-2xl overflow-hidden border-[8px] border-gray-900 relative">
-                                        <iframe
-                                            src={`${typeof window !== 'undefined' ? window.location.origin : ''}/chat-widget?preview=true`}
-                                            key={JSON.stringify(settings)} // Force reload on save (or use postMessage for real-time if we want to be fancy)
-                                            className="w-full h-full border-none"
-                                        />
+                                <div className="sticky top-0 flex flex-col items-center gap-6">
+                                    <div className="text-center">
+                                        <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Vista Previa en Vivo</span>
+                                        <p className="text-xs text-gray-400 mt-1">Guarda los cambios para actualizar</p>
                                     </div>
-                                    <p className="text-[10px] text-gray-400 text-center max-w-[250px]">
-                                        * Los cambios se reflejarán aquí una vez que hagas clic en "Guardar Cambios".
+
+                                    {/* Phone Mockup */}
+                                    <div className="relative">
+                                        {/* Phone Frame */}
+                                        <div className="w-[380px] h-[760px] bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-[3rem] shadow-2xl p-3 relative">
+                                            {/* Notch */}
+                                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-7 bg-black rounded-b-3xl z-10"></div>
+
+                                            {/* Screen */}
+                                            <div className="w-full h-full bg-gradient-to-br from-blue-50 via-white to-purple-50 rounded-[2.5rem] overflow-hidden relative shadow-inner">
+                                                {/* Status Bar */}
+                                                <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-black/5 to-transparent z-10 flex items-center justify-between px-8 pt-2">
+                                                    <span className="text-xs font-semibold text-gray-800">9:41</span>
+                                                    <div className="flex items-center gap-1">
+                                                        <div className="w-4 h-3 border border-gray-800 rounded-sm"></div>
+                                                        <div className="text-xs">100%</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Website Background Simulation */}
+                                                <div className="absolute inset-0 bg-gradient-to-br from-purple-100 via-blue-50 to-pink-50">
+                                                    {/* Simulated website content */}
+                                                    <div className="p-6 pt-16">
+                                                        <div className="h-6 bg-white/60 rounded-lg w-3/4 mb-4"></div>
+                                                        <div className="h-4 bg-white/40 rounded w-full mb-2"></div>
+                                                        <div className="h-4 bg-white/40 rounded w-5/6 mb-2"></div>
+                                                        <div className="h-4 bg-white/40 rounded w-4/6"></div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Chat Widget Preview */}
+                                                <div className="absolute inset-0">
+                                                    <iframe
+                                                        src={`${typeof window !== 'undefined' ? window.location.origin : ''}/chat-widget?preview=true`}
+                                                        key={JSON.stringify(settings)}
+                                                        className="w-full h-full border-none bg-transparent"
+                                                        style={{ colorScheme: 'light' }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Home Indicator */}
+                                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/30 rounded-full"></div>
+                                        </div>
+
+                                        {/* Reflection Effect */}
+                                        <div className="absolute -bottom-6 left-0 right-0 h-24 bg-gradient-to-b from-gray-900/20 to-transparent blur-2xl -z-10"></div>
+                                    </div>
+
+                                    <p className="text-xs text-gray-400 text-center max-w-[300px] italic">
+                                        💡 Esta es una simulación de cómo se verá el widget en tu sitio web
                                     </p>
                                 </div>
                             </div>
