@@ -37,6 +37,7 @@ export default function ChatWidget() {
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
+    const [isPreview, setIsPreview] = useState(false)
     const [settings, setSettings] = useState<ChatSettings>({
         primary_color: '#2563eb',
         title: 'Chat Support',
@@ -49,6 +50,10 @@ export default function ChatWidget() {
     const supabase = createClient()
 
     useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        const preview = params.get('preview') === 'true'
+        setIsPreview(preview)
+
         const vid = getVisitorId()
         setVisitorId(vid)
 
@@ -56,6 +61,17 @@ export default function ChatWidget() {
         const init = async () => {
             const settingsRes = await getChatSettings()
             if (settingsRes.data) setSettings(settingsRes.data)
+
+            if (preview) {
+                setIsOpen(true)
+                setMessages([{
+                    id: 'greeting',
+                    content: settingsRes.data?.greeting_message || 'Hello! How can we help?',
+                    sender_type: 'agent',
+                    created_at: new Date().toISOString()
+                }])
+                return
+            }
 
             const formData = new FormData()
             formData.append('visitor_id', vid)
@@ -143,7 +159,7 @@ export default function ChatWidget() {
         window.parent.postMessage({ type: 'ABU_CHAT_TOGGLE', isOpen: newState }, '*')
     }
 
-    if (!sessionId) return null
+    if (!sessionId && !isPreview) return null
 
     return (
         <div className="flex flex-col h-full bg-white relative font-sans" style={{ '--primary-chat': settings.primary_color } as any}>

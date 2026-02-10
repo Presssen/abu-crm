@@ -305,116 +305,136 @@ export default function ChatDashboard() {
                     )
                 ) : (
                     /* Settings View */
-                    <div className="flex-1 overflow-y-auto p-8 max-w-2xl mx-auto w-full">
-                        <div className="mb-8">
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Personalización del Widget</h2>
-                            <p className="text-gray-500 text-sm">Configura cómo verán tus clientes el chat en su web.</p>
+                    <div className="flex-1 overflow-y-auto p-8 lg:p-12">
+                        <div className="max-w-6xl mx-auto">
+                            <div className="mb-8">
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Personalización del Widget</h2>
+                                <p className="text-gray-500 text-sm">Configura cómo verán tus clientes el chat en su web.</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                                {/* Form Column */}
+                                <form onSubmit={handleSaveSettings} className="space-y-6">
+                                    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
+                                        {/* Color */}
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                                <Palette className="w-4 h-4 text-blue-600" />
+                                                Color Principal
+                                            </label>
+                                            <div className="flex items-center gap-4">
+                                                <input
+                                                    type="color"
+                                                    className="h-10 w-20 rounded cursor-pointer border border-gray-200"
+                                                    value={settings.primary_color}
+                                                    onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm font-mono"
+                                                    value={settings.primary_color}
+                                                    onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Text Fields */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                                    <Type className="w-4 h-4 text-blue-600" />
+                                                    Título del Widget
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm"
+                                                    value={settings.title}
+                                                    onChange={(e) => setSettings({ ...settings, title: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                                    <Bot className="w-4 h-4 text-blue-600" />
+                                                    Nombre del Bot
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm"
+                                                    value={settings.bot_name}
+                                                    onChange={(e) => setSettings({ ...settings, bot_name: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-bold text-gray-700">Subtítulo / Estado</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm"
+                                                value={settings.subtitle}
+                                                onChange={(e) => setSettings({ ...settings, subtitle: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-bold text-gray-700">Mensaje de Bienvenida</label>
+                                            <textarea
+                                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm h-24 resize-none"
+                                                value={settings.greeting_message}
+                                                onChange={(e) => setSettings({ ...settings, greeting_message: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-3">
+                                        <button
+                                            type="submit"
+                                            disabled={settingsLoading}
+                                            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all disabled:opacity-50"
+                                        >
+                                            {settingsLoading ? 'Guardando...' : 'Guardar Cambios'}
+                                        </button>
+                                    </div>
+
+                                    {/* Installation Code */}
+                                    <div className="mt-12 bg-gray-900 rounded-2xl p-6 text-white">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold flex items-center gap-2">
+                                                <CheckCircle className="w-5 h-5 text-green-400" />
+                                                Instalar en tu sitio web
+                                            </h3>
+                                            <button
+                                                type="button"
+                                                onClick={copySnippet}
+                                                className="flex items-center gap-2 text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+                                            >
+                                                {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                                                {copied ? '¡Copiado!' : 'Copiar Código'}
+                                            </button>
+                                        </div>
+                                        <p className="text-gray-400 text-xs mb-4">Pega este script justo antes de la etiqueta <code className="text-blue-300">{'</body>'}</code> de tu página HTML.</p>
+                                        <div className="bg-black/50 p-4 rounded-lg border border-white/5 font-mono text-xs text-blue-300 overflow-x-auto whitespace-nowrap">
+                                            {`<script src="${typeof window !== 'undefined' ? window.location.origin : ''}/embed.js" async></script>`}
+                                        </div>
+                                    </div>
+                                </form>
+
+                                {/* Preview Column */}
+                                <div className="sticky top-0 bg-gray-50 rounded-2xl p-8 border border-gray-200 flex flex-col items-center gap-4">
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Vista Previa en Vivo</span>
+                                    <div className="w-[350px] h-[600px] bg-white rounded-3xl shadow-2xl overflow-hidden border-[8px] border-gray-900 relative">
+                                        <iframe
+                                            src={`${typeof window !== 'undefined' ? window.location.origin : ''}/chat-widget?preview=true`}
+                                            key={JSON.stringify(settings)} // Force reload on save (or use postMessage for real-time if we want to be fancy)
+                                            className="w-full h-full border-none"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 text-center max-w-[250px]">
+                                        * Los cambios se reflejarán aquí una vez que hagas clic en "Guardar Cambios".
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-
-                        <form onSubmit={handleSaveSettings} className="space-y-6">
-                            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-6">
-                                {/* Color */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                        <Palette className="w-4 h-4 text-blue-600" />
-                                        Color Principal
-                                    </label>
-                                    <div className="flex items-center gap-4">
-                                        <input
-                                            type="color"
-                                            className="h-10 w-20 rounded cursor-pointer"
-                                            value={settings.primary_color}
-                                            onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
-                                        />
-                                        <input
-                                            type="text"
-                                            className="flex-1 bg-gray-50 border-none rounded-lg px-4 py-2 text-sm font-mono"
-                                            value={settings.primary_color}
-                                            onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Text Fields */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                            <Type className="w-4 h-4 text-blue-600" />
-                                            Título del Widget
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="w-full bg-gray-50 border-none rounded-lg px-4 py-2 text-sm"
-                                            value={settings.title}
-                                            onChange={(e) => setSettings({ ...settings, title: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                            <Bot className="w-4 h-4 text-blue-600" />
-                                            Nombre del Bot
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="w-full bg-gray-50 border-none rounded-lg px-4 py-2 text-sm"
-                                            value={settings.bot_name}
-                                            onChange={(e) => setSettings({ ...settings, bot_name: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">Subtítulo / Estado</label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-gray-50 border-none rounded-lg px-4 py-2 text-sm"
-                                        value={settings.subtitle}
-                                        onChange={(e) => setSettings({ ...settings, subtitle: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">Mensaje de Bienvenida</label>
-                                    <textarea
-                                        className="w-full bg-gray-50 border-none rounded-lg px-4 py-2 text-sm h-24 resize-none"
-                                        value={settings.greeting_message}
-                                        onChange={(e) => setSettings({ ...settings, greeting_message: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-3">
-                                <button
-                                    type="submit"
-                                    disabled={settingsLoading}
-                                    className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all disabled:opacity-50"
-                                >
-                                    {settingsLoading ? 'Guardando...' : 'Guardar Cambios'}
-                                </button>
-                            </div>
-
-                            {/* Installation Code */}
-                            <div className="mt-12 bg-gray-900 rounded-2xl p-6 text-white">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="font-bold flex items-center gap-2">
-                                        <CheckCircle className="w-5 h-5 text-green-400" />
-                                        Instalar en tu sitio web
-                                    </h3>
-                                    <button
-                                        type="button"
-                                        onClick={copySnippet}
-                                        className="flex items-center gap-2 text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
-                                    >
-                                        {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                                        {copied ? '¡Copiado!' : 'Copiar Código'}
-                                    </button>
-                                </div>
-                                <p className="text-gray-400 text-xs mb-4">Pega este script justo antes de la etiqueta <code className="text-blue-300">{'</body>'}</code> de tu página HTML.</p>
-                                <div className="bg-black/50 p-4 rounded-lg border border-white/5 font-mono text-xs text-blue-300 overflow-x-auto whitespace-nowrap">
-                                    {`<script src="${typeof window !== 'undefined' ? window.location.origin : ''}/embed.js" async></script>`}
-                                </div>
-                            </div>
-                        </form>
                     </div>
                 )}
             </div>
