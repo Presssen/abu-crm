@@ -17,10 +17,16 @@ export async function createChatSession(formData: FormData) {
         .select('id')
         .eq('visitor_id', visitorId)
         .eq('status', 'active')
-        .single()
+        .maybeSingle()
 
     if (existing) {
         return { success: true, sessionId: existing.id }
+    }
+
+    // ONLY create if we have the registration data
+    // This prevents "empty" sessions from being created during the initial check
+    if (!name || !email || !shopName) {
+        return { success: true, sessionId: null }
     }
 
     const { data, error } = await supabase
