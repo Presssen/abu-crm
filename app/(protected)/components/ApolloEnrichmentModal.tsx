@@ -45,6 +45,8 @@ export default function ApolloEnrichmentModal({
         setLoading(true)
         setError(null)
         try {
+            console.log('[Apollo] Searching for domain:', domain)
+
             const response = await fetch('/api/enrich/apollo/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -52,18 +54,28 @@ export default function ApolloEnrichmentModal({
             })
 
             const data = await response.json()
+            console.log('[Apollo] Response:', { status: response.status, data })
 
             if (!response.ok) {
+                // Provide more helpful error messages
+                if (response.status === 403 || data.error?.includes('403')) {
+                    throw new Error('Apollo API key inválida o sin permisos. Verifica tu API key en Admin > Integrations.')
+                }
+                if (data.error?.includes('not configured')) {
+                    throw new Error('Apollo API no configurada. Ve a Admin > Integrations para añadir tu API key.')
+                }
                 throw new Error(data.error || 'Error al buscar contactos')
             }
 
-            if (data.contacts.length === 0) {
-                setError('No se encontraron contactos para este dominio')
+            if (!data.contacts || data.contacts.length === 0) {
+                setError('No se encontraron contactos para este dominio. Intenta con otro dominio o verifica que sea correcto.')
                 return
             }
 
+            console.log('[Apollo] Found contacts:', data.contacts.length)
             setContacts(data.contacts)
         } catch (err: any) {
+            console.error('[Apollo] Search error:', err)
             setError(err.message || 'Error al conectar con Apollo')
         } finally {
             setLoading(false)
@@ -149,8 +161,17 @@ export default function ApolloEnrichmentModal({
                 {/* Content */}
                 <div className="p-6 overflow-y-auto flex-1">
                     {error && (
-                        <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm">
-                            {error}
+                        <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl">
+                            <p className="text-rose-700 text-sm font-medium mb-2">{error}</p>
+                            {(error.includes('API key') || error.includes('configurada')) && (
+                                <a
+                                    href="/admin"
+                                    target="_blank"
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-rose-800 hover:text-rose-900 underline"
+                                >
+                                    → Ir a Admin &gt; Integrations
+                                </a>
+                            )}
                         </div>
                     )}
 
