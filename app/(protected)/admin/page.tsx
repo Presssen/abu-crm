@@ -24,7 +24,9 @@ import {
     ArrowRight,
     PlusCircle,
     Store,
-    Info
+    Info,
+    Eye,
+    EyeOff
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -82,6 +84,10 @@ function AdminContent() {
     const [apolloKey, setApolloKey] = useState('')
     const [marathonGoal, setMarathonGoal] = useState('20')
     const [shopifyConfig, setShopifyConfig] = useState({ apiKey: '', sharedSecret: '', webhookSecret: '' })
+
+    // Visibility toggles for API keys
+    const [showGeminiKey, setShowGeminiKey] = useState(false)
+    const [showApolloKey, setShowApolloKey] = useState(false)
 
     // Selection & Filters
     const [selectedLeads, setSelectedLeads] = useState<string[]>([])
@@ -483,12 +489,20 @@ function AdminContent() {
                                     <div className="relative">
                                         <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
                                         <input
-                                            type="password"
+                                            type={showGeminiKey ? "text" : "password"}
                                             value={geminiKey}
                                             onChange={(e) => setGeminiKey(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                            className="w-full pl-10 pr-10 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                                             placeholder="Introduce tu clave..."
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowGeminiKey(!showGeminiKey)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                            title={showGeminiKey ? "Ocultar API key" : "Mostrar API key"}
+                                        >
+                                            {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -533,12 +547,20 @@ function AdminContent() {
                                     <div className="relative">
                                         <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
                                         <input
-                                            type="password"
+                                            type={showApolloKey ? "text" : "password"}
                                             value={apolloKey}
                                             onChange={(e) => setApolloKey(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                            className="w-full pl-10 pr-10 py-2 bg-gray-50/50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                             placeholder="Introduce tu clave Apollo..."
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowApolloKey(!showApolloKey)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                            title={showApolloKey ? "Ocultar API key" : "Mostrar API key"}
+                                        >
+                                            {showApolloKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
                                     </div>
                                     <div className="flex items-center space-x-1 text-[10px] text-gray-400">
                                         <Info size={12} />
