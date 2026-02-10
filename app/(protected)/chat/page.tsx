@@ -397,24 +397,83 @@ export default function ChatDashboard() {
                                     </div>
 
                                     {/* Installation Code */}
-                                    <div className="mt-12 bg-gray-900 rounded-2xl p-6 text-white">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <h3 className="font-bold flex items-center gap-2">
-                                                <CheckCircle className="w-5 h-5 text-green-400" />
-                                                Instalar en tu sitio web
-                                            </h3>
-                                            <button
-                                                type="button"
-                                                onClick={copySnippet}
-                                                className="flex items-center gap-2 text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
-                                            >
-                                                {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                                                {copied ? '¡Copiado!' : 'Copiar Código'}
-                                            </button>
+                                    <div className="mt-12 space-y-6">
+                                        {/* Option 1: Automatic Script */}
+                                        <div className="bg-gray-900 rounded-2xl p-6 text-white">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="font-bold flex items-center gap-2">
+                                                    <CheckCircle className="w-5 h-5 text-green-400" />
+                                                    Opción 1: Script Automático (Recomendado)
+                                                </h3>
+                                                <button
+                                                    type="button"
+                                                    onClick={copySnippet}
+                                                    className="flex items-center gap-2 text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+                                                >
+                                                    {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                                                    {copied ? '¡Copiado!' : 'Copiar Código'}
+                                                </button>
+                                            </div>
+                                            <p className="text-gray-400 text-xs mb-4">Pega este script justo antes de la etiqueta <code className="text-blue-300">{'</body>'}</code> de tu página HTML.</p>
+                                            <div className="bg-black/50 p-4 rounded-lg border border-white/5 font-mono text-xs text-blue-300 overflow-x-auto whitespace-nowrap">
+                                                {`<script src="${typeof window !== 'undefined' ? window.location.origin : ''}/embed.js" async></script>`}
+                                            </div>
                                         </div>
-                                        <p className="text-gray-400 text-xs mb-4">Pega este script justo antes de la etiqueta <code className="text-blue-300">{'</body>'}</code> de tu página HTML.</p>
-                                        <div className="bg-black/50 p-4 rounded-lg border border-white/5 font-mono text-xs text-blue-300 overflow-x-auto whitespace-nowrap">
-                                            {`<script src="${typeof window !== 'undefined' ? window.location.origin : ''}/embed.js" async></script>`}
+
+                                        {/* Option 2: Manual HTML */}
+                                        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="font-bold flex items-center gap-2 text-gray-900">
+                                                    <SettingsIcon className="w-5 h-5 text-gray-500" />
+                                                    Opción 2: Código Manual (Alternativa)
+                                                </h3>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const url = window.location.origin
+                                                        const manualCode = `
+<div id="abu-chat-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 2147483647; width: 64px; height: 64px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
+  <iframe id="abu-chat-iframe" src="${url}/chat-widget" style="width: 100%; height: 100%; border: none; border-radius: 32px; background-color: transparent; color-scheme: light;" allowtransparency="true"></iframe>
+</div>
+<script>
+window.addEventListener('message', (event) => {
+  if (event.origin !== "${url}") return;
+  const container = document.getElementById('abu-chat-container');
+  const iframe = document.getElementById('abu-chat-iframe');
+  if (event.data.type === 'ABU_CHAT_TOGGLE') {
+    if (event.data.isOpen) {
+      container.style.width = '400px';
+      container.style.height = '650px';
+      container.style.maxWidth = '90vw';
+      container.style.maxHeight = '90vh';
+      container.style.bottom = '10px';
+      container.style.right = '10px';
+      iframe.style.boxShadow = '0 10px 40px rgba(0,0,0,0.15)';
+      iframe.style.borderRadius = '16px';
+    } else {
+      container.style.width = '64px';
+      container.style.height = '64px';
+      container.style.bottom = '20px';
+      container.style.right = '20px';
+      iframe.style.boxShadow = 'none';
+      iframe.style.borderRadius = '32px';
+    }
+  }
+});
+</script>`.trim()
+                                                        navigator.clipboard.writeText(manualCode)
+                                                        alert('Código manual copiado al portapapeles')
+                                                    }}
+                                                    className="flex items-center gap-2 text-xs font-bold bg-white border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors text-gray-700"
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                    Copiar HTML
+                                                </button>
+                                            </div>
+                                            <p className="text-gray-500 text-xs mb-4">
+                                                Si el script automático no funciona (por bloqueos de red o seguridad), usa este código.
+                                                Copia y pega todo este bloque directamente en el HTML de tu página, antes del cierre de body.
+                                            </p>
                                         </div>
                                     </div>
                                 </form>
