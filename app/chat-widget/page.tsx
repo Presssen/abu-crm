@@ -159,10 +159,14 @@ export default function ChatWidget() {
         window.parent.postMessage({ type: 'ABU_CHAT_TOGGLE', isOpen: newState }, '*')
     }
 
-    if (!sessionId && !isPreview) return null
+    // If session creation fails, we still want to show the button
+    // The session will be retried when they try to send a message or we can silently retry
+
+    // Only return null if we are not in preview AND we want to hide it completely (which we don't anymore)
+    // if (!sessionId && !isPreview) return null 
 
     return (
-        <div className="flex flex-col h-full bg-white relative font-sans" style={{ '--primary-chat': settings.primary_color } as any}>
+        <div className="flex flex-col h-full bg-transparent relative font-sans" style={{ '--primary-chat': settings.primary_color } as any}>
             {isOpen && (
                 <div className="flex flex-col h-full w-full shadow-xl rounded-lg overflow-hidden border border-gray-100 bg-white">
                     {/* Header */}
@@ -178,11 +182,16 @@ export default function ChatWidget() {
 
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 min-h-0">
+                        {messages.length === 0 && !loading && (
+                            <div className="flex h-full items-center justify-center text-gray-400 text-xs">
+                                <p>Cargando historial...</p>
+                            </div>
+                        )}
                         {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.sender_type === 'visitor' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm ${m.sender_type === 'visitor'
-                                        ? 'text-white rounded-br-none'
-                                        : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                                    ? 'text-white rounded-br-none'
+                                    : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
                                     }`} style={m.sender_type === 'visitor' ? { backgroundColor: settings.primary_color } : {}}>
                                     {m.content}
                                 </div>
@@ -206,7 +215,7 @@ export default function ChatWidget() {
                             <button
                                 onClick={handleSend}
                                 disabled={!input.trim() || loading}
-                                className="text-white p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                                className="text-white p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 flex items-center justify-center"
                                 style={{ backgroundColor: settings.primary_color }}
                             >
                                 <Send size={18} />
