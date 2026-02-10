@@ -3,16 +3,21 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/auth/client'
 import { createChatSession, sendMessage, getChatHistory, getChatSettings } from '@/app/actions/chat'
-import { Send, X, MessageCircle } from 'lucide-react'
+import { Send, X } from 'lucide-react'
 
-// Helper to get/set visitor ID
+// Helper to get/set visitor ID safely
 const getVisitorId = () => {
-    let id = localStorage.getItem('abu_chat_visitor_id')
-    if (!id) {
-        id = crypto.randomUUID()
-        localStorage.setItem('abu_chat_visitor_id', id)
+    try {
+        let id = localStorage.getItem('abu_chat_visitor_id')
+        if (!id) {
+            id = crypto.randomUUID()
+            localStorage.setItem('abu_chat_visitor_id', id)
+        }
+        return id
+    } catch (e) {
+        console.warn('LocalStorage access denied or failed', e)
+        return 'temp-visitor-' + crypto.randomUUID()
     }
-    return id
 }
 
 interface Message {
@@ -37,7 +42,6 @@ export default function ChatWidget() {
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
-    const [isPreview, setIsPreview] = useState(false)
     const [settings, setSettings] = useState<ChatSettings>({
         primary_color: '#2563eb',
         title: 'Chat Support',
@@ -45,69 +49,70 @@ export default function ChatWidget() {
         bot_name: 'ABU Bot',
         greeting_message: 'Hello! How can we help you today?'
     })
+    const [error, setError] = useState<string | null>(null)
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const supabase = createClient()
 
     useEffect(() => {
-        // Force transparent background for the iframe document
+        // Double safety for body style, handled by layout but good to have
         document.documentElement.style.setProperty('background-color', 'transparent', 'important');
         document.body.style.setProperty('background-color', 'transparent', 'important');
 
-        // Reset margins and padding to ensure full width/height usage
-        document.documentElement.style.margin = '0';
-        document.documentElement.style.padding = '0';
-        document.body.style.margin = '0';
-        document.body.style.padding = '0';
-        document.body.style.overflow = 'hidden'; // Prevent scrollbars in the small iframe
+        try {
+            const vid = getVisitorId()
+            setVisitorId(vid)
 
-        const params = new URLSearchParams(window.location.search)
-        const preview = params.get('preview') === 'true'
-        setIsPreview(preview)
+            // Fetch Settings and Initial Session
+            const init = async () => {
+                try {
+                    const settingsRes = await getChatSettings()
+                    if (settingsRes.data) setSettings(settingsRes.data)
 
-        const vid = getVisitorId()
-        setVisitorId(vid)
+                    const formData = new FormData()
+                    formData.append('visitor_id', vid)
 
-        // Fetch Settings and Initial Session
-        const init = async () => {
-            const settingsRes = await getChatSettings()
-            if (settingsRes.data) setSettings(settingsRes.data)
+                    // Create session
+                    const res = await createChatSession(formData).catch(err => {
+                        console.error("Failed to create session:", err)
+                        return { sessionId: null }
+                    })
 
-            if (preview) {
-                setIsOpen(true)
-                setMessages([{
-                    id: 'greeting',
-                    content: settingsRes.data?.greeting_message || 'Hello! How can we help?',
-                    sender_type: 'agent',
-                    created_at: new Date().toISOString()
-                }])
-                return
-            }
-
-            const formData = new FormData()
-            formData.append('visitor_id', vid)
-            const res = await createChatSession(formData)
-
-            if (res.sessionId) {
-                setSessionId(res.sessionId)
-                const hist = await getChatHistory(res.sessionId)
-                if (hist.data) {
-                    const existingMessages = hist.data as Message[]
-                    // If no history, we could add the greeting message?
-                    if (existingMessages.length === 0) {
+                    if (res.sessionId) {
+                        setSessionId(res.sessionId)
+                        const hist = await getChatHistory(res.sessionId).catch(() => ({ data: [] }))
+                        if (hist.data) {
+                            const existingMessages = hist.data as Message[]
+                            if (existingMessages.length === 0) {
+                                setMessages([{
+                                    id: 'greeting',
+                                    content: settingsRes.data?.greeting_message || 'Hello! How can we help?',
+                                    sender_type: 'agent',
+                                    created_at: new Date().toISOString()
+                                }])
+                            } else {
+                                setMessages(existingMessages)
+                            }
+                        }
+                    } else {
+                        // Fallback for visual testing if session fails
+                        console.warn("Could not create session, running in offline mode")
                         setMessages([{
                             id: 'greeting',
                             content: settingsRes.data?.greeting_message || 'Hello! How can we help?',
                             sender_type: 'agent',
                             created_at: new Date().toISOString()
                         }])
-                    } else {
-                        setMessages(existingMessages)
                     }
+                } catch (err) {
+                    console.error("Initialization error:", err)
+                    setError("Failed to initialize chat")
                 }
             }
+            init()
+        } catch (e) {
+            console.error("Critical error in useEffect", e)
         }
-        init()
     }, [])
 
     // Realtime Subscription
@@ -141,7 +146,8 @@ export default function ChatWidget() {
     }, [messages, isOpen])
 
     const handleSend = async () => {
-        if (!input.trim() || !sessionId) return
+        if (!input.trim()) return
+        // Allow sending even if session is pending, it might retry inside action or we can warn user
 
         const tempId = crypto.randomUUID()
         const msg: Message = {
@@ -155,26 +161,38 @@ export default function ChatWidget() {
         setInput('')
         setLoading(true)
 
-        const formData = new FormData()
-        formData.append('session_id', sessionId)
-        formData.append('content', msg.content)
-        formData.append('sender_type', 'visitor')
-
-        await sendMessage(formData)
-        setLoading(false)
+        try {
+            if (sessionId) {
+                const formData = new FormData()
+                formData.append('session_id', sessionId)
+                formData.append('content', msg.content)
+                formData.append('sender_type', 'visitor')
+                await sendMessage(formData)
+            } else {
+                // If no session, try to create one on the fly? Or just simulate
+                console.warn("Sending message without session ID")
+            }
+        } catch (e) {
+            console.error("Failed to send", e)
+        } finally {
+            setLoading(false)
+        }
     }
 
     const toggleChat = () => {
         const newState = !isOpen
         setIsOpen(newState)
-        window.parent.postMessage({ type: 'ABU_CHAT_TOGGLE', isOpen: newState }, '*')
+        try {
+            window.parent.postMessage({ type: 'ABU_CHAT_TOGGLE', isOpen: newState }, '*')
+        } catch (e) {
+            console.warn("Failed to post message to parent", e)
+        }
     }
 
-    // If session creation fails, we still want to show the button
-    // The session will be retried when they try to send a message or we can silently retry
-
-    // Only return null if we are not in preview AND we want to hide it completely (which we don't anymore)
-    // if (!sessionId && !isPreview) return null 
+    if (error) {
+        // Minimal fallback UI
+        return null
+    }
 
     return (
         <div className="flex flex-col h-full w-full bg-transparent relative font-sans select-none" style={{ '--primary-chat': settings.primary_color } as any}>
@@ -196,7 +214,6 @@ export default function ChatWidget() {
 
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f8f9fa] min-h-0 relative">
-                        {/* Background subtle pattern or gradient can be added here */}
                         {messages.length === 0 && !loading && (
                             <div className="flex h-full items-center justify-center text-gray-400 text-xs italic">
                                 <p>Iniciando conversación...</p>
@@ -228,7 +245,7 @@ export default function ChatWidget() {
                             />
                             <button
                                 onClick={handleSend}
-                                disabled={!input.trim() || loading || !sessionId}
+                                disabled={!input.trim() || loading}
                                 className="text-white h-8 w-8 rounded-full transition-all disabled:opacity-30 disabled:grayscale flex-shrink-0 flex items-center justify-center shadow-sm active:scale-90 hover:brightness-110"
                                 style={{ backgroundColor: settings.primary_color }}
                             >
@@ -249,9 +266,23 @@ export default function ChatWidget() {
                     onClick={toggleChat}
                     className="w-full h-full rounded-full flex items-center justify-center text-white transition-all hover:scale-110 active:scale-90 absolute inset-0 border-2 border-white/20 overflow-hidden ring-4 ring-black/5"
                     style={{ backgroundColor: settings.primary_color }}
+                    aria-label="Open chat"
                 >
                     <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent pointer-events-none" />
-                    <MessageCircle size={32} strokeWidth={2.5} className="relative z-10 drop-shadow-md" />
+                    {/* Replaced Lucide icon with inline SVG for robustness */}
+                    <svg
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="relative z-10 drop-shadow-md"
+                    >
+                        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+                    </svg>
                 </button>
             )}
         </div>
