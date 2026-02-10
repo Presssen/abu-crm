@@ -164,25 +164,25 @@ export default function ChatWidget() {
     return (
         <div className="flex flex-col h-full bg-white relative font-sans" style={{ '--primary-chat': settings.primary_color } as any}>
             {isOpen && (
-                <div className="flex flex-col h-[500px] w-full sm:w-[350px] shadow-xl rounded-lg overflow-hidden border border-gray-100 bg-white fixed bottom-20 right-4 sm:static sm:h-full sm:w-full">
+                <div className="flex flex-col h-full w-full shadow-xl rounded-lg overflow-hidden border border-gray-100 bg-white">
                     {/* Header */}
-                    <div className="p-4 text-white flex justify-between items-center shadow-sm" style={{ backgroundColor: settings.primary_color }}>
-                        <div>
-                            <h3 className="font-bold">{settings.title}</h3>
-                            <p className="text-xs opacity-90">{settings.subtitle}</p>
+                    <div className="p-4 text-white flex justify-between items-center shadow-sm flex-shrink-0" style={{ backgroundColor: settings.primary_color }}>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="font-bold truncate">{settings.title}</h3>
+                            <p className="text-xs opacity-90 truncate">{settings.subtitle}</p>
                         </div>
-                        <button onClick={toggleChat} className="sm:hidden text-white hover:opacity-80">
+                        <button onClick={toggleChat} className="text-white hover:opacity-80 ml-2 flex-shrink-0">
                             <X size={20} />
                         </button>
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 min-h-0">
                         {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.sender_type === 'visitor' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm ${m.sender_type === 'visitor'
-                                    ? 'text-white rounded-br-none'
-                                    : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                                        ? 'text-white rounded-br-none'
+                                        : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
                                     }`} style={m.sender_type === 'visitor' ? { backgroundColor: settings.primary_color } : {}}>
                                     {m.content}
                                 </div>
@@ -192,11 +192,11 @@ export default function ChatWidget() {
                     </div>
 
                     {/* Input */}
-                    <div className="p-3 bg-white border-t border-gray-100">
+                    <div className="p-3 bg-white border-t border-gray-100 flex-shrink-0">
                         <div className="flex items-center gap-2">
                             <input
                                 type="text"
-                                className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all text-gray-700"
+                                className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all text-gray-700 min-w-0"
                                 style={{ borderColor: 'transparent', focusColor: settings.primary_color } as any}
                                 placeholder="Escribe un mensaje..."
                                 value={input}
@@ -206,14 +206,14 @@ export default function ChatWidget() {
                             <button
                                 onClick={handleSend}
                                 disabled={!input.trim() || loading}
-                                className="text-white p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-white p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                                 style={{ backgroundColor: settings.primary_color }}
                             >
                                 <Send size={18} />
                             </button>
                         </div>
                     </div>
-                    <div className="pb-1 text-center bg-gray-50">
+                    <div className="pb-1 text-center bg-gray-50 flex-shrink-0">
                         <a href="https://abuapp.io" target="_blank" className="text-[10px] text-gray-400 font-medium hover:text-gray-500">Powered by ABU CRM</a>
                     </div>
                 </div>
