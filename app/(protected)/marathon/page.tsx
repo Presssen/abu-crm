@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
+import ApolloEnrichmentModal from '../components/ApolloEnrichmentModal'
 import { enrichLead } from '@/app/actions/enrich-lead'
 import SendEmailModal from '../components/SendEmailModal'
 import CreateMeetingModal from '../components/CreateMeetingModal'
@@ -74,6 +75,7 @@ export default function MarathonPage() {
     const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false)
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
     const [isLogCallModalOpen, setIsLogCallModalOpen] = useState(false)
+    const [showApolloModal, setShowApolloModal] = useState(false)
     const [taskInitialTitle, setTaskInitialTitle] = useState('')
     const [emailInitialTo, setEmailInitialTo] = useState('')
     const { showSuccess, showError } = useNotification()
@@ -288,6 +290,12 @@ export default function MarathonPage() {
         handleNext()
     }
 
+    const handleApolloSuccess = () => {
+        if (currentLead) {
+            fetchActivity(currentLead.id)
+        }
+    }
+
     const handleEnrich = async () => {
         if (!currentLead?.domain) {
             showSuccess('Web no disponible para investigar')
@@ -474,6 +482,14 @@ export default function MarathonPage() {
                     onSuccess={() => fetchActivity(currentLead.id)}
                     leadId={currentLead.id}
                     leadName={currentLead.company_name}
+                />
+
+                <ApolloEnrichmentModal
+                    isOpen={showApolloModal}
+                    onClose={() => setShowApolloModal(false)}
+                    leadId={currentLead?.id || ''}
+                    domain={currentLead?.domain || ''}
+                    onSuccess={handleApolloSuccess}
                 />
             </>
         )
@@ -923,6 +939,75 @@ export default function MarathonPage() {
                             </div>
                         </div>
 
+                        {/* Additional Contacts Section - Read Mode */}
+                        {contacts.length > 0 && (
+                            <>
+                                <div className="h-px w-full bg-gray-100" />
+                                <div>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                                            <User size={12} className="mr-1.5" /> Contactos Adicionales
+                                        </h3>
+                                        <button
+                                            onClick={() => setIsEditingLead(true)}
+                                            className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
+                                        >
+                                            <Plus size={12} />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {contacts.map((contact) => (
+                                            <div key={contact.id} className="p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all space-y-2">
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-gray-900">{contact.name}</h4>
+                                                        <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider mt-0.5">
+                                                            {contact.job_title || 'Colaborador'}
+                                                        </p>
+                                                    </div>
+                                                    {contact.is_primary && (
+                                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[8px] font-bold uppercase">
+                                                            Principal
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                                                    {contact.email && (
+                                                        <div className="flex items-center justify-between group">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <Mail size={10} className="text-gray-400 shrink-0" />
+                                                                <span className="text-[11px] text-gray-600 font-medium truncate">{contact.email}</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEmailInitialTo(contact.email)
+                                                                    setIsEmailModalOpen(true)
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 p-1 bg-gray-900 text-white rounded-md hover:bg-black transition-all"
+                                                            >
+                                                                <Mail size={8} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {contact.phone && (
+                                                        <div className="flex items-center gap-2">
+                                                            <Phone size={10} className="text-gray-400 shrink-0" />
+                                                            <a
+                                                                href={`tel:${contact.phone}`}
+                                                                className="text-[11px] text-gray-600 font-medium hover:text-emerald-600 transition-colors"
+                                                            >
+                                                                {contact.phone}
+                                                            </a>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
                         <div className="h-px w-full bg-gray-100" />
 
                         {/* 3. Activity History */}
@@ -1060,6 +1145,20 @@ export default function MarathonPage() {
                                         </span>
                                     </div>
                                     {!enriching && <div className="bg-white px-1.5 py-0.5 rounded text-[9px] font-bold text-indigo-400 border border-indigo-100">AI</div>}
+                                </button>
+
+                                <button
+                                    onClick={() => setShowApolloModal(true)}
+                                    disabled={!currentLead?.domain}
+                                    className="w-full flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-xl hover:bg-blue-100 transition-all group disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                                >
+                                    <div className="flex items-center">
+                                        <Sparkles size={16} className="mr-2 text-blue-600" />
+                                        <span className="text-xs font-bold text-blue-700">
+                                            Buscar Contactos en Apollo
+                                        </span>
+                                    </div>
+                                    <ChevronRight size={14} className="text-blue-400 group-hover:translate-x-0.5 transition-transform" />
                                 </button>
                             </div>
 
