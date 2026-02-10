@@ -23,7 +23,9 @@ import {
     Save,
     Building2,
     Target,
-    Tag
+    Tag,
+    Star,
+    Trash2
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
@@ -77,17 +79,19 @@ export default function MarathonPage() {
     const { showSuccess, showError } = useNotification()
 
     const [isEditingLead, setIsEditingLead] = useState(false)
+    const [contacts, setContacts] = useState<any[]>([])
     const [editForm, setEditForm] = useState({
         company_name: '',
         contact_name: '',
         contact_role: '',
+        emails: [''],
+        phones: [''],
         domain: '',
-        email: '',
-        phone: '',
         city: '',
         country: '',
         categories: '',
-        status: ''
+        status: '',
+        notes: ''
     })
 
     const [isMobile, setIsMobile] = useState(false)
@@ -113,13 +117,14 @@ export default function MarathonPage() {
                 company_name: leads[currentIndex].company_name || '',
                 contact_name: leads[currentIndex].contact_name || '',
                 contact_role: leads[currentIndex].contact_role || '',
+                emails: leads[currentIndex].email ? leads[currentIndex].email.split(':').map((e: string) => e.trim()).filter(Boolean) : [''],
+                phones: leads[currentIndex].phone ? leads[currentIndex].phone.split(':').map((p: string) => p.trim()).filter(Boolean) : [''],
                 domain: leads[currentIndex].domain || '',
-                email: leads[currentIndex].email || '',
-                phone: leads[currentIndex].phone || '',
                 city: leads[currentIndex].city || '',
                 country: leads[currentIndex].country || '',
                 categories: leads[currentIndex].categories || '',
-                status: leads[currentIndex].status || ''
+                status: leads[currentIndex].status || '',
+                notes: leads[currentIndex].notes || ''
             })
             setIsEditingLead(false)
         }
@@ -134,13 +139,15 @@ export default function MarathonPage() {
                 .update({
                     company_name: editForm.company_name,
                     contact_name: editForm.contact_name,
+                    contact_role: editForm.contact_role,
+                    email: editForm.emails.filter(Boolean).join(' : '),
+                    phone: editForm.phones.filter(Boolean).join(' : '),
                     domain: editForm.domain,
-                    email: editForm.email,
-                    phone: editForm.phone,
                     city: editForm.city,
                     country: editForm.country,
                     categories: editForm.categories,
-                    status: editForm.status
+                    status: editForm.status,
+                    notes: editForm.notes
                 })
                 .eq('id', currentLead.id)
 
@@ -149,13 +156,24 @@ export default function MarathonPage() {
             const updatedLeads = [...leads]
             updatedLeads[currentIndex] = {
                 ...currentLead,
-                ...editForm
+                company_name: editForm.company_name,
+                contact_name: editForm.contact_name,
+                contact_role: editForm.contact_role,
+                email: editForm.emails.filter(Boolean).join(' : '),
+                phone: editForm.phones.filter(Boolean).join(' : '),
+                domain: editForm.domain,
+                city: editForm.city,
+                country: editForm.country,
+                categories: editForm.categories,
+                status: editForm.status,
+                notes: editForm.notes
             }
             setLeads(updatedLeads)
             setIsEditingLead(false)
-            showSuccess('Lead actualizado')
+            showSuccess('Lead actualizado correctamente')
         } catch (error) {
             console.error('Error updating lead:', error)
+            showError('Error al actualizar el lead')
         } finally {
             setSavingDetails(false)
         }
@@ -221,17 +239,19 @@ export default function MarathonPage() {
 
     const fetchActivity = async (leadId: string) => {
         try {
-            const [emailsData, meetingsData, tasksData, callsData] = await Promise.all([
+            const [emailsData, meetingsData, tasksData, callsData, contactsData] = await Promise.all([
                 supabase.from('emails').select('*').eq('lead_id', leadId).order('sent_at', { ascending: false }),
                 supabase.from('meetings').select('*').eq('lead_id', leadId).order('start_time', { ascending: false }),
                 supabase.from('tasks').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }),
-                supabase.from('calls').select('*').eq('lead_id', leadId).order('created_at', { ascending: false })
+                supabase.from('calls').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }),
+                supabase.from('lead_contacts').select('*').eq('lead_id', leadId).order('is_primary', { ascending: false })
             ])
 
             setEmailHistory(emailsData.data || [])
             setMeetings(meetingsData.data || [])
             setTasks(tasksData.data || [])
             setCalls(callsData.data || [])
+            setContacts(contactsData.data || [])
         } catch (error) {
             console.error('Error fetching activity:', error)
         }
@@ -323,6 +343,47 @@ export default function MarathonPage() {
             showSuccess('Error al investigar')
         } finally {
             setEnriching(false)
+        }
+    }
+
+    const handleAddContact = async () => {
+        if (!currentLead) return
+        const { data, error } = await supabase
+            .from('lead_contacts')
+            .insert({
+                lead_id: currentLead.id,
+                name: 'Nuevo Contacto',
+                is_primary: contacts.length === 0
+            })
+            .select()
+            .single()
+
+        if (!error && data) {
+            setContacts([...contacts, data])
+        }
+    }
+
+    const handleDeleteContact = async (contactId: string) => {
+        if (!confirm('¿Eliminar este contacto?')) return
+        const { error } = await supabase
+            .from('lead_contacts')
+            .delete()
+            .eq('id', contactId)
+
+        if (!error) {
+            setContacts(contacts.filter(c => c.id !== contactId))
+            showSuccess('Contacto eliminado')
+        }
+    }
+
+    const handleUpdateContact = async (contactId: string, updates: any) => {
+        const { error } = await supabase
+            .from('lead_contacts')
+            .update(updates)
+            .eq('id', contactId)
+
+        if (!error) {
+            setContacts(contacts.map(c => c.id === contactId ? { ...c, ...updates } : c))
         }
     }
 
@@ -484,40 +545,271 @@ export default function MarathonPage() {
                             </div>
 
                             {isEditingLead ? (
-                                <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                                    <input
-                                        type="text"
-                                        value={editForm.company_name}
-                                        onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
-                                        className="block w-full text-xl font-bold bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                        placeholder="Nombre de empresa"
-                                    />
-                                    <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-4 bg-gray-50 p-5 rounded-xl border border-gray-200">
+                                    {/* Company Name */}
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Empresa</label>
                                         <input
                                             type="text"
-                                            value={editForm.contact_name}
-                                            onChange={(e) => setEditForm({ ...editForm, contact_name: e.target.value })}
-                                            className="block w-full text-sm font-medium bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                            placeholder="Persona de contacto"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={editForm.contact_role}
-                                            onChange={(e) => setEditForm({ ...editForm, contact_role: e.target.value })}
-                                            className="block w-full text-sm font-medium bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                            placeholder="Cargo"
+                                            value={editForm.company_name}
+                                            onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
+                                            className="block w-full text-xl font-bold bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                            placeholder="Nombre de empresa"
                                         />
                                     </div>
-                                    <div className="flex gap-2 pt-2">
+
+                                    {/* Contact Name & Role */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Contacto Principal</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.contact_name}
+                                                onChange={(e) => setEditForm({ ...editForm, contact_name: e.target.value })}
+                                                className="block w-full text-sm font-medium bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                                placeholder="Nombre"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Cargo</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.contact_role}
+                                                onChange={(e) => setEditForm({ ...editForm, contact_role: e.target.value })}
+                                                className="block w-full text-sm font-medium bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                                placeholder="CEO, Manager..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Emails Array */}
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2 flex items-center">
+                                            <Mail size={12} className="mr-1.5" /> Emails
+                                        </label>
+                                        <div className="space-y-2">
+                                            {editForm.emails.map((email, idx) => (
+                                                <div key={idx} className="flex items-center gap-2">
+                                                    <input
+                                                        type="email"
+                                                        value={email}
+                                                        onChange={(e) => {
+                                                            const newEmails = [...editForm.emails]
+                                                            newEmails[idx] = e.target.value
+                                                            setEditForm({ ...editForm, emails: newEmails })
+                                                        }}
+                                                        className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                        placeholder="email@empresa.com"
+                                                    />
+                                                    {idx === 0 && <Star size={14} className="text-amber-500 fill-amber-500" />}
+                                                    {editForm.emails.length > 1 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const newEmails = editForm.emails.filter((_, i) => i !== idx)
+                                                                setEditForm({ ...editForm, emails: newEmails.length ? newEmails : [''] })
+                                                            }}
+                                                            className="p-1.5 hover:bg-rose-50 rounded-md text-gray-400 hover:text-rose-500"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            <button
+                                                onClick={() => setEditForm({ ...editForm, emails: [...editForm.emails, ''] })}
+                                                className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                                            >
+                                                <Plus size={12} /> Añadir Email
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Phones Array */}
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2 flex items-center">
+                                            <Phone size={12} className="mr-1.5" /> Teléfonos
+                                        </label>
+                                        <div className="space-y-2">
+                                            {editForm.phones.map((phone, idx) => (
+                                                <div key={idx} className="flex items-center gap-2">
+                                                    <input
+                                                        type="tel"
+                                                        value={phone}
+                                                        onChange={(e) => {
+                                                            const newPhones = [...editForm.phones]
+                                                            newPhones[idx] = e.target.value
+                                                            setEditForm({ ...editForm, phones: newPhones })
+                                                        }}
+                                                        className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                        placeholder="+34..."
+                                                    />
+                                                    {idx === 0 && <Star size={14} className="text-amber-500 fill-amber-500" />}
+                                                    {editForm.phones.length > 1 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const newPhones = editForm.phones.filter((_, i) => i !== idx)
+                                                                setEditForm({ ...editForm, phones: newPhones.length ? newPhones : [''] })
+                                                            }}
+                                                            className="p-1.5 hover:bg-rose-50 rounded-md text-gray-400 hover:text-rose-500"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            <button
+                                                onClick={() => setEditForm({ ...editForm, phones: [...editForm.phones, ''] })}
+                                                className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                                            >
+                                                <Plus size={12} /> Añadir Teléfono
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Domain & Status */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2 flex items-center">
+                                                <Globe size={12} className="mr-1.5" /> Web
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={editForm.domain}
+                                                onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })}
+                                                className="block w-full text-sm font-medium bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                placeholder="www.empresa.com"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2 flex items-center">
+                                                <Target size={12} className="mr-1.5" /> Estado
+                                            </label>
+                                            <select
+                                                value={editForm.status}
+                                                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                                className="block w-full text-sm font-medium bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            >
+                                                <option value="new">Nuevo</option>
+                                                <option value="contacted">Contactado</option>
+                                                <option value="demo_scheduled">Demo Agendada</option>
+                                                <option value="proposal_sent">Propuesta Enviada</option>
+                                                <option value="won">Ganado</option>
+                                                <option value="lost">Perdido</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Location */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Ciudad</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.city}
+                                                onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                                                className="block w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                placeholder="Madrid"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">País</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.country}
+                                                onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                                                className="block w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                placeholder="España"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Category */}
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2 flex items-center">
+                                            <Tag size={12} className="mr-1.5" /> Sector
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={editForm.categories}
+                                            onChange={(e) => setEditForm({ ...editForm, categories: e.target.value })}
+                                            className="block w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            placeholder="Tecnología, Retail..."
+                                        />
+                                    </div>
+
+                                    {/* Additional Contacts Section */}
+                                    <div className="border-t border-gray-200 pt-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                                                <User size={12} className="mr-1.5" /> Contactos Adicionales
+                                            </label>
+                                            <button
+                                                onClick={handleAddContact}
+                                                className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                                            >
+                                                <Plus size={12} /> Añadir
+                                            </button>
+                                        </div>
+                                        {contacts.length > 0 && (
+                                            <div className="space-y-2">
+                                                {contacts.map((contact) => (
+                                                    <div key={contact.id} className="p-3 bg-white rounded-lg border border-gray-200 space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={contact.name}
+                                                                onChange={(e) => handleUpdateContact(contact.id, { name: e.target.value })}
+                                                                className="flex-1 text-sm font-semibold bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
+                                                                placeholder="Nombre"
+                                                            />
+                                                            <button
+                                                                onClick={() => handleDeleteContact(contact.id)}
+                                                                className="p-1 text-rose-500 hover:bg-rose-50 rounded"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={contact.job_title || ''}
+                                                            onChange={(e) => handleUpdateContact(contact.id, { job_title: e.target.value })}
+                                                            className="w-full text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
+                                                            placeholder="Cargo"
+                                                        />
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <input
+                                                                type="email"
+                                                                value={contact.email || ''}
+                                                                onChange={(e) => handleUpdateContact(contact.id, { email: e.target.value })}
+                                                                className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
+                                                                placeholder="Email"
+                                                            />
+                                                            <input
+                                                                type="tel"
+                                                                value={contact.phone || ''}
+                                                                onChange={(e) => handleUpdateContact(contact.id, { phone: e.target.value })}
+                                                                className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
+                                                                placeholder="Teléfono"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-2 pt-3 border-t border-gray-200">
                                         <button
                                             onClick={handleUpdateLead}
-                                            className="px-4 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-all"
+                                            disabled={savingDetails}
+                                            className="flex-1 px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-black transition-all disabled:opacity-50"
                                         >
-                                            Guardar
+                                            {savingDetails ? 'Guardando...' : 'Guardar Cambios'}
                                         </button>
                                         <button
                                             onClick={() => setIsEditingLead(false)}
-                                            className="px-4 py-1.5 bg-white border border-gray-200 text-gray-500 text-xs font-bold rounded-lg hover:bg-gray-50 transition-all"
+                                            className="px-4 py-2 bg-white border border-gray-200 text-gray-500 text-sm font-bold rounded-lg hover:bg-gray-50 transition-all"
                                         >
                                             Cancelar
                                         </button>
