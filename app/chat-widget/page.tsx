@@ -50,6 +50,17 @@ export default function ChatWidget() {
     const supabase = createClient()
 
     useEffect(() => {
+        // Force transparent background for the iframe document
+        document.documentElement.style.setProperty('background-color', 'transparent', 'important');
+        document.body.style.setProperty('background-color', 'transparent', 'important');
+
+        // Reset margins and padding to ensure full width/height usage
+        document.documentElement.style.margin = '0';
+        document.documentElement.style.padding = '0';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.body.style.overflow = 'hidden'; // Prevent scrollbars in the small iframe
+
         const params = new URLSearchParams(window.location.search)
         const preview = params.get('preview') === 'true'
         setIsPreview(preview)
