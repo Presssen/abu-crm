@@ -21,7 +21,8 @@ import {
     Zap,
     ChevronLeft,
     ChevronRight,
-    DollarSign
+    DollarSign,
+    MessageSquare
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -91,6 +92,7 @@ export default function ProtectedLayout({
         { name: 'Tasks', href: '/tasks', icon: CheckSquare },
         { name: 'Meetings', href: '/meetings', icon: Calendar },
         { name: 'Emails', href: '/emails', icon: Mail },
+        { name: 'Chat', href: '/chat', icon: MessageSquare },
         { name: 'Finances', href: '/finances', icon: DollarSign },
         { name: 'Settings', href: '/settings', icon: Settings },
     ]
