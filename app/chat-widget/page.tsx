@@ -47,9 +47,12 @@ export default function ChatWidget() {
         title: 'Chat Support',
         subtitle: 'We usually reply in a few minutes',
         bot_name: 'ABU Bot',
-        greeting_message: 'Hello! How can we help you today?'
+        greeting_message: 'Hello! How can we help today?'
     })
     const [error, setError] = useState<string | null>(null)
+    const [isRegistered, setIsRegistered] = useState(false)
+    const [formData, setForm] = useState({ shop_name: '', name: '', email: '' })
+    const [formLoading, setFormLoading] = useState(false)
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const supabase = createClient()
@@ -69,17 +72,18 @@ export default function ChatWidget() {
                     const settingsRes = await getChatSettings()
                     if (settingsRes.data) setSettings(settingsRes.data)
 
-                    const formData = new FormData()
-                    formData.append('visitor_id', vid)
+                    // Check if we have an existing active session
+                    const fd = new FormData()
+                    fd.append('visitor_id', vid)
 
-                    // Create session
-                    const res = await createChatSession(formData).catch(err => {
-                        console.error("Failed to create session:", err)
+                    const res = await createChatSession(fd).catch(err => {
+                        console.error("Failed to check for existing session:", err)
                         return { sessionId: null }
                     })
 
                     if (res.sessionId) {
                         setSessionId(res.sessionId)
+                        setIsRegistered(true)
                         const hist = await getChatHistory(res.sessionId).catch(() => ({ data: [] }))
                         if (hist.data) {
                             const existingMessages = hist.data as Message[]
@@ -95,14 +99,9 @@ export default function ChatWidget() {
                             }
                         }
                     } else {
-                        // Fallback for visual testing if session fails
-                        console.warn("Could not create session, running in offline mode")
-                        setMessages([{
-                            id: 'greeting',
-                            content: settingsRes.data?.greeting_message || 'Hello! How can we help?',
-                            sender_type: 'agent',
-                            created_at: new Date().toISOString()
-                        }])
+                        // No active session, user needs to register
+                        setIsRegistered(false)
+                        console.log("No active session found, showing lead form")
                     }
                 } catch (err) {
                     console.error("Initialization error:", err)
@@ -145,9 +144,41 @@ export default function ChatWidget() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages, isOpen])
 
+    const handleFormSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!formData.shop_name || !formData.name || !formData.email) return
+        setFormLoading(true)
+
+        try {
+            const fd = new FormData()
+            fd.append('visitor_id', visitorId)
+            fd.append('shop_name', formData.shop_name)
+            fd.append('name', formData.name)
+            fd.append('email', formData.email)
+
+            const res = await createChatSession(fd)
+            if (res.sessionId) {
+                setSessionId(res.sessionId)
+                setIsRegistered(true)
+                setMessages([{
+                    id: 'greeting',
+                    content: settings.greeting_message || 'Hello! How can we help?',
+                    sender_type: 'agent',
+                    created_at: new Date().toISOString()
+                }])
+            } else {
+                setError("Error al crear la sesión")
+            }
+        } catch (e) {
+            console.error("Form submit error", e)
+            setError("Error de conexión")
+        } finally {
+            setFormLoading(false)
+        }
+    }
+
     const handleSend = async () => {
-        if (!input.trim()) return
-        // Allow sending even if session is pending, it might retry inside action or we can warn user
+        if (!input.trim() || !sessionId) return
 
         const tempId = crypto.randomUUID()
         const msg: Message = {
@@ -162,16 +193,11 @@ export default function ChatWidget() {
         setLoading(true)
 
         try {
-            if (sessionId) {
-                const formData = new FormData()
-                formData.append('session_id', sessionId)
-                formData.append('content', msg.content)
-                formData.append('sender_type', 'visitor')
-                await sendMessage(formData)
-            } else {
-                // If no session, try to create one on the fly? Or just simulate
-                console.warn("Sending message without session ID")
-            }
+            const formData = new FormData()
+            formData.append('session_id', sessionId)
+            formData.append('content', msg.content)
+            formData.append('sender_type', 'visitor')
+            await sendMessage(formData)
         } catch (e) {
             console.error("Failed to send", e)
         } finally {
@@ -190,8 +216,11 @@ export default function ChatWidget() {
     }
 
     if (error) {
-        // Minimal fallback UI
-        return null
+        return (
+            <div className="flex items-center justify-center h-full p-4 text-center">
+                <p className="text-red-500 text-xs">{error}</p>
+            </div>
+        )
     }
 
     return (
@@ -215,47 +244,106 @@ export default function ChatWidget() {
                         </button>
                     </div>
 
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f8f9fa] min-h-0 relative">
-                        {messages.length === 0 && !loading && (
-                            <div className="flex h-full items-center justify-center text-gray-400 text-xs italic">
-                                <p>Iniciando conversación...</p>
+                    {!isRegistered ? (
+                        <div className="flex-1 overflow-y-auto p-6 bg-[#f8f9fa] flex flex-col justify-center">
+                            <form onSubmit={handleFormSubmit} className="space-y-4">
+                                <div className="text-center mb-6">
+                                    <h4 className="font-bold text-gray-800 text-sm">Bienvenido</h4>
+                                    <p className="text-gray-500 text-[11px]">Por favor, introduce tus datos para comenzar.</p>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Nombre de la Tienda</label>
+                                        <input
+                                            required
+                                            type="text"
+                                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 transition-all mt-1"
+                                            style={{ '--tw-ring-color': settings.primary_color } as any}
+                                            value={formData.shop_name}
+                                            onChange={e => setForm({ ...formData, shop_name: e.target.value })}
+                                            placeholder="Mi Tienda Online"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Tu Nombre</label>
+                                        <input
+                                            required
+                                            type="text"
+                                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 transition-all mt-1"
+                                            style={{ '--tw-ring-color': settings.primary_color } as any}
+                                            value={formData.name}
+                                            onChange={e => setForm({ ...formData, name: e.target.value })}
+                                            placeholder="Juan Pérez"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Email</label>
+                                        <input
+                                            required
+                                            type="email"
+                                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 transition-all mt-1"
+                                            style={{ '--tw-ring-color': settings.primary_color } as any}
+                                            value={formData.email}
+                                            onChange={e => setForm({ ...formData, email: e.target.value })}
+                                            placeholder="juan@ejemplo.com"
+                                        />
+                                    </div>
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={formLoading}
+                                    className="w-full text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50 mt-4 text-sm"
+                                    style={{ backgroundColor: settings.primary_color }}
+                                >
+                                    {formLoading ? 'Cargando...' : 'Empezar Chat'}
+                                </button>
+                            </form>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Messages */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f8f9fa] min-h-0 relative">
+                                {messages.length === 0 && !loading && (
+                                    <div className="flex h-full items-center justify-center text-gray-400 text-xs italic">
+                                        <p>Iniciando conversación...</p>
+                                    </div>
+                                )}
+                                {messages.map((m) => (
+                                    <div key={m.id} className={`flex ${m.sender_type === 'visitor' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+                                        <div className={`max-w-[85%] rounded-[1.25rem] px-4 py-2.5 text-[13px] leading-relaxed shadow-sm ${m.sender_type === 'visitor'
+                                            ? 'text-white rounded-br-none font-medium'
+                                            : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none shadow-[4px_4px_10px_rgba(0,0,0,0.02)]'
+                                            }`} style={m.sender_type === 'visitor' ? { backgroundColor: settings.primary_color } : {}}>
+                                            {m.content}
+                                        </div>
+                                    </div>
+                                ))}
+                                <div ref={messagesEndRef} />
                             </div>
-                        )}
-                        {messages.map((m) => (
-                            <div key={m.id} className={`flex ${m.sender_type === 'visitor' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                                <div className={`max-w-[85%] rounded-[1.25rem] px-4 py-2.5 text-[13px] leading-relaxed shadow-sm ${m.sender_type === 'visitor'
-                                    ? 'text-white rounded-br-none font-medium'
-                                    : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none shadow-[4px_4px_10px_rgba(0,0,0,0.02)]'
-                                    }`} style={m.sender_type === 'visitor' ? { backgroundColor: settings.primary_color } : {}}>
-                                    {m.content}
+
+                            {/* Input */}
+                            <div className="p-4 bg-white border-t border-gray-100 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-10 flex-shrink-0">
+                                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full pl-4 pr-1 py-1 focus-within:ring-2 focus-within:ring-offset-1 transition-all" style={{ '--tw-ring-color': settings.primary_color } as any}>
+                                    <input
+                                        type="text"
+                                        className="flex-1 bg-transparent border-none py-1.5 text-sm focus:outline-none focus:ring-0 text-gray-700 placeholder:text-gray-400 min-w-0"
+                                        placeholder="Escribe un mensaje..."
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                    />
+                                    <button
+                                        onClick={handleSend}
+                                        disabled={!input.trim() || loading}
+                                        className="text-white h-8 w-8 rounded-full transition-all disabled:opacity-30 disabled:grayscale flex-shrink-0 flex items-center justify-center shadow-sm active:scale-90 hover:brightness-110"
+                                        style={{ backgroundColor: settings.primary_color }}
+                                    >
+                                        <Send size={16} strokeWidth={2.5} />
+                                    </button>
                                 </div>
                             </div>
-                        ))}
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    {/* Input */}
-                    <div className="p-4 bg-white border-t border-gray-100 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-10 flex-shrink-0">
-                        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full pl-4 pr-1 py-1 focus-within:ring-2 focus-within:ring-offset-1 transition-all" style={{ '--tw-ring-color': settings.primary_color } as any}>
-                            <input
-                                type="text"
-                                className="flex-1 bg-transparent border-none py-1.5 text-sm focus:outline-none focus:ring-0 text-gray-700 placeholder:text-gray-400 min-w-0"
-                                placeholder="Escribe un mensaje..."
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                            />
-                            <button
-                                onClick={handleSend}
-                                disabled={!input.trim() || loading}
-                                className="text-white h-8 w-8 rounded-full transition-all disabled:opacity-30 disabled:grayscale flex-shrink-0 flex items-center justify-center shadow-sm active:scale-90 hover:brightness-110"
-                                style={{ backgroundColor: settings.primary_color }}
-                            >
-                                <Send size={16} strokeWidth={2.5} />
-                            </button>
-                        </div>
-                    </div>
+                        </>
+                    )}
                     <div className="py-2 text-center bg-white border-t border-gray-50/50 flex-shrink-0">
                         <a href="https://abuapp.io" target="_blank" className="text-[9px] text-gray-300 font-bold uppercase tracking-widest hover:text-gray-400 transition-colors">
                             Powered by <span style={{ color: settings.primary_color }}>ABU CRM</span>
@@ -271,13 +359,8 @@ export default function ChatWidget() {
                     style={{ backgroundColor: settings.primary_color }}
                     aria-label="Open chat"
                 >
-                    {/* brillo suave */}
                     <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent pointer-events-none" />
-
-                    {/* ring suave (sin recortes) */}
                     <div className="absolute inset-0 rounded-full ring-1 ring-black/10 pointer-events-none" />
-
-                    {/* icono */}
                     <svg
                         width="28"
                         height="28"
@@ -293,7 +376,6 @@ export default function ChatWidget() {
                     </svg>
                 </button>
             )}
-
         </div>
     )
 }

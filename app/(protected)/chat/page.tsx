@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/auth/client'
-import { sendMessage, getChatHistory, closeChatSession, getChatSettings, updateChatSettings } from '@/app/actions/chat'
+import { sendMessage, getChatHistory, closeChatSession, getChatSettings, updateChatSettings, markMessagesAsRead } from '@/app/actions/chat'
 import { Send, CheckCircle, User, MessageSquare, Settings as SettingsIcon, Palette, Bot, Type, Copy, Check } from 'lucide-react'
 
 interface ChatSession {
@@ -31,7 +31,7 @@ interface ChatSettings {
 
 export default function ChatDashboard() {
     const [view, setView] = useState<'chats' | 'settings'>('chats')
-    const [sessions, setSessions] = useState<ChatSession[]>([])
+    const [sessions, setSessions] = useState<(ChatSession & { unread_count?: number, shop_name?: string })[]>([])
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
@@ -57,43 +57,84 @@ export default function ChatDashboard() {
         fetchSettings()
     }, [])
 
-    // Fetch initial sessions
-    useEffect(() => {
-        const fetchSessions = async () => {
-            const { data, error } = await supabase
-                .from('chat_sessions')
-                .select('*')
-                .eq('status', 'active')
-                .order('updated_at', { ascending: false })
+    // Fetch initial sessions with unread counts
+    const fetchSessions = async () => {
+        // Using a join-like approach to get unread counts since Supabase client makes aggregations a bit tricky
+        const { data: sessionsData, error: sessionsError } = await supabase
+            .from('chat_sessions')
+            .select('*')
+            .eq('status', 'active')
+            .order('updated_at', { ascending: false })
 
-            if (data) setSessions(data)
+        if (sessionsData) {
+            // Get unread counts for all these sessions
+            const { data: unreadData } = await supabase
+                .from('chat_messages')
+                .select('session_id')
+                .is('read_at', null)
+                .eq('sender_type', 'visitor')
+                .in('session_id', sessionsData.map(s => s.id))
+
+            const counts = unreadData?.reduce((acc: any, msg) => {
+                acc[msg.session_id] = (acc[msg.session_id] || 0) + 1
+                return acc
+            }, {}) || {}
+
+            setSessions(sessionsData.map(s => ({
+                ...s,
+                unread_count: counts[s.id] || 0
+            })))
         }
+    }
+
+    useEffect(() => {
         fetchSessions()
 
         // Subscribe to NEW sessions or updates
-        const channel = supabase
+        const sessionsChannel = supabase
             .channel('chat_list_updates')
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'chat_sessions'
+            }, () => {
+                fetchSessions()
+            })
+            .subscribe()
+
+        // Subscribe to messages globally to update unread counts on the list
+        const messagesChannel = supabase
+            .channel('global_messages_updates')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'chat_messages'
             }, (payload) => {
-                fetchSessions() // Refresh list on any change
+                if (payload.new.sender_type === 'visitor') {
+                    fetchSessions()
+                }
             })
             .subscribe()
 
         return () => {
-            supabase.removeChannel(channel)
+            supabase.removeChannel(sessionsChannel)
+            supabase.removeChannel(messagesChannel)
         }
     }, [supabase])
 
-    // Load messages when a session is selected
+    // Load messages when a session is selected and mark as read
     useEffect(() => {
         if (!selectedSessionId) return
 
         const loadMessages = async () => {
             const res = await getChatHistory(selectedSessionId)
-            if (res.data) setMessages(res.data as Message[])
+            if (res.data) {
+                setMessages(res.data as Message[])
+                // Mark as read
+                await markMessagesAsRead(selectedSessionId)
+                // Update local session count
+                setSessions(prev => prev.map(s => s.id === selectedSessionId ? { ...s, unread_count: 0 } : s))
+            }
         }
         loadMessages()
 
@@ -111,6 +152,10 @@ export default function ChatDashboard() {
                     if (prev.find(m => m.id === newMsg.id)) return prev
                     return [...prev, newMsg]
                 })
+                // If the new message is from visitor, mark as read if we are looking at it
+                if (newMsg.sender_type === 'visitor') {
+                    markMessagesAsRead(selectedSessionId)
+                }
             })
             .subscribe()
 
@@ -207,18 +252,32 @@ export default function ChatDashboard() {
                                 <div
                                     key={session.id}
                                     onClick={() => setSelectedSessionId(session.id)}
-                                    className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedSessionId === session.id ? 'bg-white shadow-sm border-l-4 border-blue-500' : ''
+                                    className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors relative ${selectedSessionId === session.id ? 'bg-white shadow-sm border-l-4 border-blue-500' : ''
                                         }`}
                                 >
                                     <div className="flex justify-between items-start mb-1">
-                                        <span className="font-semibold text-sm text-gray-900 truncate">
-                                            {session.name || 'Visitante'}
-                                        </span>
-                                        <span className="text-[10px] text-gray-400 whitespace-nowrap ml-2">
-                                            {new Date(session.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                            <span className="font-semibold text-sm text-gray-900 truncate">
+                                                {session.name || 'Visitante'}
+                                            </span>
+                                            {session.shop_name && (
+                                                <span className="text-[10px] text-blue-600 font-bold uppercase truncate">
+                                                    {session.shop_name}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col items-end ml-2">
+                                            <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                                {new Date(session.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                            {session.unread_count ? (
+                                                <span className="mt-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-sm">
+                                                    {session.unread_count}
+                                                </span>
+                                            ) : null}
+                                        </div>
                                     </div>
-                                    <div className="text-xs text-gray-500 truncate">
+                                    <div className="text-xs text-gray-500 truncate mt-1">
                                         {session.email || `ID: ${session.visitor_id.slice(0, 8)}`}
                                     </div>
                                 </div>

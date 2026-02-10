@@ -7,6 +7,7 @@ export async function createChatSession(formData: FormData) {
     const visitorId = formData.get('visitor_id') as string
     const name = formData.get('name') as string
     const email = formData.get('email') as string
+    const shopName = formData.get('shop_name') as string
 
     if (!visitorId) return { error: 'Visitor ID required' }
 
@@ -28,6 +29,7 @@ export async function createChatSession(formData: FormData) {
             visitor_id: visitorId,
             name,
             email,
+            shop_name: shopName,
             status: 'active'
         })
         .select()
@@ -80,6 +82,22 @@ export async function getChatHistory(sessionId: string) {
 
     if (error) return { error: error.message }
     return { data }
+}
+
+export async function markMessagesAsRead(sessionId: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('chat_messages')
+        .update({ read_at: new Date().toISOString() })
+        .eq('session_id', sessionId)
+        .eq('sender_type', 'visitor')
+        .is('read_at', null)
+
+    if (error) {
+        console.error('Error marking messages as read:', error)
+        return { error: error.message }
+    }
+    return { success: true }
 }
 
 export async function closeChatSession(sessionId: string) {
