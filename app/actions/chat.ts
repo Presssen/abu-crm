@@ -92,3 +92,53 @@ export async function closeChatSession(sessionId: string) {
     if (error) return { error: error.message }
     return { success: true }
 }
+
+export async function getChatSettings() {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('chat_settings')
+        .select('*')
+        .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows found"
+        console.error('Error fetching chat settings:', error)
+        return { error: error.message }
+    }
+    return { data }
+}
+
+export async function updateChatSettings(formData: FormData) {
+    const supabase = await createClient()
+
+    const settings = {
+        primary_color: formData.get('primary_color') as string,
+        title: formData.get('title') as string,
+        subtitle: formData.get('subtitle') as string,
+        bot_name: formData.get('bot_name') as string,
+        greeting_message: formData.get('greeting_message') as string,
+    }
+
+    // Get the first settings row ID
+    const { data: existing } = await supabase.from('chat_settings').select('id').single()
+
+    let error
+    if (existing) {
+        const { error: err } = await supabase
+            .from('chat_settings')
+            .update(settings)
+            .eq('id', existing.id)
+        error = err
+    } else {
+        const { error: err } = await supabase
+            .from('chat_settings')
+            .insert(settings)
+        error = err
+    }
+
+    if (error) {
+        console.error('Error updating chat settings:', error)
+        return { error: error.message }
+    }
+
+    return { success: true }
+}
