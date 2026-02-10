@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Search, Mail, Phone, Briefcase, Loader2, CheckCircle2 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -119,11 +119,11 @@ export default function ApolloEnrichmentModal({
     }
 
     // Auto-search when modal opens
-    useState(() => {
+    useEffect(() => {
         if (isOpen && step === 'search' && contacts.length === 0) {
             searchContacts()
         }
-    })
+    }, [isOpen])
 
     if (!isOpen) return null
 
