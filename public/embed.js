@@ -33,6 +33,8 @@
     container.style.boxShadow = '0 8px 25px rgba(0,0,0,0.2)'; // Launcher shadow
     container.style.borderRadius = '32px'; // Rounded for launcher
     container.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+    container.style.overflow = 'hidden'; // Prevent content overflow
+    container.style.pointerEvents = 'auto'; // Ensure clickable
 
     // Create iframe
     var iframe = document.createElement('iframe');
@@ -42,9 +44,8 @@
     iframe.style.height = '100%';
     iframe.style.border = 'none';
     iframe.style.borderRadius = '32px';
-    iframe.style.backgroundColor = 'transparent'; // Ensure transparent background
+    iframe.style.display = 'block'; // Prevent inline spacing issues
     iframe.style.colorScheme = 'light'; // Force light mode for standard iframe behavior
-    iframe.allowTransparency = 'true';
 
     // Append
     container.appendChild(iframe);

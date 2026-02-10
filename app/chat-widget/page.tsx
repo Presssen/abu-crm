@@ -195,7 +195,10 @@ export default function ChatWidget() {
     }
 
     return (
-        <div className="flex flex-col h-full w-full bg-transparent relative font-sans select-none" style={{ '--primary-chat': settings.primary_color } as any}>
+        <div className="flex flex-col h-full w-full relative font-sans select-none" style={{
+            '--primary-chat': settings.primary_color,
+            backgroundColor: isOpen ? 'white' : 'transparent'
+        } as any}>
             {isOpen && (
                 <div className="flex flex-col h-full w-full rounded-2xl overflow-hidden border border-gray-200/50 bg-white animate-in fade-in zoom-in duration-300">
                     {/* Header */}
