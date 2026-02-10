@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/auth/client'
-import { createChatSession, sendMessage, getChatHistory } from '@/app/actions/chat'
+import { createChatSession, sendMessage, getChatHistory, getChatSettings } from '@/app/actions/chat'
 import { Send, X, MessageCircle } from 'lucide-react'
 
 // Helper to get/set visitor ID
@@ -22,6 +22,14 @@ interface Message {
     created_at: string
 }
 
+interface ChatSettings {
+    primary_color: string
+    title: string
+    subtitle: string
+    bot_name: string
+    greeting_message: string
+}
+
 export default function ChatWidget() {
     const [isOpen, setIsOpen] = useState(false)
     const [visitorId, setVisitorId] = useState<string>('')
@@ -29,6 +37,14 @@ export default function ChatWidget() {
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
+    const [settings, setSettings] = useState<ChatSettings>({
+        primary_color: '#2563eb',
+        title: 'Chat Support',
+        subtitle: 'We usually reply in a few minutes',
+        bot_name: 'ABU Bot',
+        greeting_message: 'Hello! How can we help you today?'
+    })
+
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const supabase = createClient()
 
@@ -36,21 +52,35 @@ export default function ChatWidget() {
         const vid = getVisitorId()
         setVisitorId(vid)
 
-        // Initialize Session
-        const initSession = async () => {
+        // Fetch Settings and Initial Session
+        const init = async () => {
+            const settingsRes = await getChatSettings()
+            if (settingsRes.data) setSettings(settingsRes.data)
+
             const formData = new FormData()
             formData.append('visitor_id', vid)
-            // Optional: get name/email from props or localstorage if available
             const res = await createChatSession(formData)
+
             if (res.sessionId) {
                 setSessionId(res.sessionId)
-
-                // Load history
                 const hist = await getChatHistory(res.sessionId)
-                if (hist.data) setMessages(hist.data as Message[])
+                if (hist.data) {
+                    const existingMessages = hist.data as Message[]
+                    // If no history, we could add the greeting message?
+                    if (existingMessages.length === 0) {
+                        setMessages([{
+                            id: 'greeting',
+                            content: settingsRes.data?.greeting_message || 'Hello! How can we help?',
+                            sender_type: 'agent',
+                            created_at: new Date().toISOString()
+                        }])
+                    } else {
+                        setMessages(existingMessages)
+                    }
+                }
             }
         }
-        initSession()
+        init()
     }, [])
 
     // Realtime Subscription
@@ -66,7 +96,6 @@ export default function ChatWidget() {
                 filter: `session_id=eq.${sessionId}`
             }, (payload) => {
                 const newMessage = payload.new as Message
-                // Only add if not already in list (optimistic UI might have added it)
                 setMessages((prev) => {
                     if (prev.find(m => m.id === newMessage.id)) return prev
                     return [...prev, newMessage]
@@ -108,11 +137,6 @@ export default function ChatWidget() {
         setLoading(false)
     }
 
-    // Pass data to parent window (if in iframe) to resize? 
-    // For now, valid strategy is: The iframe is fixed size or toggles size.
-    // Actually, widespread pattern is: embed script creates a fixed size iframe for bubble, 
-    // then expands iframe size when clicked. 
-    // We need to communicate with parent.
     const toggleChat = () => {
         const newState = !isOpen
         setIsOpen(newState)
@@ -121,25 +145,17 @@ export default function ChatWidget() {
 
     if (!sessionId) return null
 
-    // If viewed directly (not in iframe/embed mode), we might want to show full screen or centered.
-    // But assuming embed usage:
     return (
-        <div className="flex flex-col h-full bg-white relative font-sans">
-            {/* We only render the "Window" here. The embed script handles the Bubble vs Window toggle visually using iframe dimensions?
-               OR, we render everything inside the iframe and the iframe is always large but transparent?
-               Better: The iframe is small (bubble only) initially. When clicked, it tells parent to resize iframe.
-            */}
-
-            {/* Chat Window */}
+        <div className="flex flex-col h-full bg-white relative font-sans" style={{ '--primary-chat': settings.primary_color } as any}>
             {isOpen && (
                 <div className="flex flex-col h-[500px] w-full sm:w-[350px] shadow-xl rounded-lg overflow-hidden border border-gray-100 bg-white fixed bottom-20 right-4 sm:static sm:h-full sm:w-full">
                     {/* Header */}
-                    <div className="bg-blue-600 p-4 text-white flex justify-between items-center shadow-sm">
+                    <div className="p-4 text-white flex justify-between items-center shadow-sm" style={{ backgroundColor: settings.primary_color }}>
                         <div>
-                            <h3 className="font-bold">Chat Support</h3>
-                            <p className="text-xs text-blue-100">We usually reply in a few minutes</p>
+                            <h3 className="font-bold">{settings.title}</h3>
+                            <p className="text-xs opacity-90">{settings.subtitle}</p>
                         </div>
-                        <button onClick={toggleChat} className="sm:hidden text-white hover:text-blue-200">
+                        <button onClick={toggleChat} className="sm:hidden text-white hover:opacity-80">
                             <X size={20} />
                         </button>
                     </div>
@@ -149,9 +165,9 @@ export default function ChatWidget() {
                         {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.sender_type === 'visitor' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm ${m.sender_type === 'visitor'
-                                        ? 'bg-blue-600 text-white rounded-br-none'
-                                        : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
-                                    }`}>
+                                    ? 'text-white rounded-br-none'
+                                    : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                                    }`} style={m.sender_type === 'visitor' ? { backgroundColor: settings.primary_color } : {}}>
                                     {m.content}
                                 </div>
                             </div>
@@ -164,8 +180,9 @@ export default function ChatWidget() {
                         <div className="flex items-center gap-2">
                             <input
                                 type="text"
-                                className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-gray-700 placeholder:text-gray-400"
-                                placeholder="Type a message..."
+                                className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all text-gray-700"
+                                style={{ borderColor: 'transparent', focusColor: settings.primary_color } as any}
+                                placeholder="Escribe un mensaje..."
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
@@ -173,7 +190,8 @@ export default function ChatWidget() {
                             <button
                                 onClick={handleSend}
                                 disabled={!input.trim() || loading}
-                                className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-white p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ backgroundColor: settings.primary_color }}
                             >
                                 <Send size={18} />
                             </button>
@@ -185,15 +203,13 @@ export default function ChatWidget() {
                 </div>
             )}
 
-            {/* Bubble Trigger (Only visible if closed?) */}
-            {/* If we are using the resize strategy, the bubble logic should probably be here. */}
             {!isOpen && (
                 <button
                     onClick={toggleChat}
-                    className="fixed bottom-4 right-4 h-14 w-14 bg-blue-600 rounded-full shadow-lg flex items-center justify-center text-white hover:bg-blue-700 transition-all hover:scale-105 active:scale-95"
+                    className="fixed bottom-4 right-4 h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white transition-all hover:scale-105 active:scale-95"
+                    style={{ backgroundColor: settings.primary_color }}
                 >
                     <MessageCircle size={32} />
-                    {/* Unread badge could go here */}
                 </button>
             )}
         </div>
