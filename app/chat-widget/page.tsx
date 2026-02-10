@@ -231,7 +231,7 @@ export default function ChatWidget() {
             {!isOpen && (
                 <button
                     onClick={toggleChat}
-                    className="fixed bottom-4 right-4 h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white transition-all hover:scale-105 active:scale-95"
+                    className="w-full h-full rounded-full shadow-lg flex items-center justify-center text-white transition-all hover:scale-105 active:scale-95 absolute inset-0"
                     style={{ backgroundColor: settings.primary_color }}
                 >
                     <MessageCircle size={32} />
