@@ -38,7 +38,7 @@ export async function updateSession(request: NextRequest) {
     const path = request.nextUrl.pathname
 
     // Public routes (including /blocked)
-    if (['/login', '/signup', '/forgot-password', '/auth/callback', '/pending-approval', '/blocked'].includes(path)) {
+    if (['/login', '/signup', '/forgot-password', '/auth/callback', '/pending-approval', '/blocked', '/chat-widget'].includes(path)) {
         if (user) {
             // Check status if logged in and trying to access public/pending/blocked pages
             const { data: profile } = await supabase
