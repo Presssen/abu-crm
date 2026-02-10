@@ -1,17 +1,16 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/auth/client'
 import {
     MessageSquare,
     User,
     Mail,
     Calendar,
-    Search,
     RefreshCw,
-    Reply,
     MailOpen,
-    Archive
+    Archive,
+    Sparkles
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import SendEmailModal from '../../components/SendEmailModal'
@@ -58,6 +57,10 @@ export default function InboxPage() {
     const [filterUnread, setFilterUnread] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
+    // Cache for status calls
+    const [statusCache, setStatusCache] = useState<{ unread?: number, inbox?: number }>({})
+    const CACHE_DURATION = 30000 // 30 seconds
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
@@ -68,9 +71,7 @@ export default function InboxPage() {
         }
     }, [messages])
 
-    // Fetch unique threads from emails table
     const [sortOrder, setSortOrder] = useState<'recent' | 'oldest'>('recent')
-
     const [page, setPage] = useState(1)
     const [hasMore, setHasMore] = useState(true)
 
@@ -98,7 +99,7 @@ export default function InboxPage() {
                     leads (company_name, email)
                 `)
                 .eq('owner_id', user.id)
-                .is('archived', false) // Only show unarchived emails
+                .is('archived', false)
                 .order('sent_at', { ascending: false })
                 .range((currentPage - 1) * pageSize, currentPage * pageSize - 1)
 
@@ -111,10 +112,6 @@ export default function InboxPage() {
             }
 
             const threadMap = new Map<string, Thread>()
-
-            // If not resetting, we want to merge with existing threads preferably, 
-            // but for a Map-based de-duplication, we can just process all.
-            // Let's keep it simple: if resetting, new map; if not, merge.
             const newThreads = resetPage ? [] : [...threads]
             const existingMap = new Map(newThreads.map(t => [t.thread_id, t]))
 
@@ -136,44 +133,48 @@ export default function InboxPage() {
 
             setThreads(Array.from(existingMap.values()))
 
-            // Fetch status from Gmail in parallel
-            await Promise.all([
-                fetchUnreadStatus(),
-                fetchInboxStatus()
-            ])
+            // Only fetch status if cache is expired or doesn't exist
+            const now = Date.now()
+            if (!statusCache.unread || now - statusCache.unread > CACHE_DURATION) {
+                await fetchUnreadStatus()
+            }
+            if (!statusCache.inbox || now - statusCache.inbox > CACHE_DURATION) {
+                await fetchInboxStatus()
+            }
         } catch (error) {
             console.error('Error fetching threads:', error)
-            // If main fetch fails, ensures we don't stick in loading state
         } finally {
             setLoading(false)
         }
     }
 
-    const fetchUnreadStatus = async () => {
+    const fetchUnreadStatus = useCallback(async () => {
         try {
             const res = await fetch('/api/gmail/unread')
             const data = await res.json()
             if (data.threadIds) {
                 setUnreadThreads(new Set(data.threadIds))
+                setStatusCache(prev => ({ ...prev, unread: Date.now() }))
             }
         } catch (error) {
             console.error('Error fetching unread status:', error)
         }
-    }
+    }, [])
 
-    const fetchInboxStatus = async () => {
+    const fetchInboxStatus = useCallback(async () => {
         try {
             const res = await fetch('/api/gmail/inbox')
             const data = await res.json()
             if (data.threadIds) {
                 setInboxThreadIds(new Set(data.threadIds))
+                setStatusCache(prev => ({ ...prev, inbox: Date.now() }))
             }
         } catch (error) {
             console.error('Error fetching inbox status:', error)
         } finally {
             setInboxLoaded(true)
         }
-    }
+    }, [])
 
     const archiveThread = async (threadId: string) => {
         try {
@@ -183,6 +184,8 @@ export default function InboxPage() {
                 body: JSON.stringify({ threadId })
             })
             if (res.ok) {
+                // Update local state immediately
+                setThreads(prev => prev.filter(t => t.thread_id !== threadId))
                 setInboxThreadIds(prev => {
                     const next = new Set(prev)
                     next.delete(threadId)
@@ -209,11 +212,9 @@ export default function InboxPage() {
         setLoadingMessages(true)
         setMessages([])
 
-        // Check for virtual thread (Legacy fallback)
         if (threadId.startsWith('virtual-')) {
             const t = threads.find(th => th.thread_id === threadId)
             if (t) {
-                // Construct a fake message from local data
                 const fakeMessage: Message = {
                     id: t.thread_id,
                     threadId: t.thread_id,
@@ -221,11 +222,11 @@ export default function InboxPage() {
                     internalDate: new Date(t.last_message_at).getTime().toString(),
                     payload: {
                         headers: [
-                            { name: 'From', value: 'me' }, // Assumed sent by us
+                            { name: 'From', value: 'me' },
                             { name: 'Subject', value: t.subject },
                             { name: 'Date', value: t.last_message_at }
                         ],
-                        body: { data: '' }, // Not used directly if parts are missing, but let's emulate structure
+                        body: { data: '' },
                         parts: [
                             {
                                 mimeType: 'text/html',
@@ -251,7 +252,6 @@ export default function InboxPage() {
             if (data.messages) {
                 setMessages(data.messages)
 
-                // If the thread was unread, mark it as read
                 if (unreadThreads.has(threadId)) {
                     markAsReadStatus(threadId, false)
                 }
@@ -289,8 +289,7 @@ export default function InboxPage() {
             showSuccess(isUnread ? 'Marcado como no leído' : 'Marcado como leído')
         } catch (error: any) {
             console.error('Error updating read status:', error)
-            showError(`Error: ${error.message || 'No se pudo actualizar el estado'}`)
-            showError('Error al actualizar estado')
+            showError(`Error al actualizar estado: ${error.message || 'No se pudo completar la operación'}`)
         }
     }
 
@@ -324,7 +323,6 @@ export default function InboxPage() {
         if (!data) return '(Sin contenido o formato no soportado)'
 
         try {
-            // Robust UTF-8 Base64 decoding
             const decoded = decodeURIComponent(
                 atob(data.replace(/-/g, '+').replace(/_/g, '/'))
                     .split('')
@@ -345,60 +343,65 @@ export default function InboxPage() {
     const selectedThreadData = threads.find(t => t.thread_id === selectedThreadId)
 
     return (
-        <div className="flex h-[calc(100vh-200px)] border rounded-2xl overflow-hidden bg-white shadow-sm border-gray-100">
+        <div className="flex h-[calc(100vh-200px)] border rounded-2xl overflow-hidden bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 shadow-xl border-gray-200">
             {/* Sidebar List */}
-            <div className="w-1/3 border-r border-gray-100 flex flex-col bg-gray-50/50">
-                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
-                    <h3 className="font-bold text-gray-700">Conversaciones</h3>
-                    <div className="flex space-x-1">
-                        <button
-                            onClick={() => setSortOrder(prev => prev === 'recent' ? 'oldest' : 'recent')}
-                            className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-indigo-600 transition-colors"
-                            title={sortOrder === 'recent' ? "Ordenar: Más recientes primero" : "Ordenar: Más antiguos primero"}
-                        >
-                            {/* Simple icon switch or just same icon with tooltip */}
-                            <Calendar size={16} className={sortOrder === 'recent' ? "" : "transform rotate-180"} />
-                        </button>
-                        <button onClick={() => fetchThreads(true)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-indigo-600 transition-colors mr-1">
-                            <RefreshCw size={16} />
-                        </button>
-                        <button
-                            onClick={() => setFilterUnread(!filterUnread)}
-                            className={clsx(
-                                "flex items-center space-x-1 px-2 py-1 rounded-full text-[10px] font-bold transition-all border",
-                                filterUnread
-                                    ? "bg-indigo-600 text-white border-indigo-600"
-                                    : "bg-gray-50 text-gray-500 border-gray-200 hover:border-indigo-300"
-                            )}
-                        >
-                            <Mail size={12} />
-                            <span>{filterUnread ? "Solo No Leídos" : "Filtrar No Leídos"}</span>
-                        </button>
+            <div className="w-1/3 border-r border-gray-200 flex flex-col bg-white/80 backdrop-blur-sm">
+                <div className="p-5 border-b border-gray-200 bg-white/90 backdrop-blur-md">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                            <Mail className="w-5 h-5 text-indigo-600" />
+                            Conversaciones
+                        </h3>
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={() => setSortOrder(prev => prev === 'recent' ? 'oldest' : 'recent')}
+                                className="p-2 hover:bg-indigo-50 rounded-lg text-gray-400 hover:text-indigo-600 transition-all"
+                                title={sortOrder === 'recent' ? "Ordenar: Más recientes primero" : "Ordenar: Más antiguos primero"}
+                            >
+                                <Calendar size={16} className={sortOrder === 'recent' ? "" : "transform rotate-180"} />
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setStatusCache({}) // Clear cache
+                                    fetchThreads(true)
+                                }}
+                                className="p-2 hover:bg-indigo-50 rounded-lg text-gray-400 hover:text-indigo-600 transition-all"
+                            >
+                                <RefreshCw size={16} />
+                            </button>
+                        </div>
                     </div>
+                    <button
+                        onClick={() => setFilterUnread(!filterUnread)}
+                        className={clsx(
+                            "flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2 shadow-sm",
+                            filterUnread
+                                ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white border-indigo-600 shadow-indigo-200"
+                                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50"
+                        )}
+                    >
+                        <Mail size={14} />
+                        <span>{filterUnread ? "Mostrando No Leídos" : "Todos los Emails"}</span>
+                    </button>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
                         Array.from({ length: 5 }).map((_, i) => (
                             <div key={i} className="p-4 border-b border-gray-100 animate-pulse">
-                                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                                <div className="h-3 bg-gray-100 rounded w-1/2"></div>
+                                <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-100 rounded-lg w-3/4 mb-3"></div>
+                                <div className="h-3 bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg w-1/2"></div>
                             </div>
                         ))
                     ) : threads.length === 0 ? (
-                        <div className="p-8 text-center text-gray-400 text-sm">
-                            <MessageSquare className="mx-auto mb-2 opacity-20" size={32} />
-                            No hay conversaciones iniciadas recientes.
+                        <div className="p-12 text-center text-gray-400">
+                            <MessageSquare className="mx-auto mb-3 opacity-20" size={48} />
+                            <p className="text-sm font-medium">No hay conversaciones</p>
                         </div>
                     ) : (
                         <>
                             {threads
                                 .filter(t => {
-                                    // If we haven't loaded inbox IDs yet (initial load), show all
-                                    // If inbox status failed to load (safety), show all
                                     if (!inboxLoaded) return true
-
-                                    // If loaded, filter by inbox label
-                                    // Also checking for 'virtual-' legacy threads to be safe
                                     return inboxThreadIds.has(t.thread_id) || t.thread_id.startsWith('virtual-')
                                 })
                                 .filter(t => filterUnread ? unreadThreads.has(t.thread_id) : true)
@@ -418,48 +421,48 @@ export default function InboxPage() {
                                             className={clsx(
                                                 "p-4 border-b border-gray-100 cursor-pointer transition-all relative group",
                                                 isSelected
-                                                    ? "bg-white border-l-4 border-l-indigo-600 shadow-sm z-10"
+                                                    ? "bg-gradient-to-r from-indigo-50 to-white border-l-4 border-l-indigo-600 shadow-lg shadow-indigo-100/50"
                                                     : isUnread
-                                                        ? "bg-indigo-50/40 border-l-4 border-l-indigo-400"
-                                                        : "hover:bg-gray-100 border-l-4 border-l-transparent"
+                                                        ? "bg-gradient-to-r from-indigo-50/60 to-transparent border-l-4 border-l-indigo-400"
+                                                        : "hover:bg-gray-50/80 border-l-4 border-l-transparent hover:border-l-gray-300"
                                             )}
                                         >
-                                            <div className="flex justify-between items-start mb-1">
+                                            <div className="flex justify-between items-start mb-2">
                                                 <h4 className={clsx(
                                                     "font-bold text-sm truncate pr-2",
-                                                    isSelected ? "text-indigo-900" : isUnread ? "text-indigo-700" : "text-gray-900"
+                                                    isSelected ? "text-indigo-900" : isUnread ? "text-indigo-800" : "text-gray-900"
                                                 )}>
                                                     {thread.lead_name || 'Sin nombre'}
                                                 </h4>
                                                 <div className="flex items-center space-x-2">
                                                     {isUnread && (
-                                                        <span className="flex h-2 w-2 rounded-full bg-indigo-600 animate-pulse shadow-[0_0_8px_rgba(79,70,229,0.5)]" />
+                                                        <Sparkles className="w-3 h-3 text-indigo-600 animate-pulse" />
                                                     )}
-                                                    <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                                        {new Date(thread.last_message_at).toLocaleDateString()}
+                                                    <span className="text-[10px] text-gray-400 whitespace-nowrap font-medium">
+                                                        {new Date(thread.last_message_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className={clsx(
-                                                "text-xs truncate mb-1",
-                                                isUnread ? "text-indigo-600 font-bold" : "text-slate-500 font-medium"
+                                                "text-xs truncate mb-2",
+                                                isUnread ? "text-indigo-700 font-semibold" : "text-gray-600 font-medium"
                                             )}>
                                                 {thread.subject}
                                             </div>
                                             <div className="flex items-center justify-between mt-2">
-                                                <div className="flex items-center text-[10px] text-gray-400">
-                                                    <div className={clsx("h-1.5 w-1.5 rounded-full mr-1", thread.thread_id.startsWith('virtual-') ? "bg-amber-400" : "bg-emerald-400")} title={thread.thread_id.startsWith('virtual-') ? "Email sin hilo (Legacy)" : "Hilo activo"} />
-                                                    {thread.lead_email}
+                                                <div className="flex items-center text-[10px] text-gray-400 gap-1.5">
+                                                    <div className={clsx("h-1.5 w-1.5 rounded-full", thread.thread_id.startsWith('virtual-') ? "bg-amber-400" : "bg-emerald-400")} />
+                                                    <span className="truncate max-w-[150px]">{thread.lead_email}</span>
                                                 </div>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         markAsReadStatus(thread.thread_id, !unreadThreads.has(thread.thread_id));
                                                     }}
-                                                    className="p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-indigo-600 transition-colors"
+                                                    className="p-1.5 hover:bg-white rounded-lg text-gray-400 hover:text-indigo-600 transition-all shadow-sm"
                                                     title={unreadThreads.has(thread.thread_id) ? "Marcar como leído" : "Marcar como no leído"}
                                                 >
-                                                    {unreadThreads.has(thread.thread_id) ? <MailOpen size={12} /> : <Mail size={12} />}
+                                                    {unreadThreads.has(thread.thread_id) ? <MailOpen size={13} /> : <Mail size={13} />}
                                                 </button>
                                             </div>
                                         </div>
@@ -473,7 +476,7 @@ export default function InboxPage() {
                                             setPage(nextPage)
                                             fetchThreads(false)
                                         }}
-                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-4 py-2 rounded-lg hover:bg-indigo-50 transition-all"
                                     >
                                         Cargar más...
                                     </button>
@@ -490,60 +493,67 @@ export default function InboxPage() {
                 {selectedThreadId ? (
                     <>
                         {/* Thread Header */}
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-white z-10">
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900 mb-1">{selectedThreadData?.subject}</h2>
-                                <div className="flex items-center text-sm text-gray-500">
-                                    <User size={14} className="mr-1.5" />
-                                    <span className="font-medium mr-1">{selectedThreadData?.lead_name}</span>
-                                    <span className="text-gray-400">&lt;{selectedThreadData?.lead_email}&gt;</span>
+                        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-white to-gray-50/50">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-900 mb-2">{selectedThreadData?.subject}</h2>
+                                    <div className="flex items-center text-sm text-gray-600 gap-2">
+                                        <div className="flex items-center gap-1.5 bg-gray-100 px-3 py-1.5 rounded-full">
+                                            <User size={14} className="text-indigo-600" />
+                                            <span className="font-semibold">{selectedThreadData?.lead_name}</span>
+                                        </div>
+                                        <span className="text-gray-400">&lt;{selectedThreadData?.lead_email}&gt;</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="flex space-x-2">
-                                <button
-                                    onClick={() => selectedThreadId && archiveThread(selectedThreadId)}
-                                    className="flex items-center px-4 py-2 border border-gray-200 text-gray-500 text-sm font-bold rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all shadow-sm bg-white"
-                                    title="Archivar conversación"
-                                >
-                                    <Archive size={16} className="mr-2" />
-                                    Archivar
-                                </button>
-                                <button
-                                    onClick={() => setShowReplyModal(true)}
-                                    className="flex items-center px-4 py-2 border border-gray-200 text-gray-600 text-sm font-bold rounded-xl hover:bg-gray-50 transition-all shadow-sm bg-white"
-                                >
-                                    Redactar Nuevo
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => selectedThreadId && archiveThread(selectedThreadId)}
+                                        className="flex items-center gap-2 px-4 py-2.5 border-2 border-gray-200 text-gray-600 text-sm font-bold rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm bg-white"
+                                    >
+                                        <Archive size={16} />
+                                        Archivar
+                                    </button>
+                                    <button
+                                        onClick={() => setShowReplyModal(true)}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white text-sm font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-200 transition-all"
+                                    >
+                                        <Mail size={16} />
+                                        Redactar Nuevo
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
                         {/* Thread Messages */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-br from-slate-50/30 via-white to-indigo-50/10">
                             {loadingMessages ? (
                                 <div className="flex items-center justify-center h-full">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
                                 </div>
                             ) : (
                                 messages.map((msg, idx) => {
-                                    const isMe = getHeader(msg.payload.headers, 'From').includes('me') || getHeader(msg.payload.headers, 'From').includes(selectedThreadData?.lead_email || 'XXXXX') === false // Crude check, ideally verify email
-                                    // Better check: usually we know our email. Or just rely on visual style.
-                                    // Let's assume incoming messages have the lead's email in 'From'
-
                                     const from = getHeader(msg.payload.headers, 'From')
-                                    const isIncoming = from.includes(selectedThreadData?.lead_email || '@') && !from.includes('presen') // TODO: Check actual user email
+                                    const isIncoming = from.includes(selectedThreadData?.lead_email || '@') && !from.includes('presen')
 
                                     return (
                                         <div key={msg.id} className={clsx("flex flex-col max-w-3xl", isIncoming ? "mr-auto" : "ml-auto items-end")}>
                                             <div className={clsx(
-                                                "rounded-2xl p-5 shadow-sm border",
-                                                isIncoming ? "bg-white border-gray-100 rounded-tl-none" : "bg-indigo-50 border-indigo-100 rounded-tr-none"
+                                                "rounded-2xl p-6 shadow-lg border-2 transition-all hover:shadow-xl",
+                                                isIncoming
+                                                    ? "bg-white border-gray-200 rounded-tl-sm"
+                                                    : "bg-gradient-to-br from-indigo-50 to-indigo-100/50 border-indigo-200 rounded-tr-sm"
                                             )}>
-                                                <div className="flex items-center justify-between mb-3 gap-4 border-b border-gray-200/50 pb-2">
-                                                    <span className="text-xs font-bold text-gray-700 truncate max-w-[200px]">
+                                                <div className="flex items-center justify-between mb-3 gap-4 pb-3 border-b border-gray-200">
+                                                    <span className="text-xs font-bold text-gray-800 truncate max-w-[200px]">
                                                         {from.replace(/<.*>/, '')}
                                                     </span>
-                                                    <span className="text-[10px] text-gray-400">
-                                                        {new Date(parseInt(msg.internalDate)).toLocaleString()}
+                                                    <span className="text-[10px] text-gray-500 font-medium">
+                                                        {new Date(parseInt(msg.internalDate)).toLocaleString('es-ES', {
+                                                            month: 'short',
+                                                            day: 'numeric',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })}
                                                     </span>
                                                 </div>
                                                 <div
@@ -572,11 +582,12 @@ export default function InboxPage() {
                         />
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400 bg-gray-50/30">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                            <MessageSquare size={32} className="opacity-50" />
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400 bg-gradient-to-br from-slate-50/30 to-white">
+                        <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                            <MessageSquare size={40} className="opacity-40 text-indigo-600" />
                         </div>
-                        <p className="font-medium">Selecciona una conversación para ver los detalles.</p>
+                        <p className="font-semibold text-gray-600">Selecciona una conversación</p>
+                        <p className="text-sm text-gray-400 mt-1">para ver los detalles</p>
                     </div>
                 )}
             </div>
@@ -597,7 +608,6 @@ export default function InboxPage() {
                 isOpen={showMeetingModal}
                 onClose={() => setShowMeetingModal(false)}
                 onSuccess={() => {
-                    // Refresh thread detail to show potentially new meeting log if the API does that
                     if (selectedThreadId) fetchThreadDetail(selectedThreadId)
                 }}
                 initialLeadId={selectedThreadData?.lead_id}

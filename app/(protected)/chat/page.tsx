@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/auth/client'
-import { sendMessage, getChatHistory, closeChatSession, getChatSettings, updateChatSettings, markMessagesAsRead } from '@/app/actions/chat'
-import { Send, CheckCircle, User, MessageSquare, Settings as SettingsIcon, Palette, Bot, Type, Copy, Check } from 'lucide-react'
+import { sendMessage, getChatHistory, closeChatSession, getChatSettings, updateChatSettings, markMessagesAsRead, markChatAsUnread } from '@/app/actions/chat'
+import { Send, CheckCircle, User, MessageSquare, Settings as SettingsIcon, Palette, Bot, Type, Copy, Check, MailOpen } from 'lucide-react'
 
 interface ChatSession {
     id: string
@@ -63,7 +63,7 @@ export default function ChatDashboard() {
         const { data: sessionsData, error: sessionsError } = await supabase
             .from('chat_sessions')
             .select('*')
-            .eq('status', 'active')
+            .neq('status', 'resolved')
             .order('updated_at', { ascending: false })
 
         if (sessionsData) {
@@ -132,6 +132,8 @@ export default function ChatDashboard() {
                 setMessages(res.data as Message[])
                 // Mark as read
                 await markMessagesAsRead(selectedSessionId)
+                // Mark session as read (is_read = true)
+                await supabase.from('chat_sessions').update({ is_read: true }).eq('id', selectedSessionId)
                 // Update local session count
                 setSessions(prev => prev.map(s => s.id === selectedSessionId ? { ...s, unread_count: 0 } : s))
             }
@@ -186,7 +188,18 @@ export default function ChatDashboard() {
     const handleCloseSession = async () => {
         if (!selectedSessionId) return
         await closeChatSession(selectedSessionId)
+        // Remove from local state immediately
+        setSessions(prev => prev.filter(s => s.id !== selectedSessionId))
         setSelectedSessionId(null)
+    }
+
+    const handleMarkAsUnread = async () => {
+        if (!selectedSessionId) return
+        await markChatAsUnread(selectedSessionId)
+        // Update local session to show as unread
+        setSessions(prev => prev.map(s =>
+            s.id === selectedSessionId ? { ...s, unread_count: 1 } : s
+        ))
     }
 
     const handleSaveSettings = async (e: React.FormEvent) => {
@@ -307,13 +320,22 @@ export default function ChatDashboard() {
                                         </p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={handleCloseSession}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
-                                >
-                                    <CheckCircle className="w-4 h-4" />
-                                    Marcar Resuelto
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleMarkAsUnread}
+                                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                                    >
+                                        <MailOpen className="w-4 h-4" />
+                                        Marcar No Leído
+                                    </button>
+                                    <button
+                                        onClick={handleCloseSession}
+                                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
+                                    >
+                                        <CheckCircle className="w-4 h-4" />
+                                        Marcar Resuelto
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Messages */}

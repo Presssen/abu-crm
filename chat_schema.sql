@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
     visitor_id UUID NOT NULL, -- Managed by client (localStorage)
     name TEXT,
     email TEXT,
-    status TEXT CHECK (status IN ('active', 'closed')) DEFAULT 'active',
+    status TEXT CHECK (status IN ('active', 'closed', 'resolved')) DEFAULT 'active',
+    is_read BOOLEAN DEFAULT true,
+    resolved_at TIMESTAMPTZ,
     assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()

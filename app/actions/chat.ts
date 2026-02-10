@@ -110,11 +110,56 @@ export async function closeChatSession(sessionId: string) {
     const supabase = await createClient()
     const { error } = await supabase
         .from('chat_sessions')
-        .update({ status: 'closed' })
+        .update({
+            status: 'resolved',
+            resolved_at: new Date().toISOString()
+        })
         .eq('id', sessionId)
 
     if (error) return { error: error.message }
     return { success: true }
+}
+
+export async function markChatAsUnread(sessionId: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('chat_sessions')
+        .update({ is_read: false })
+        .eq('id', sessionId)
+
+    if (error) {
+        console.error('Error marking chat as unread:', error)
+        return { error: error.message }
+    }
+    return { success: true }
+}
+
+export async function getUnreadChatCount() {
+    const supabase = await createClient()
+
+    // Get sessions that are either unread OR have unread messages from visitors
+    const { data: unreadSessions, error: sessionError } = await supabase
+        .from('chat_sessions')
+        .select('id')
+        .neq('status', 'resolved')
+        .eq('is_read', false)
+
+    const { data: sessionsWithUnreadMessages, error: messagesError } = await supabase
+        .from('chat_messages')
+        .select('session_id')
+        .is('read_at', null)
+        .eq('sender_type', 'visitor')
+
+    if (sessionError || messagesError) {
+        console.error('Error fetching unread count:', sessionError || messagesError)
+        return { count: 0 }
+    }
+
+    // Combine both: sessions marked as unread + sessions with unread visitor messages
+    const unreadSessionIds = new Set(unreadSessions?.map(s => s.id) || [])
+    sessionsWithUnreadMessages?.forEach(m => unreadSessionIds.add(m.session_id))
+
+    return { count: unreadSessionIds.size }
 }
 
 export async function getChatSettings() {

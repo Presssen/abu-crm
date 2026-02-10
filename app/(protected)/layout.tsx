@@ -40,6 +40,7 @@ export default function ProtectedLayout({
     const [user, setUser] = useState<any>(null)
     const [userRole, setUserRole] = useState<string | null>(null)
     const [isCollapsed, setIsCollapsed] = useState(false)
+    const [unreadChatCount, setUnreadChatCount] = useState(0)
 
     // Load collapse state from localStorage
     useEffect(() => {
@@ -76,6 +77,60 @@ export default function ProtectedLayout({
         }
         fetchUserAndProfile()
     }, [])
+
+    // Fetch unread chat count
+    useEffect(() => {
+        const fetchUnreadCount = async () => {
+            // Get sessions that are either unread OR have unread messages from visitors
+            const { data: unreadSessions } = await supabase
+                .from('chat_sessions')
+                .select('id')
+                .neq('status', 'resolved')
+                .eq('is_read', false)
+
+            const { data: sessionsWithUnreadMessages } = await supabase
+                .from('chat_messages')
+                .select('session_id')
+                .is('read_at', null)
+                .eq('sender_type', 'visitor')
+
+            // Combine both: sessions marked as unread + sessions with unread visitor messages
+            const unreadSessionIds = new Set(unreadSessions?.map(s => s.id) || [])
+            sessionsWithUnreadMessages?.forEach(m => unreadSessionIds.add(m.session_id))
+
+            setUnreadChatCount(unreadSessionIds.size)
+        }
+
+        fetchUnreadCount()
+
+        // Subscribe to changes in chat_sessions and chat_messages
+        const sessionsChannel = supabase
+            .channel('sidebar_chat_sessions')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'chat_sessions'
+            }, () => {
+                fetchUnreadCount()
+            })
+            .subscribe()
+
+        const messagesChannel = supabase
+            .channel('sidebar_chat_messages')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'chat_messages'
+            }, () => {
+                fetchUnreadCount()
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(sessionsChannel)
+            supabase.removeChannel(messagesChannel)
+        }
+    }, [supabase])
 
     const handleLogout = async () => {
         setLoading(true)
@@ -172,13 +227,23 @@ export default function ProtectedLayout({
                                             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                                     )}
                                 >
-                                    <item.icon
-                                        className={clsx(
-                                            "h-5 w-5 transition-colors shrink-0",
-                                            !isCollapsed && "mr-3",
-                                            isActive ? "text-indigo-600" : "text-gray-400"
+                                    <div className="relative flex items-center">
+                                        <item.icon
+                                            className={clsx(
+                                                "h-5 w-5 transition-colors shrink-0",
+                                                !isCollapsed && "mr-3",
+                                                isActive ? "text-indigo-600" : "text-gray-400"
+                                            )}
+                                        />
+                                        {item.name === 'Chat' && unreadChatCount > 0 && (
+                                            <span className={clsx(
+                                                "absolute bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center shadow-sm",
+                                                isCollapsed ? "-top-1 -right-1" : "-top-2 -left-2"
+                                            )}>
+                                                {unreadChatCount}
+                                            </span>
                                         )}
-                                    />
+                                    </div>
                                     {!isCollapsed && <span>{item.name}</span>}
                                 </Link>
                             )
