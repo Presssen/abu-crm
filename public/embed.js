@@ -40,31 +40,11 @@
     var iframe = document.createElement('iframe');
     iframe.id = 'abu-chat-iframe';
     iframe.src = origin + '/chat-widget';
-    if (event.data.isOpen) {
-        container.style.width = '400px';
-        container.style.height = '650px';
-        container.style.maxWidth = '90vw';
-        container.style.maxHeight = '90vh';
-        container.style.bottom = '24px';
-        container.style.right = '24px';
-        container.style.boxShadow = '0 20px 50px rgba(0,0,0,0.25)';
-        container.style.borderRadius = '16px';
-        container.style.backgroundColor = 'transparent';
-
-        iframe.style.boxShadow = 'none';
-        iframe.style.borderRadius = 'inherit';
-    } else {
-        container.style.width = '64px';
-        container.style.height = '64px';
-        container.style.bottom = '24px';
-        container.style.right = '24px';
-        container.style.boxShadow = '0 8px 25px rgba(0,0,0,0.2)';
-        container.style.borderRadius = '32px';
-        container.style.backgroundColor = 'transparent';
-
-        iframe.style.boxShadow = 'none';
-        iframe.style.borderRadius = 'inherit';
-    }
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    iframe.style.display = 'block';
+    iframe.style.colorScheme = 'light';
 
     // Append
     container.appendChild(iframe);
@@ -91,7 +71,8 @@
                 container.style.boxShadow = '0 20px 50px rgba(0,0,0,0.25)'; // Open state shadow
                 container.style.borderRadius = '16px'; // Rounded for open chat
                 iframe.style.boxShadow = '0 10px 40px rgba(0,0,0,0.15)';
-                iframe.style.borderRadius = '16px';
+                iframe.style.borderRadius = 'inherit';
+                iframe.style.backgroundColor = 'transparent';
             } else {
                 container.style.width = '64px';
                 container.style.height = '64px';
@@ -100,7 +81,8 @@
                 container.style.boxShadow = '0 8px 25px rgba(0,0,0,0.2)'; // Back to launcher shadow
                 container.style.borderRadius = '32px'; // Back to launcher radius
                 iframe.style.boxShadow = 'none';
-                iframe.style.borderRadius = '32px';
+                iframe.style.borderRadius = 'inherit';
+                iframe.style.backgroundColor = 'transparent';
             }
         }
     });
