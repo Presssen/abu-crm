@@ -267,27 +267,33 @@ export default function ChatWidget() {
             {!isOpen && (
                 <button
                     onClick={toggleChat}
-                    className="w-full h-full rounded-full flex items-center justify-center text-white transition-all hover:scale-110 active:scale-90 absolute inset-0 border-2 border-white/20 overflow-hidden ring-4 ring-black/5"
+                    className="w-full h-full rounded-full flex items-center justify-center text-white transition-transform duration-200 absolute inset-0 overflow-hidden"
                     style={{ backgroundColor: settings.primary_color }}
                     aria-label="Open chat"
                 >
+                    {/* brillo suave */}
                     <div className="absolute inset-0 bg-gradient-to-tr from-black/10 to-transparent pointer-events-none" />
-                    {/* Replaced Lucide icon with inline SVG for robustness */}
+
+                    {/* ring suave (sin recortes) */}
+                    <div className="absolute inset-0 rounded-full ring-1 ring-black/10 pointer-events-none" />
+
+                    {/* icono */}
                     <svg
-                        width="32"
-                        height="32"
+                        width="28"
+                        height="28"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2.5"
+                        strokeWidth="2.25"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className="relative z-10 drop-shadow-md"
+                        className="relative z-10 drop-shadow-sm"
                     >
                         <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                     </svg>
                 </button>
             )}
+
         </div>
     )
 }
