@@ -59,6 +59,12 @@ function SettingsContent() {
     const [geminiKey, setGeminiKey] = useState('')
     const [apolloKey, setApolloKey] = useState('')
 
+    // Password change state
+    const [currentPassword, setCurrentPassword] = useState('')
+    const [newPassword, setNewPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [updatingPassword, setUpdatingPassword] = useState(false)
+
     useEffect(() => {
         fetchSettings()
 
@@ -295,6 +301,56 @@ function SettingsContent() {
             alert('Error al subir la foto: ' + error.message)
         } finally {
             setUploadingPhoto(false)
+        }
+    }
+
+    const handleChangePassword = async () => {
+        // Validation
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            alert('Por favor, completa todos los campos.')
+            return
+        }
+
+        if (newPassword !== confirmPassword) {
+            alert('Las contraseñas nuevas no coinciden.')
+            return
+        }
+
+        if (newPassword.length < 6) {
+            alert('La nueva contraseña debe tener al menos 6 caracteres.')
+            return
+        }
+
+        setUpdatingPassword(true)
+        try {
+            // First verify current password by attempting to sign in
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: currentPassword
+            })
+
+            if (signInError) {
+                throw new Error('La contraseña actual es incorrecta.')
+            }
+
+            // Update password
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: newPassword
+            })
+
+            if (updateError) throw updateError
+
+            alert('Contraseña actualizada correctamente')
+
+            // Clear fields
+            setCurrentPassword('')
+            setNewPassword('')
+            setConfirmPassword('')
+        } catch (error: any) {
+            console.error('Error updating password:', error)
+            alert('Error al actualizar la contraseña: ' + error.message)
+        } finally {
+            setUpdatingPassword(false)
         }
     }
 
@@ -640,15 +696,38 @@ function SettingsContent() {
                                     <div className="space-y-4 max-w-md">
                                         <div className="space-y-2">
                                             <label className="text-sm font-semibold text-gray-700">Contraseña Actual</label>
-                                            <input type="password" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl" />
+                                            <input
+                                                type="password"
+                                                value={currentPassword}
+                                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                                            />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-semibold text-gray-700">Nueva Contraseña</label>
-                                            <input type="password" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl" />
+                                            <input
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-semibold text-gray-700">Confirmar Nueva Contraseña</label>
+                                            <input
+                                                type="password"
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                                            />
                                         </div>
                                         <div className="pt-4">
-                                            <button className="px-6 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors">
-                                                Actualizar Contraseña
+                                            <button
+                                                onClick={handleChangePassword}
+                                                disabled={updatingPassword}
+                                                className="px-6 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {updatingPassword ? 'Actualizando...' : 'Actualizar Contraseña'}
                                             </button>
                                         </div>
                                     </div>

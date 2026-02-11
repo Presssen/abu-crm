@@ -65,6 +65,10 @@ export default function MarathonPage() {
     const [enriching, setEnriching] = useState(false)
     const [savingDetails, setSavingDetails] = useState(false)
 
+    // Filters state
+    const [planFilter, setPlanFilter] = useState<string>('all')
+    const [excludePasswordProtected, setExcludePasswordProtected] = useState<boolean>(true)
+
     // Activity state
     const [emailHistory, setEmailHistory] = useState<any[]>([])
     const [meetings, setMeetings] = useState<any[]>([])
@@ -107,10 +111,24 @@ export default function MarathonPage() {
         return () => window.removeEventListener('resize', checkMobile)
     }, [])
 
+    // Load filters from localStorage
+    useEffect(() => {
+        const savedPlan = localStorage.getItem('marathon_plan_filter')
+        const savedExclude = localStorage.getItem('marathon_exclude_password')
+        if (savedPlan) setPlanFilter(savedPlan)
+        if (savedExclude !== null) setExcludePasswordProtected(savedExclude === 'true')
+    }, [])
+
+    // Save filters to localStorage
+    useEffect(() => {
+        localStorage.setItem('marathon_plan_filter', planFilter)
+        localStorage.setItem('marathon_exclude_password', String(excludePasswordProtected))
+    }, [planFilter, excludePasswordProtected])
+
     useEffect(() => {
         fetchLeads()
         fetchUserGoal()
-    }, [])
+    }, [planFilter, excludePasswordProtected])
 
     useEffect(() => {
         if (leads[currentIndex]) {
@@ -193,6 +211,16 @@ export default function MarathonPage() {
                 .from('leads')
                 .select('*')
                 .eq('status', 'new')
+
+            // Apply Plan Filter
+            if (planFilter !== 'all') {
+                query = query.eq('plan', planFilter)
+            }
+
+            // Apply Password Protected Exclusion
+            if (excludePasswordProtected) {
+                query = query.neq('shopify_status', 'Password Protected')
+            }
 
             // If not admin, only show leads owned by the user
             if (!isAdmin && user) {
@@ -533,6 +561,40 @@ export default function MarathonPage() {
                         <ChevronRight size={16} />
                     </button>
                 </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="bg-white px-6 py-2 border-b border-gray-100 flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Plan Shopify:</label>
+                    <select
+                        value={planFilter}
+                        onChange={(e) => {
+                            setPlanFilter(e.target.value)
+                            setCurrentIndex(0)
+                        }}
+                        className="text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                        <option value="all">Todos</option>
+                        <option value="Shopify Plus">Shopify Plus</option>
+                        <option value="Shopify Standard">Shopify Standard</option>
+                    </select>
+                </div>
+                <div className="h-4 w-px bg-gray-200" />
+                <label className="flex items-center space-x-2 cursor-pointer group">
+                    <input
+                        type="checkbox"
+                        checked={excludePasswordProtected}
+                        onChange={(e) => {
+                            setExcludePasswordProtected(e.target.checked)
+                            setCurrentIndex(0)
+                        }}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest group-hover:text-gray-700 transition-colors">
+                        Excluir Tiendas con Contraseña
+                    </span>
+                </label>
             </div>
 
             {/* Main Content - Independent Scrolling Columns */}
