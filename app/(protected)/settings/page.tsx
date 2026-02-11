@@ -23,8 +23,14 @@ import {
     Settings
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import Toast from '../components/Toast'
 
 type Tab = 'profile' | 'integrations' | 'notifications' | 'security'
+
+type ToastState = {
+    message: string
+    type: 'success' | 'error' | 'info'
+} | null
 
 export default function SettingsPage() {
     return (
@@ -64,6 +70,13 @@ function SettingsContent() {
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
     const [updatingPassword, setUpdatingPassword] = useState(false)
+
+    // Toast state
+    const [toast, setToast] = useState<ToastState>(null)
+
+    const showToast = (message: string, type: 'success' | 'error' | 'info') => {
+        setToast({ message, type })
+    }
 
     useEffect(() => {
         fetchSettings()
@@ -249,11 +262,11 @@ function SettingsContent() {
                 .eq('id', user.id)
 
             if (error) throw error
-            alert('Perfil actualizado correctamente')
+            showToast('Perfil actualizado correctamente', 'success')
             fetchSettings()
         } catch (error: any) {
             console.error('Error updating profile:', error)
-            alert('Error al actualizar: ' + error.message)
+            showToast('Error al actualizar: ' + error.message, 'error')
         } finally {
             setUpdating(false)
         }
@@ -265,7 +278,7 @@ function SettingsContent() {
 
         // 1MB limit
         if (file.size > 1024 * 1024) {
-            alert('La foto es demasiado grande. Máximo 1MB.')
+            showToast('La foto es demasiado grande. Máximo 1MB.', 'error')
             return
         }
 
@@ -294,11 +307,11 @@ function SettingsContent() {
 
             if (updateError) throw updateError
 
-            alert('Foto actualizada')
+            showToast('Foto actualizada correctamente', 'success')
             fetchSettings()
         } catch (error: any) {
             console.error('Error uploading avatar:', error)
-            alert('Error al subir la foto: ' + error.message)
+            showToast('Error al subir la foto: ' + error.message, 'error')
         } finally {
             setUploadingPhoto(false)
         }
@@ -307,17 +320,17 @@ function SettingsContent() {
     const handleChangePassword = async () => {
         // Validation
         if (!currentPassword || !newPassword || !confirmPassword) {
-            alert('Por favor, completa todos los campos.')
+            showToast('Por favor, completa todos los campos.', 'error')
             return
         }
 
         if (newPassword !== confirmPassword) {
-            alert('Las contraseñas nuevas no coinciden.')
+            showToast('Las contraseñas nuevas no coinciden.', 'error')
             return
         }
 
         if (newPassword.length < 6) {
-            alert('La nueva contraseña debe tener al menos 6 caracteres.')
+            showToast('La nueva contraseña debe tener al menos 6 caracteres.', 'error')
             return
         }
 
@@ -340,7 +353,7 @@ function SettingsContent() {
 
             if (updateError) throw updateError
 
-            alert('Contraseña actualizada correctamente')
+            showToast('Contraseña actualizada correctamente', 'success')
 
             // Clear fields
             setCurrentPassword('')
@@ -348,7 +361,7 @@ function SettingsContent() {
             setConfirmPassword('')
         } catch (error: any) {
             console.error('Error updating password:', error)
-            alert('Error al actualizar la contraseña: ' + error.message)
+            showToast('Error: ' + error.message, 'error')
         } finally {
             setUpdatingPassword(false)
         }
@@ -738,6 +751,15 @@ function SettingsContent() {
                     </div>
                 </div>
             </div>
+
+            {/* Toast Notification */}
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
         </div>
     )
 }
