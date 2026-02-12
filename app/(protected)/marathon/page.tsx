@@ -51,6 +51,8 @@ interface Lead {
     city?: string
     country?: string
     categories?: string
+    plan?: string
+    shopify_status?: string
     created_at: string
 }
 
@@ -96,6 +98,8 @@ export default function MarathonPage() {
         city: '',
         country: '',
         categories: '',
+        plan: '',
+        shopify_status: '',
         status: '',
         notes: ''
     })
@@ -143,6 +147,8 @@ export default function MarathonPage() {
                 city: leads[currentIndex].city || '',
                 country: leads[currentIndex].country || '',
                 categories: leads[currentIndex].categories || '',
+                plan: leads[currentIndex].plan || '',
+                shopify_status: leads[currentIndex].shopify_status || '',
                 status: leads[currentIndex].status || '',
                 notes: leads[currentIndex].notes || ''
             })
@@ -166,6 +172,8 @@ export default function MarathonPage() {
                     city: editForm.city,
                     country: editForm.country,
                     categories: editForm.categories,
+                    plan: editForm.plan,
+                    shopify_status: editForm.shopify_status,
                     status: editForm.status,
                     notes: editForm.notes
                 })
@@ -185,6 +193,8 @@ export default function MarathonPage() {
                 city: editForm.city,
                 country: editForm.country,
                 categories: editForm.categories,
+                plan: editForm.plan,
+                shopify_status: editForm.shopify_status,
                 status: editForm.status,
                 notes: editForm.notes
             }
@@ -815,6 +825,34 @@ export default function MarathonPage() {
                                         />
                                     </div>
 
+                                    {/* Shopify Plan & Status */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Plan Shopify</label>
+                                            <select
+                                                value={editForm.plan}
+                                                onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
+                                                className="block w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            >
+                                                <option value="">Sin especificar</option>
+                                                <option value="Shopify Plus">Shopify Plus</option>
+                                                <option value="Shopify Standard">Shopify Standard</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Estado Tienda</label>
+                                            <select
+                                                value={editForm.shopify_status}
+                                                onChange={(e) => setEditForm({ ...editForm, shopify_status: e.target.value })}
+                                                className="block w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            >
+                                                <option value="">Sin especificar</option>
+                                                <option value="Active">Active</option>
+                                                <option value="Password Protected">Password Protected</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
                                     {/* Additional Contacts Section */}
                                     <div className="border-t border-gray-200 pt-4">
                                         <div className="flex items-center justify-between mb-3">
@@ -924,6 +962,26 @@ export default function MarathonPage() {
                                             <Tag size={12} className="mr-1.5 text-gray-400" />
                                             {currentLead.categories || 'Sin sector'}
                                         </div>
+                                        {currentLead.plan && (
+                                            <div className={clsx(
+                                                "flex items-center text-xs font-bold px-2 py-1 rounded border",
+                                                currentLead.plan === 'Shopify Plus'
+                                                    ? "bg-purple-50 text-purple-700 border-purple-200"
+                                                    : "bg-blue-50 text-blue-700 border-blue-200"
+                                            )}>
+                                                {currentLead.plan}
+                                            </div>
+                                        )}
+                                        {currentLead.shopify_status && (
+                                            <div className={clsx(
+                                                "flex items-center text-xs font-bold px-2 py-1 rounded border",
+                                                currentLead.shopify_status === 'Active'
+                                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                            )}>
+                                                {currentLead.shopify_status}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
