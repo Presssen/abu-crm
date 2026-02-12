@@ -386,12 +386,30 @@ export default function InboxPage() {
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
-                        Array.from({ length: 5 }).map((_, i) => (
-                            <div key={i} className="p-4 border-b border-gray-100 animate-pulse">
-                                <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-100 rounded-lg w-3/4 mb-3"></div>
-                                <div className="h-3 bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg w-1/2"></div>
+                        <div className="space-y-0">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <div key={i} className="p-4 border-b border-gray-100 animate-pulse">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="h-4 bg-gradient-to-r from-indigo-200 via-indigo-100 to-indigo-50 rounded-lg w-2/5 animate-shimmer"></div>
+                                        <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-50 rounded-lg w-16"></div>
+                                    </div>
+                                    <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-50 rounded-lg w-3/4 mb-2"></div>
+                                    <div className="flex items-center justify-between mt-3">
+                                        <div className="h-2 bg-gradient-to-r from-gray-100 via-gray-50 to-transparent rounded-lg w-1/3"></div>
+                                        <div className="h-6 w-6 bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-lg"></div>
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="p-8 text-center">
+                                <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-indigo-50 to-indigo-100/50 rounded-2xl border-2 border-indigo-200/50">
+                                    <div className="relative">
+                                        <div className="h-5 w-5 border-3 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
+                                        <div className="absolute inset-0 h-5 w-5 border-3 border-transparent border-t-indigo-400 rounded-full animate-spin animation-delay-150"></div>
+                                    </div>
+                                    <span className="text-sm font-bold text-indigo-700">Cargando conversaciones...</span>
+                                </div>
                             </div>
-                        ))
+                        </div>
                     ) : threads.length === 0 ? (
                         <div className="p-12 text-center text-gray-400">
                             <MessageSquare className="mx-auto mb-3 opacity-20" size={48} />
