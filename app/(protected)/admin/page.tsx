@@ -4,6 +4,8 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/auth/client'
 import FlowBuilder from './components/FlowBuilder'
+import Toast from '../components/Toast'
+import ConfirmDialog from '../components/ConfirmDialog'
 import {
     Settings,
     Mail,
@@ -79,6 +81,18 @@ function AdminContent() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
+    // Toast notifications
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+    // Confirmation dialog
+    const [confirmDialog, setConfirmDialog] = useState<{
+        isOpen: boolean
+        title: string
+        message: string
+        onConfirm: () => void
+        type?: 'danger' | 'warning' | 'info'
+    }>({ isOpen: false, title: '', message: '', onConfirm: () => { } })
+
     // Forms
     const [geminiKey, setGeminiKey] = useState('')
     const [apolloKey, setApolloKey] = useState('')
@@ -98,6 +112,10 @@ function AdminContent() {
         status: '',
         owner: 'all' // all, assigned, unassigned
     })
+
+    const showToast = (message: string, type: 'success' | 'error' | 'info') => {
+        setToast({ message, type })
+    }
 
     const filteredLeads = leads.filter(lead => {
         if (filters.country && lead.country !== filters.country) return false
@@ -227,10 +245,10 @@ function AdminContent() {
                     is_active: true
                 }])
             }
-            alert('API Key de Gemini guardada correctamente')
+            showToast('API Key de Gemini guardada correctamente', 'success')
             fetchData()
         } catch (error: any) {
-            alert('Error al guardar: ' + error.message)
+            showToast('Error al guardar: ' + error.message, 'error')
         } finally {
             setSaving(false)
         }
@@ -259,34 +277,42 @@ function AdminContent() {
                     is_active: true
                 }])
             }
-            alert('API Key de Apollo guardada correctamente')
+            showToast('API Key de Apollo guardada correctamente', 'success')
             fetchData()
         } catch (error: any) {
-            alert('Error al guardar: ' + error.message)
+            showToast('Error al guardar: ' + error.message, 'error')
         } finally {
             setSaving(false)
         }
     }
 
     const deleteUser = async (userId: string) => {
-        if (!confirm('¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer y borrará permanentemente la cuenta del usuario.')) return
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Eliminar Usuario',
+            message: '¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer y borrará permanentemente la cuenta del usuario.',
+            type: 'danger',
+            onConfirm: async () => {
+                setSaving(true)
+                try {
+                    const res = await fetch(`/api/admin/users/${userId}`, {
+                        method: 'DELETE'
+                    })
 
-        setSaving(true)
-        try {
-            const res = await fetch(`/api/admin/users/${userId}`, {
-                method: 'DELETE'
-            })
+                    const data = await res.json()
+                    if (!res.ok) throw new Error(data.error || 'Error al eliminar usuario')
 
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || 'Error al eliminar usuario')
+                    showToast('Usuario eliminado correctamente', 'success')
+                    setProfiles(prev => prev.filter(p => p.id !== userId))
+                } catch (error: any) {
+                    showToast('Error al eliminar: ' + error.message, 'error')
+                } finally {
+                    setSaving(false)
+                }
+            }
+        })
+        return
 
-            alert('Usuario eliminado correctamente')
-            setProfiles(prev => prev.filter(p => p.id !== userId))
-        } catch (error: any) {
-            alert('Error al eliminar: ' + error.message)
-        } finally {
-            setSaving(false)
-        }
     }
 
     const updateUserProfile = async (userId: string, updates: Partial<Profile>) => {
@@ -299,7 +325,7 @@ function AdminContent() {
             setProfiles(prev => prev.map(p => p.id === userId ? { ...p, ...updates } : p))
         } catch (error: any) {
             console.error('Update error:', error)
-            alert('Error al actualizar usuario: ' + (error.message || 'Error desconocido'))
+            showToast('Error al actualizar usuario: ' + (error.message || 'Error desconocido'), 'error')
             fetchData() // Refresh on error
         } finally {
             setSaving(false)
@@ -315,9 +341,9 @@ function AdminContent() {
                 updated_at: new Date().toISOString()
             })
             if (error) throw error
-            alert('Configuración de Marathon guardada')
+            showToast('Configuración de Marathon guardada', 'success')
         } catch (error: any) {
-            alert('Error al guardar config: ' + error.message)
+            showToast('Error al guardar config: ' + error.message, 'error')
         } finally {
             setSaving(false)
         }
@@ -332,9 +358,10 @@ function AdminContent() {
 
             const { error } = await supabase.from('leads').update(updates).eq('id', leadId)
             if (error) throw error
+            showToast('Lead reasignado correctamente', 'success')
             fetchData()
         } catch (error: any) {
-            alert('Error al reasignar lead: ' + error.message)
+            showToast('Error al reasignar lead: ' + error.message, 'error')
         }
     }
 
@@ -350,11 +377,11 @@ function AdminContent() {
             const { error } = await supabase.from('leads').update(updates).in('id', leadIds)
             if (error) throw error
 
-            alert(`Se han reasignado ${leadIds.length} leads correctamente`)
+            showToast(`Se han reasignado ${leadIds.length} leads correctamente`, 'success')
             setSelectedLeads([])
             fetchData()
         } catch (error: any) {
-            alert('Error en actualización masiva: ' + error.message)
+            showToast('Error en actualización masiva: ' + error.message, 'error')
         } finally {
             setSaving(false)
         }
@@ -375,48 +402,74 @@ function AdminContent() {
     }
 
     const deleteLead = async (leadId: string) => {
-        if (!confirm('¿Seguro que quieres borrar este lead?')) return
-        setSaving(true)
-        try {
-            const { error } = await supabase.from('leads').delete().eq('id', leadId)
-            if (error) throw error
-            fetchData()
-        } catch (error: any) {
-            alert('Error al eliminar lead: ' + error.message)
-        } finally {
-            setSaving(false)
-        }
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Eliminar Lead',
+            message: '¿Estás seguro de que deseas eliminar este lead?',
+            type: 'danger',
+            onConfirm: async () => {
+                setSaving(true)
+                try {
+                    const { error } = await supabase.from('leads').delete().eq('id', leadId)
+                    if (error) throw error
+                    showToast('Lead eliminado correctamente', 'success')
+                    fetchData()
+                } catch (error: any) {
+                    showToast('Error al eliminar lead: ' + error.message, 'error')
+                } finally {
+                    setSaving(false)
+                }
+            }
+        })
+        return
     }
 
     const bulkDeleteLeads = async (leadIds: string[]) => {
         if (!leadIds.length) return
-        if (!confirm(`¿Seguro que quieres borrar ${leadIds.length} leads?`)) return
-        setSaving(true)
-        try {
-            const { error } = await supabase.from('leads').delete().in('id', leadIds)
-            if (error) throw error
-            alert(`${leadIds.length} leads eliminados`)
-            setSelectedLeads([])
-            fetchData()
-        } catch (error: any) {
-            alert('Error en borrado masivo: ' + error.message)
-        } finally {
-            setSaving(false)
-        }
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Eliminar Leads',
+            message: `¿Estás seguro de que deseas eliminar ${leadIds.length} leads? Esta acción no se puede deshacer.`,
+            type: 'danger',
+            onConfirm: async () => {
+                setSaving(true)
+                try {
+                    const { error } = await supabase.from('leads').delete().in('id', leadIds)
+                    if (error) throw error
+                    showToast(`${leadIds.length} leads eliminados`, 'success')
+                    setSelectedLeads([])
+                    fetchData()
+                } catch (error: any) {
+                    showToast('Error en borrado masivo: ' + error.message, 'error')
+                } finally {
+                    setSaving(false)
+                }
+            }
+        })
+        return
     }
 
     const deleteImportBatch = async (batchId: string) => {
-        if (!confirm('¿Seguro que quieres borrar esta importación? Esto eliminará TODOS los leads asociados.')) return
-        setSaving(true)
-        try {
-            const { error } = await supabase.from('import_batches').delete().eq('id', batchId)
-            if (error) throw error
-            fetchData()
-        } catch (error: any) {
-            alert('Error al eliminar importación: ' + error.message)
-        } finally {
-            setSaving(false)
-        }
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Eliminar Importación',
+            message: '¿Estás seguro de que deseas eliminar esta importación? Esto eliminará TODOS los leads asociados. Esta acción no se puede deshacer.',
+            type: 'danger',
+            onConfirm: async () => {
+                setSaving(true)
+                try {
+                    const { error } = await supabase.from('import_batches').delete().eq('id', batchId)
+                    if (error) throw error
+                    showToast('Importación eliminada correctamente', 'success')
+                    fetchData()
+                } catch (error: any) {
+                    showToast('Error al eliminar importación: ' + error.message, 'error')
+                } finally {
+                    setSaving(false)
+                }
+            }
+        })
+        return
     }
 
     return (
@@ -687,9 +740,9 @@ function AdminContent() {
                                             } else {
                                                 await supabase.from('integrations').insert([payload])
                                             }
-                                            alert('Configuración de Shopify guardada correctamente')
+                                            showToast('Configuración de Shopify guardada correctamente', 'success')
                                         } catch (err: any) {
-                                            alert('Error al guardar: ' + err.message)
+                                            showToast('Error al guardar: ' + err.message, 'error')
                                         } finally {
                                             setSaving(false)
                                         }
@@ -1057,6 +1110,25 @@ function AdminContent() {
             {activeTab === 'flows' && (
                 <FlowBuilder />
             )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
+
+            {/* Confirmation Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                type={confirmDialog.type}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+            />
         </div>
     )
 }
