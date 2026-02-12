@@ -243,7 +243,12 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                         } else if (dbField === 'status') {
                             lead['shopify_status'] = value
                         } else if (dbField === 'plan') {
-                            lead['plan'] = value?.toString().toLowerCase().includes('plus') ? 'Shopify Plus' : 'Shopify Standard'
+                            // If plan is empty, default to "Shopify Standard"
+                            if (!value || value.toString().trim() === '') {
+                                lead['plan'] = 'Shopify Standard'
+                            } else {
+                                lead['plan'] = value.toString().toLowerCase().includes('plus') ? 'Shopify Plus' : 'Shopify Standard'
+                            }
                         } else {
                             lead[dbField] = value
                         }
