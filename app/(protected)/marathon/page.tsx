@@ -448,12 +448,51 @@ export default function MarathonPage() {
                     <Sparkles className="h-12 w-12 text-indigo-600" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Todo al día!</h2>
-                <p className="text-gray-500 max-w-md">
-                    No hay nuevos leads pendientes para el modo maratón en este momento.
+                <p className="text-gray-500 max-w-md mb-6">
+                    No hay nuevos leads pendientes para el modo maratón con los filtros actuales.
                 </p>
+
+                {/* Filter Controls */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-md w-full mb-6 space-y-4">
+                    <h3 className="text-sm font-bold text-gray-900 mb-4">Ajustar Filtros</h3>
+
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-xs font-bold text-gray-600 block mb-2">Plan Shopify:</label>
+                            <select
+                                value={planFilter}
+                                onChange={(e) => {
+                                    setPlanFilter(e.target.value)
+                                    setCurrentIndex(0)
+                                }}
+                                className="w-full text-sm font-medium bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="Shopify Plus">Shopify Plus</option>
+                                <option value="Shopify Standard">Shopify Standard</option>
+                            </select>
+                        </div>
+
+                        <label className="flex items-center space-x-3 cursor-pointer p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                            <input
+                                type="checkbox"
+                                checked={excludePasswordProtected}
+                                onChange={(e) => {
+                                    setExcludePasswordProtected(e.target.checked)
+                                    setCurrentIndex(0)
+                                }}
+                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700">
+                                Excluir Tiendas con Contraseña
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
                 <button
                     onClick={fetchLeads}
-                    className="mt-6 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors"
+                    className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-bold text-sm shadow-sm"
                 >
                     Recargar Leads
                 </button>

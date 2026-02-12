@@ -85,7 +85,9 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
         city: '',
         country: '',
         categories: '',
-        status: ''
+        status: '',
+        plan: '',
+        shopify_status: ''
     })
 
     useEffect(() => {
@@ -115,7 +117,9 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     city: leadData.city || '',
                     country: leadData.country || '',
                     categories: leadData.categories || '',
-                    status: leadData.status || 'new'
+                    status: leadData.status || 'new',
+                    plan: leadData.plan || '',
+                    shopify_status: leadData.shopify_status || ''
                 })
             }
 
@@ -211,7 +215,9 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     city: editForm.city,
                     country: editForm.country,
                     categories: editForm.categories,
-                    status: editForm.status
+                    status: editForm.status,
+                    plan: editForm.plan,
+                    shopify_status: editForm.shopify_status
                 })
                 .eq('id', leadId)
 
@@ -753,6 +759,69 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Shopify Information */}
+                                    {(lead.plan || lead.shopify_status || isEditing) && (
+                                        <div className="p-5 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl border border-purple-100 relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 p-6 transform translate-x-2 -translate-y-2 opacity-10">
+                                                <Globe size={80} className="text-purple-600" />
+                                            </div>
+                                            <div className="relative z-10 space-y-4">
+                                                <h4 className="text-xs font-bold text-purple-900 flex items-center uppercase tracking-widest">
+                                                    <Globe size={14} className="mr-2" />
+                                                    Información de Shopify
+                                                </h4>
+
+                                                {/* Plan */}
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-purple-600 uppercase tracking-widest mb-1.5 block">
+                                                        Plan
+                                                    </label>
+                                                    {isEditing ? (
+                                                        <select
+                                                            value={editForm.plan}
+                                                            onChange={e => setEditForm({ ...editForm, plan: e.target.value })}
+                                                            className="w-full text-sm font-bold bg-white border border-purple-200 rounded-lg px-3 py-1.5 outline-none focus:border-purple-400"
+                                                        >
+                                                            <option value="">Sin especificar</option>
+                                                            <option value="Shopify Standard">Shopify Standard</option>
+                                                            <option value="Shopify Plus">Shopify Plus</option>
+                                                        </select>
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                                                            {lead.plan || 'No especificado'}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Status */}
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-purple-600 uppercase tracking-widest mb-1.5 block">
+                                                        Estado
+                                                    </label>
+                                                    {isEditing ? (
+                                                        <input
+                                                            value={editForm.shopify_status}
+                                                            onChange={e => setEditForm({ ...editForm, shopify_status: e.target.value })}
+                                                            className="w-full text-sm font-bold bg-white border border-purple-200 rounded-lg px-3 py-1.5 outline-none focus:border-purple-400"
+                                                            placeholder="Active, Password Protected, etc."
+                                                        />
+                                                    ) : (
+                                                        <span className={clsx(
+                                                            "inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold border",
+                                                            lead.shopify_status === 'Active'
+                                                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                                                : lead.shopify_status === 'Password Protected'
+                                                                    ? "bg-rose-100 text-rose-700 border-rose-200"
+                                                                    : "bg-gray-100 text-gray-700 border-gray-200"
+                                                        )}>
+                                                            {lead.shopify_status || 'No especificado'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {!isEditing && (
                                         <button
