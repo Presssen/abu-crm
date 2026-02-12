@@ -11,6 +11,26 @@ export async function POST(request: Request) {
 
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+        // Check if this is a virtual thread (local-only email, not from Gmail)
+        const isVirtualThread = threadId.startsWith('virtual-')
+
+        if (isVirtualThread) {
+            // For virtual threads, only update the local database
+            const { error: dbError } = await supabase
+                .from('emails')
+                .update({ archived: true })
+                .eq('thread_id', threadId)
+                .eq('owner_id', user.id)
+
+            if (dbError) {
+                console.error('Error archiving virtual thread:', dbError)
+                throw new Error('No se pudo archivar el email local')
+            }
+
+            return NextResponse.json({ success: true, virtual: true })
+        }
+
+        // For real Gmail threads, archive in Gmail and update local database
         const { data: integration } = await supabase
             .from('integrations')
             .select('*')

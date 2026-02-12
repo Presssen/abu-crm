@@ -50,9 +50,23 @@ export default function PipelinePage() {
     const [dragOverStage, setDragOverStage] = useState<string | null>(null)
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
-    const fetchLeads = async () => {
-        setLoading(true)
-        setLeads([]) // Clear existing
+    // Pagination state per stage
+    const [stagePagination, setStagePagination] = useState<Record<string, { page: number; hasMore: boolean; loading: boolean }>>({
+        new: { page: 1, hasMore: true, loading: false },
+        contacted: { page: 1, hasMore: true, loading: false },
+        demo_scheduled: { page: 1, hasMore: true, loading: false },
+        proposal_sent: { page: 1, hasMore: true, loading: false },
+        won: { page: 1, hasMore: true, loading: false },
+        lost: { page: 1, hasMore: true, loading: false },
+    })
+    const LEADS_PER_PAGE = 25
+
+    const fetchLeads = async (stageId?: string, append = false) => {
+        if (!append) {
+            setLoading(true)
+            setLeads([])
+        }
+
         try {
             const { data: { user } } = await supabase.auth.getUser()
 
@@ -60,34 +74,85 @@ export default function PipelinePage() {
             const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
             const isAdmin = profile?.role === 'admin'
 
-            // Simple select to guarantee visibility
-            // Fetch leads with their primary contacts
-            let query = supabase
-                .from('leads')
-                .select('*, lead_contacts(email, phone, is_primary)')
-                .order('created_at', { ascending: false })
+            // If loading a specific stage for pagination
+            if (stageId && append) {
+                const currentPage = stagePagination[stageId].page
+                const start = (currentPage - 1) * LEADS_PER_PAGE
+                const end = start + LEADS_PER_PAGE - 1
 
-            // Each user only sees their leads (created by them or assigned by admin)
-            if (!isAdmin && user) {
-                query = query.eq('owner_id', user.id)
+                setStagePagination(prev => ({
+                    ...prev,
+                    [stageId]: { ...prev[stageId], loading: true }
+                }))
+
+                let query = supabase
+                    .from('leads')
+                    .select('*, lead_contacts(email, phone, is_primary)')
+                    .eq('status', stageId)
+                    .order('created_at', { ascending: false })
+                    .range(start, end)
+
+                if (!isAdmin && user) {
+                    query = query.eq('owner_id', user.id)
+                }
+
+                const { data, error } = await query
+
+                if (error) throw error
+
+                // Update leads and pagination state
+                setLeads(prev => [...prev, ...(data || [])])
+                setStagePagination(prev => ({
+                    ...prev,
+                    [stageId]: {
+                        page: currentPage + 1,
+                        hasMore: data ? data.length === LEADS_PER_PAGE : false,
+                        loading: false
+                    }
+                }))
+
+                return
             }
 
-            const { data, error } = await query
+            // Initial load: fetch first page for all stages
+            const stagePromises = STAGES.map(async (stage) => {
+                let query = supabase
+                    .from('leads')
+                    .select('*, lead_contacts(email, phone, is_primary)')
+                    .eq('status', stage.id)
+                    .order('created_at', { ascending: false })
+                    .range(0, LEADS_PER_PAGE - 1)
 
-            if (error) {
-                console.error('Supabase Error:', error)
-                throw error
-            }
+                if (!isAdmin && user) {
+                    query = query.eq('owner_id', user.id)
+                }
 
-            // Debugging: Log unique statuses found
-            if (data) {
-                const statuses = Array.from(new Set(data.map(l => l.status)))
-                console.log('Fetched leads count:', data.length)
-                console.log('Unique statuses found:', statuses)
-                console.log('Current User ID:', user?.id)
-            }
+                const { data, error } = await query
+                if (error) throw error
 
-            setLeads(data || [])
+                return {
+                    stageId: stage.id,
+                    leads: data || [],
+                    hasMore: data ? data.length === LEADS_PER_PAGE : false
+                }
+            })
+
+            const results = await Promise.all(stagePromises)
+
+            // Combine all leads
+            const allLeads = results.flatMap(r => r.leads)
+            setLeads(allLeads)
+
+            // Update pagination state
+            const newPagination: typeof stagePagination = {}
+            results.forEach(r => {
+                newPagination[r.stageId] = {
+                    page: 2, // Next page to load
+                    hasMore: r.hasMore,
+                    loading: false
+                }
+            })
+            setStagePagination(newPagination)
 
             // Sync inactive leads in background without blocking
             syncInactiveLeads(supabase).catch(err =>
@@ -219,71 +284,94 @@ export default function PipelinePage() {
                                         <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 animate-pulse h-28" />
                                     ))
                                 ) : (
-                                    getLeadsByStatus(stage.id).map((lead) => (
-                                        <div
-                                            key={lead.id}
-                                            draggable
-                                            onDragStart={(e) => handleDragStart(e, lead)}
-                                            onClick={(e) => {
-                                                // Only open modal if not clicking the action button
-                                                if (!(e.target as HTMLElement).closest('button')) {
-                                                    setSelectedLeadId(lead.id)
-                                                }
-                                            }}
-                                            className={clsx(
-                                                "group bg-white p-3 rounded-xl border transition-all cursor-pointer",
-                                                lead.status === 'won' ? "border-emerald-200 shadow-sm" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200",
-                                                draggedLead?.id === lead.id ? "opacity-50 ring-2 ring-indigo-400" : ""
-                                            )}
-                                        >
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div className="text-xs font-bold text-gray-900 group-hover:text-indigo-600 transition-colors truncate pr-4">
-                                                    {lead.company_name}
-                                                </div>
-                                                <div className="flex items-center space-x-1 shrink-0">
-                                                    {lead.status !== 'won' && (
-                                                        <button
-                                                            onClick={() => handleUpdateStatus(lead.id, 'won')}
-                                                            className="p-1 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 rounded"
-                                                            title="Marcar como éxito"
-                                                        >
-                                                            <Plus size={14} className="rotate-45" />
-                                                        </button>
-                                                    )}
-                                                    <ChevronRight size={14} className="text-gray-300 group-hover:text-indigo-400" />
-                                                </div>
-                                            </div>
-
-                                            {(() => {
-                                                const primaryContact = lead.lead_contacts?.find(c => c.is_primary)
-                                                const displayEmail = primaryContact?.email || lead.email
-                                                const displayPhone = primaryContact?.phone || lead.phone
-
-                                                return (
-                                                    <div className="space-y-1.5">
-                                                        {displayEmail && (
-                                                            <div className="text-[11px] text-gray-500 flex items-center">
-                                                                <Mail className="h-3 w-3 mr-1.5 text-gray-400 shrink-0" />
-                                                                <span className="truncate">{displayEmail}</span>
-                                                            </div>
-                                                        )}
-                                                        {displayPhone && (
-                                                            <div className="text-[11px] text-gray-500 flex items-center">
-                                                                <Phone size={12} className="h-3 w-3 mr-1.5 text-gray-400 shrink-0" />
-                                                                <span className="truncate">{displayPhone}</span>
-                                                            </div>
-                                                        )}
+                                    <>
+                                        {getLeadsByStatus(stage.id).map((lead) => (
+                                            <div
+                                                key={lead.id}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, lead)}
+                                                onClick={(e) => {
+                                                    // Only open modal if not clicking the action button
+                                                    if (!(e.target as HTMLElement).closest('button')) {
+                                                        setSelectedLeadId(lead.id)
+                                                    }
+                                                }}
+                                                className={clsx(
+                                                    "group bg-white p-3 rounded-xl border transition-all cursor-pointer",
+                                                    lead.status === 'won' ? "border-emerald-200 shadow-sm" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200",
+                                                    draggedLead?.id === lead.id ? "opacity-50 ring-2 ring-indigo-400" : ""
+                                                )}
+                                            >
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="text-xs font-bold text-gray-900 group-hover:text-indigo-600 transition-colors truncate pr-4">
+                                                        {lead.company_name}
                                                     </div>
-                                                )
-                                            })()}
-
-                                            {lead.status === 'won' && (lead as any).profiles && (
-                                                <div className="mt-2 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg flex items-center w-fit">
-                                                    🏆 {(lead as any).profiles.first_name || ''}
+                                                    <div className="flex items-center space-x-1 shrink-0">
+                                                        {lead.status !== 'won' && (
+                                                            <button
+                                                                onClick={() => handleUpdateStatus(lead.id, 'won')}
+                                                                className="p-1 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 rounded"
+                                                                title="Marcar como éxito"
+                                                            >
+                                                                <Plus size={14} className="rotate-45" />
+                                                            </button>
+                                                        )}
+                                                        <ChevronRight size={14} className="text-gray-300 group-hover:text-indigo-400" />
+                                                    </div>
                                                 </div>
-                                            )}
-                                        </div>
-                                    ))
+
+                                                {(() => {
+                                                    const primaryContact = lead.lead_contacts?.find(c => c.is_primary)
+                                                    const displayEmail = primaryContact?.email || lead.email
+                                                    const displayPhone = primaryContact?.phone || lead.phone
+
+                                                    return (
+                                                        <div className="space-y-1.5">
+                                                            {displayEmail && (
+                                                                <div className="text-[11px] text-gray-500 flex items-center">
+                                                                    <Mail className="h-3 w-3 mr-1.5 text-gray-400 shrink-0" />
+                                                                    <span className="truncate">{displayEmail}</span>
+                                                                </div>
+                                                            )}
+                                                            {displayPhone && (
+                                                                <div className="text-[11px] text-gray-500 flex items-center">
+                                                                    <Phone size={12} className="h-3 w-3 mr-1.5 text-gray-400 shrink-0" />
+                                                                    <span className="truncate">{displayPhone}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })()}
+
+                                                {lead.status === 'won' && (lead as any).profiles && (
+                                                    <div className="mt-2 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg flex items-center w-fit">
+                                                        🏆 {(lead as any).profiles.first_name || ''}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+
+                                        {/* Load More Button */}
+                                        {stagePagination[stage.id]?.hasMore && (
+                                            <button
+                                                onClick={() => fetchLeads(stage.id, true)}
+                                                disabled={stagePagination[stage.id]?.loading}
+                                                className="w-full py-2.5 flex items-center justify-center text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border-2 border-indigo-200 hover:border-indigo-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {stagePagination[stage.id]?.loading ? (
+                                                    <>
+                                                        <div className="h-3 w-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mr-2" />
+                                                        Cargando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Plus size={14} className="mr-1" />
+                                                        Cargar más ({LEADS_PER_PAGE})
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
+                                    </>
                                 )}
 
                                 <button

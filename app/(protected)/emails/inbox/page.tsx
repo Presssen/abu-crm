@@ -184,6 +184,7 @@ export default function InboxPage() {
                 body: JSON.stringify({ threadId })
             })
             if (res.ok) {
+                const data = await res.json()
                 // Update local state immediately
                 setThreads(prev => prev.filter(t => t.thread_id !== threadId))
                 setInboxThreadIds(prev => {
@@ -192,7 +193,13 @@ export default function InboxPage() {
                     return next
                 })
                 if (selectedThreadId === threadId) setSelectedThreadId(null)
-                showSuccess('Conversación archivada')
+
+                // Show appropriate success message
+                if (data.virtual) {
+                    showSuccess('Email local archivado correctamente')
+                } else {
+                    showSuccess('Conversación archivada')
+                }
             } else {
                 const errData = await res.json().catch(() => ({}))
                 console.error('Archive failed:', errData)
