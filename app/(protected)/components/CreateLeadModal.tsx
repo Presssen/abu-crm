@@ -54,7 +54,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
                 .insert([{
                     ...formData,
                     tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : [],
-                    plan: formData.plan || null, // Ensure empty string doesn't overwrite if nullable
+                    plan: formData.plan === 'Shopify Plus' ? 'Shopify Plus' : 'Shopify Standard',
                     owner_id: ownerId
                 }])
                 .select()
