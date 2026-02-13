@@ -15,6 +15,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ABU CRM",
   description: "Modern CRM for ABU Management",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ABU CRM",
+  },
+  icons: {
+    apple: [
+      { url: "/abu_logo.png" },
+    ],
+  },
   openGraph: {
     title: "ABU CRM",
     description: "Modern CRM for ABU Management",
