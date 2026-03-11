@@ -102,6 +102,7 @@ export default function LeadsPage() {
     const [showFilters, setShowFilters] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
+    const [excludePasswordProtected, setExcludePasswordProtected] = useState(false)
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         setIsScrolled(e.currentTarget.scrollTop > 10)
@@ -139,6 +140,10 @@ export default function LeadsPage() {
 
             if (shopifyStatusFilter !== 'all') {
                 query = query.eq('shopify_status', shopifyStatusFilter)
+            }
+
+            if (excludePasswordProtected) {
+                query = query.neq('shopify_status', 'Password Protected')
             }
 
             if (countryFilter !== 'all') {
@@ -192,7 +197,7 @@ export default function LeadsPage() {
     useEffect(() => {
         setPage(1)
         fetchLeads()
-    }, [statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter, viewMode, isAdmin])
+    }, [statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter, viewMode, isAdmin, excludePasswordProtected])
 
     useEffect(() => {
         fetchLeads()
@@ -339,6 +344,17 @@ export default function LeadsPage() {
                                 <Filter size={16} />
                                 <span className="hidden sm:inline">Filtros Shopify</span>
                             </button>
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    checked={excludePasswordProtected}
+                                    onChange={(e) => setExcludePasswordProtected(e.target.checked)}
+                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-xs font-semibold text-gray-500 group-hover:text-gray-700 transition-colors whitespace-nowrap">
+                                    Excluir tiendas con contraseña
+                                </span>
+                            </label>
                         </div>
                     </div>
 

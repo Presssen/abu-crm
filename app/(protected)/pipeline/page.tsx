@@ -49,6 +49,7 @@ export default function PipelinePage() {
     const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
     const [dragOverStage, setDragOverStage] = useState<string | null>(null)
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
+    const [excludePasswordProtected, setExcludePasswordProtected] = useState(false)
 
     // Pagination state per stage
     const [stagePagination, setStagePagination] = useState<Record<string, { page: number; hasMore: boolean; loading: boolean }>>({
@@ -96,6 +97,10 @@ export default function PipelinePage() {
                     query = query.eq('owner_id', user.id)
                 }
 
+                if (excludePasswordProtected) {
+                    query = query.neq('shopify_status', 'Password Protected')
+                }
+
                 const { data, error } = await query
 
                 if (error) throw error
@@ -125,6 +130,10 @@ export default function PipelinePage() {
 
                 if (!isAdmin && user) {
                     query = query.eq('owner_id', user.id)
+                }
+
+                if (excludePasswordProtected) {
+                    query = query.neq('shopify_status', 'Password Protected')
                 }
 
                 const { data, error } = await query
@@ -167,7 +176,7 @@ export default function PipelinePage() {
 
     useEffect(() => {
         fetchLeads()
-    }, [])
+    }, [excludePasswordProtected])
 
     const handleUpdateStatus = async (leadId: string, newStatus: string) => {
         try {
@@ -237,13 +246,26 @@ export default function PipelinePage() {
                     <h1 className="text-2xl font-bold text-gray-900 truncate">Pipeline de Ventas</h1>
                     <p className="text-sm text-gray-500">Visualiza y gestiona el flujo de tus oportunidades.</p>
                 </div>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="flex-shrink-0 inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
-                >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Lead
-                </button>
+                <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                        <input
+                            type="checkbox"
+                            checked={excludePasswordProtected}
+                            onChange={(e) => setExcludePasswordProtected(e.target.checked)}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-xs font-semibold text-gray-500 group-hover:text-gray-700 transition-colors whitespace-nowrap">
+                            Excluir tiendas con contraseña
+                        </span>
+                    </label>
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="flex-shrink-0 inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nuevo Lead
+                    </button>
+                </div>
             </div>
 
             <CreateLeadModal
