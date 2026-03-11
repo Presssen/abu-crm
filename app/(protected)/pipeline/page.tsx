@@ -49,7 +49,17 @@ export default function PipelinePage() {
     const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
     const [dragOverStage, setDragOverStage] = useState<string | null>(null)
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
-    const [excludePasswordProtected, setExcludePasswordProtected] = useState(false)
+    const [excludePasswordProtected, setExcludePasswordProtected] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('pipeline_exclude_password') === 'true'
+        }
+        return false
+    })
+
+    const handleExcludePasswordChange = (checked: boolean) => {
+        setExcludePasswordProtected(checked)
+        localStorage.setItem('pipeline_exclude_password', String(checked))
+    }
 
     // Pagination state per stage
     const [stagePagination, setStagePagination] = useState<Record<string, { page: number; hasMore: boolean; loading: boolean }>>({
@@ -251,7 +261,7 @@ export default function PipelinePage() {
                         <input
                             type="checkbox"
                             checked={excludePasswordProtected}
-                            onChange={(e) => setExcludePasswordProtected(e.target.checked)}
+                            onChange={(e) => handleExcludePasswordChange(e.target.checked)}
                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span className="text-xs font-semibold text-gray-500 group-hover:text-gray-700 transition-colors whitespace-nowrap">

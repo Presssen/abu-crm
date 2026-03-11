@@ -102,7 +102,17 @@ export default function LeadsPage() {
     const [showFilters, setShowFilters] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
-    const [excludePasswordProtected, setExcludePasswordProtected] = useState(false)
+    const [excludePasswordProtected, setExcludePasswordProtected] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('leads_exclude_password') === 'true'
+        }
+        return false
+    })
+
+    const handleExcludePasswordChange = (checked: boolean) => {
+        setExcludePasswordProtected(checked)
+        localStorage.setItem('leads_exclude_password', String(checked))
+    }
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         setIsScrolled(e.currentTarget.scrollTop > 10)
@@ -348,7 +358,7 @@ export default function LeadsPage() {
                                 <input
                                     type="checkbox"
                                     checked={excludePasswordProtected}
-                                    onChange={(e) => setExcludePasswordProtected(e.target.checked)}
+                                    onChange={(e) => handleExcludePasswordChange(e.target.checked)}
                                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                 />
                                 <span className="text-xs font-semibold text-gray-500 group-hover:text-gray-700 transition-colors whitespace-nowrap">
