@@ -249,7 +249,7 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                     country: selectedCountry,
                     file_name: fileName,
                     total_leads: 0,
-                    status: 'processing'
+                    status: 'completed'
                 }])
                 .select()
                 .single()
@@ -311,7 +311,7 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                 .from('import_batches')
                 .update({
                     total_leads: totalInserted,
-                    status: totalFailed > 0 ? 'completed_with_errors' : 'completed'
+                    status: totalFailed > 0 ? 'failed' : 'completed'
                 })
                 .eq('id', batchId)
 
