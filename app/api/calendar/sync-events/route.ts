@@ -169,10 +169,11 @@ export async function GET(request: Request) {
             const meetingData = {
                 owner_id: userData.user.id,
                 google_event_id: googleEventId,
+                title: event.summary || '',
                 start_time: event.start.dateTime,
                 end_time: event.end?.dateTime || event.start.dateTime,
                 location: event.location || event.hangoutLink || '',
-                notes: event.description || event.summary || '',
+                notes: event.description || '',
                 attendees: event.attendees?.map((a: any) => a.email) || []
             }
 

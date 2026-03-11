@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/auth/server'
-import { searchOrganizations } from '@/lib/enrichment/apollo'
+import { searchPeople } from '@/lib/enrichment/apollo'
 
 /**
- * POST /api/enrich/apollo/search
- * Search for organizations by domain + company name (does not consume Apollo credits)
+ * POST /api/enrich/apollo/people
+ * Search for people at a company by domain
  */
 export async function POST(request: NextRequest) {
     try {
@@ -47,24 +47,16 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Clean domain for search
-        const cleanDomain = (domain || '')
-            .replace(/^https?:\/\//, '')
-            .replace(/^www\./, '')
-            .replace(/\/.*$/, '')
-            .trim()
-
-        // Search organizations (domain first, then company name fallback)
-        const result = await searchOrganizations(cleanDomain, apiKey, companyName)
+        const result = await searchPeople(domain || '', apiKey, companyName)
 
         return NextResponse.json({
-            success: true,
-            organizations: result.success ? (result.organizations || []) : [],
+            success: result.success,
+            people: result.people || [],
             error: result.error,
         })
 
     } catch (error: any) {
-        console.error('Apollo search API error:', error)
+        console.error('Apollo people search API error:', error)
         return NextResponse.json(
             { error: error.message || 'Internal server error' },
             { status: 500 }

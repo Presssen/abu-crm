@@ -13,9 +13,13 @@ import {
     Database,
     Zap,
     X,
-    FileSpreadsheet
+    FileSpreadsheet,
+    AlertTriangle,
+    Loader2
 } from 'lucide-react'
 import { clsx } from 'clsx'
+
+const BATCH_SIZE = 500
 
 const LEAD_FIELDS = [
     { key: 'company_name', label: 'Empresa', required: false },
@@ -36,14 +40,11 @@ const LEAD_FIELDS = [
 
 const excelSerialToDate = (serial: any) => {
     if (!serial) return null
-    // If it's a number or a numeric string
     const num = Number(serial)
-    if (!isNaN(num) && num > 25569) { // 25569 is 1970-01-01 roughly, avoids small numbers being treated as dates if they aren't
-        // Excel base date: Dec 30, 1899
+    if (!isNaN(num) && num > 25569) {
         const date = new Date((num - 25569) * 86400 * 1000)
         return date.toISOString()
     }
-    // Try standard parsing
     const date = new Date(serial)
     if (!isNaN(date.getTime())) {
         return date.toISOString()
@@ -73,6 +74,14 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
     const [error, setError] = useState<string | null>(null)
     const [fileName, setFileName] = useState<string | null>(null)
     const [selectedCountry, setSelectedCountry] = useState<string>('')
+
+    // Progress tracking for batch import
+    const [importProgress, setImportProgress] = useState(0)
+    const [importedCount, setImportedCount] = useState(0)
+    const [totalToImport, setTotalToImport] = useState(0)
+    const [failedCount, setFailedCount] = useState(0)
+    const [currentBatch, setCurrentBatch] = useState(0)
+    const [totalBatches, setTotalBatches] = useState(0)
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = createClient()
@@ -145,9 +154,87 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
         setMapping(newMapping)
     }
 
+    const prepareLead = (row: any, ownerId: string, batchId: string) => {
+        const lead: any = {
+            owner_id: ownerId,
+            status: 'new',
+            country: selectedCountry,
+            import_batch_id: batchId
+        }
+
+        let allEmails: string[] = []
+        let allPhones: string[] = []
+
+        Object.entries(mapping).forEach(([fileHeader, dbField]) => {
+            if (dbField) {
+                let value = row[fileHeader]
+                if (!value) return
+
+                if (dbField === 'email') {
+                    const valStr = value.toString()
+                    const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/gi
+                    const matches = valStr.match(emailRegex)
+
+                    if (matches) {
+                        const cleanMatches = matches.map((m: string) => m.replace(/^[.:,;\s]+/, ''))
+                        allEmails = [...allEmails, ...cleanMatches]
+                    } else {
+                        const parts = valStr.split(/[:;,]\s*/).map((s: string) => s.trim()).filter(Boolean)
+                        allEmails = [...allEmails, ...parts]
+                    }
+                    if (allEmails.length > 0) {
+                        lead['email'] = allEmails.join(' : ')
+                    }
+                } else if (dbField === 'phone') {
+                    const phones = value.toString().split(/[:;,]\s*/).map((s: string) => s.trim()).filter(Boolean)
+                    allPhones = [...allPhones, ...phones]
+                    if (allPhones.length > 0) {
+                        lead['phone'] = allPhones.join(' : ')
+                    }
+                } else if (dbField === 'categories') {
+                    const valStr = value.toString()
+                    if (valStr.startsWith('/')) {
+                        const parts = valStr.split('/')
+                        if (parts.length > 1 && parts[1]) {
+                            lead['categories'] = parts[1]
+                        } else {
+                            lead['categories'] = valStr
+                        }
+                    } else {
+                        lead['categories'] = valStr
+                    }
+                } else if (dbField === 'created') {
+                    lead['created_date'] = excelSerialToDate(value)
+                } else if (dbField === 'status') {
+                    lead['shopify_status'] = value
+                } else if (dbField === 'plan') {
+                    if (!value || value.toString().trim() === '') {
+                        lead['plan'] = 'Shopify Standard'
+                    } else {
+                        lead['plan'] = value.toString().toLowerCase().includes('plus') ? 'Shopify Plus' : 'Shopify Standard'
+                    }
+                } else {
+                    lead[dbField] = value
+                }
+            }
+        })
+
+        if (!lead.company_name && lead.domain) {
+            lead.company_name = lead.domain
+        }
+
+        if (!lead.email && !lead.company_name && !lead.domain) return null
+
+        return lead
+    }
+
     const handleImport = async () => {
         setImporting(true)
         setError(null)
+        setImportProgress(0)
+        setImportedCount(0)
+        setFailedCount(0)
+
         try {
             const { data: userData } = await supabase.auth.getUser()
             const ownerId = userData.user?.id
@@ -162,7 +249,7 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                     country: selectedCountry,
                     file_name: fileName,
                     total_leads: 0,
-                    status: 'completed'
+                    status: 'processing'
                 }])
                 .select()
                 .single()
@@ -170,161 +257,62 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
             if (batchError) throw batchError
             const batchId = batchData.id
 
-            const leadsToInsert: any[] = []
-            const contactsToInsert: any[] = []
-
-            // Prepare leads
-            const preparedLeads = fileData.map((row) => {
-                const lead: any = {
-                    owner_id: ownerId,
-                    status: 'new',
-                    country: selectedCountry,
-                    import_batch_id: batchId
-                }
-
-                // Temporary storage for split values
-                let allEmails: string[] = []
-                let allPhones: string[] = []
-
-                Object.entries(mapping).forEach(([fileHeader, dbField]) => {
-                    if (dbField) {
-                        let value = row[fileHeader]
-
-                        if (!value) return
-
-                        // Handle Shopify-specific mappings & special parsing
-                        // Handle Shopify-specific mappings & special parsing
-                        if (dbField === 'email') {
-                            const valStr = value.toString()
-                            // Extract emails using regex to handle cases like "a@b.com.c@d.com" or separators
-                            // We use \b at the end to ensure we don't match partial domains if they run into a separator like .user
-                            const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/gi
-                            const matches = valStr.match(emailRegex)
-
-                            if (matches) {
-                                // Clean up matches that might have captured leading separators (like .email@domain.com)
-                                const cleanMatches = matches.map((m: string) => m.replace(/^[.:,;\s]+/, ''))
-                                allEmails = [...allEmails, ...cleanMatches]
-                            } else {
-                                // Fallback split if no clear email pattern found
-                                const parts = valStr.split(/[:;,]\s*/).map((s: string) => s.trim()).filter(Boolean)
-                                allEmails = [...allEmails, ...parts]
-                            }
-                            // Join all found emails into the lead record
-                            if (allEmails.length > 0) {
-                                lead['email'] = allEmails.join(' : ')
-                            }
-                        } else if (dbField === 'phone') {
-                            // Split phones values like "123:456" or "123, 456"
-                            const phones = value.toString().split(/[:;,]\s*/).map((s: string) => s.trim()).filter(Boolean)
-                            allPhones = [...allPhones, ...phones]
-
-                            if (allPhones.length > 0) {
-                                lead['phone'] = allPhones.join(' : ')
-                            }
-                        } else if (dbField === 'categories') {
-                            // Parse category: "/Beauty & Fitness/Face & Body Care" -> "Beauty & Fitness"
-                            // Take the part between the first two slashes if it starts with /
-                            const valStr = value.toString()
-                            if (valStr.startsWith('/')) {
-                                const parts = valStr.split('/')
-                                // parts[0] is empty string before first slash
-                                // parts[1] is "Beauty & Fitness"
-                                if (parts.length > 1 && parts[1]) {
-                                    lead['categories'] = parts[1]
-                                } else {
-                                    lead['categories'] = valStr // Fallback
-                                }
-                            } else {
-                                lead['categories'] = valStr
-                            }
-                        } else if (dbField === 'created') {
-                            lead['created_date'] = excelSerialToDate(value)
-                        } else if (dbField === 'status') {
-                            lead['shopify_status'] = value
-                        } else if (dbField === 'plan') {
-                            // If plan is empty, default to "Shopify Standard"
-                            if (!value || value.toString().trim() === '') {
-                                lead['plan'] = 'Shopify Standard'
-                            } else {
-                                lead['plan'] = value.toString().toLowerCase().includes('plus') ? 'Shopify Plus' : 'Shopify Standard'
-                            }
-                        } else {
-                            lead[dbField] = value
-                        }
-                    }
-                })
-
-                // Use domain as company_name if company_name is empty
-                if (!lead.company_name && lead.domain) {
-                    lead.company_name = lead.domain
-                }
-
-                if (!lead.email && !lead.company_name && !lead.domain) return null
-
-                // Return both the lead object and the extra contact info needed
-                return {
-                    leadData: lead,
-                    extraContacts: {
-                        emails: allEmails,
-                        phones: allPhones,
-                        contact_name: lead.contact_name
-                    }
-                }
-            }).filter(Boolean)
+            // Prepare all leads
+            const preparedLeads = fileData
+                .map((row) => prepareLead(row, ownerId, batchId))
+                .filter(Boolean) as any[]
 
             if (preparedLeads.length === 0) {
-                throw new Error('No se encontraron leads validos para importar.')
+                throw new Error('No se encontraron leads válidos para importar.')
             }
 
-            // Insert leads in batches to avoid huge requests, but we need IDs so likely fine to do one big insert for reasonable sizes.
-            // Supabase returns inserted rows.
-            const { data: insertedLeads, error: importError } = await supabase
-                .from('leads')
-                .insert(preparedLeads.map(p => p!.leadData))
-                .select('id, email, phone')
+            setTotalToImport(preparedLeads.length)
 
-            if (importError) throw importError
+            // Split into batches
+            const batches: any[][] = []
+            for (let i = 0; i < preparedLeads.length; i += BATCH_SIZE) {
+                batches.push(preparedLeads.slice(i, i + BATCH_SIZE))
+            }
+            setTotalBatches(batches.length)
 
-            // Prepare contacts
-            // We need to match inserted leads back to our prepared data.
-            // Assumption: The order of insertedLeads matches the order of preparedLeads.
-            // THIS IS NOT GUARANTEED IN ALL SQL IMPLEMENTATIONS but typically works in single batch inserts.
-            // A safer way is ensuring we can map back via some unique key, but we might not have one.
-            // However, Supabase/Postgres `insert returning` typically preserves order of the values clause.
+            let totalInserted = 0
+            let totalFailed = 0
 
-            // To be safer/more robust, let's just iterate and assume validity for this script or use a loop.
-            // Actually, for bulk imports, order preservation in RETURNING is standard in Postgres for the VALUES list.
+            // Process each batch sequentially
+            for (let i = 0; i < batches.length; i++) {
+                setCurrentBatch(i + 1)
 
-            insertedLeads.forEach((insertedLead, index) => {
-                const prepared = preparedLeads[index]
-                if (!prepared) return
+                try {
+                    const { data: insertedLeads, error: importError } = await supabase
+                        .from('leads')
+                        .insert(batches[i])
+                        .select('id')
 
-                const { emails, phones, contact_name } = prepared.extraContacts
-
-                // Since we are now joining all emails/phones into the main lead record (company data),
-                // we do NOT create separate contact entries for them during import unless explicitly requested.
-                // The user requested that these be registered as company data, not contact persons.
-
-                // If we had logic to extract specific contact persons from other columns, we would do it here.
-                // For now, we skip creating lead_contacts from the email/phone columns.
-            })
-
-            if (contactsToInsert.length > 0) {
-                const { error: contactsError } = await supabase
-                    .from('lead_contacts')
-                    .insert(contactsToInsert)
-
-                if (contactsError) {
-                    console.error('Error importing contacts:', contactsError)
-                    // We don't fail the whole import if contacts fail, but maybe we should warn?
+                    if (importError) {
+                        console.error(`Batch ${i + 1}/${batches.length} failed:`, importError)
+                        totalFailed += batches[i].length
+                    } else {
+                        totalInserted += (insertedLeads?.length || 0)
+                    }
+                } catch (batchErr) {
+                    console.error(`Batch ${i + 1}/${batches.length} exception:`, batchErr)
+                    totalFailed += batches[i].length
                 }
+
+                // Update progress
+                const processed = Math.min((i + 1) * BATCH_SIZE, preparedLeads.length)
+                setImportProgress(Math.round((processed / preparedLeads.length) * 100))
+                setImportedCount(totalInserted)
+                setFailedCount(totalFailed)
             }
 
-            // Update batch with total leads count
+            // Update batch with final counts
             await supabase
                 .from('import_batches')
-                .update({ total_leads: insertedLeads.length })
+                .update({
+                    total_leads: totalInserted,
+                    status: totalFailed > 0 ? 'completed_with_errors' : 'completed'
+                })
                 .eq('id', batchId)
 
             setStep(4)
@@ -347,7 +335,15 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
         setFileName(null)
         setError(null)
         setSelectedCountry('')
+        setImportProgress(0)
+        setImportedCount(0)
+        setTotalToImport(0)
+        setFailedCount(0)
+        setCurrentBatch(0)
+        setTotalBatches(0)
     }
+
+    const formatNumber = (n: number) => n.toLocaleString('es-ES')
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
@@ -358,7 +354,11 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                         <h2 className="text-xl font-bold text-gray-900">Importar Leads</h2>
                         <p className="text-sm text-gray-500">Sube tus archivos Excel o CSV</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+                    <button
+                        onClick={onClose}
+                        disabled={importing}
+                        className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
                         <X size={24} />
                     </button>
                 </div>
@@ -467,6 +467,15 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                     {step === 3 && (
                         <div className="space-y-4">
                             <h3 className="font-bold text-gray-900">Vista Previa</h3>
+
+                            {/* File stats */}
+                            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex items-center gap-3">
+                                <Database size={18} className="text-indigo-600 flex-shrink-0" />
+                                <p className="text-sm text-indigo-900">
+                                    <span className="font-bold">{formatNumber(fileData.length)}</span> leads detectados en <span className="font-medium">{fileName}</span>
+                                </p>
+                            </div>
+
                             <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-gray-50 border-b border-gray-100">
@@ -488,15 +497,68 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Progress bar - visible during import */}
+                            {importing && (
+                                <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <Loader2 size={20} className="text-indigo-600 animate-spin" />
+                                            <span className="font-bold text-gray-900">Importando leads...</span>
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-500">
+                                            Lote {currentBatch} de {totalBatches}
+                                        </span>
+                                    </div>
+
+                                    {/* Progress bar */}
+                                    <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                                        <div
+                                            className="bg-gradient-to-r from-indigo-500 to-emerald-500 h-3 rounded-full transition-all duration-500 ease-out"
+                                            style={{ width: `${importProgress}%` }}
+                                        />
+                                    </div>
+
+                                    {/* Counters */}
+                                    <div className="flex items-center justify-between text-sm">
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-emerald-600 font-medium">
+                                                ✓ {formatNumber(importedCount)} importados
+                                            </span>
+                                            {failedCount > 0 && (
+                                                <span className="text-red-500 font-medium">
+                                                    ✗ {formatNumber(failedCount)} fallidos
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-gray-500 font-bold">{importProgress}%</span>
+                                    </div>
+                                </div>
+                            )}
+
                             {error && <div className="text-red-600 text-sm font-medium flex items-center"><AlertCircle size={14} className="mr-1" /> {error}</div>}
+
                             <div className="flex justify-end gap-3 pt-4">
-                                <button onClick={() => setStep(2)} className="px-4 py-2 text-gray-600 font-medium">Atrás</button>
+                                <button
+                                    onClick={() => setStep(2)}
+                                    disabled={importing}
+                                    className="px-4 py-2 text-gray-600 font-medium disabled:opacity-30"
+                                >
+                                    Atrás
+                                </button>
                                 <button
                                     onClick={handleImport}
                                     disabled={importing}
-                                    className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center"
+                                    className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    {importing ? 'Importando...' : 'Confirmar Importación'}
+                                    {importing ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            Importando...
+                                        </>
+                                    ) : (
+                                        `Importar ${formatNumber(fileData.length)} leads`
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -504,11 +566,45 @@ export default function ImportLeadsModal({ isOpen, onClose, onSuccess }: ImportL
 
                     {step === 4 && (
                         <div className="flex flex-col items-center justify-center py-10 space-y-6">
-                            <div className="h-20 w-20 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mb-2">
-                                <Check size={40} strokeWidth={3} />
+                            <div className={clsx(
+                                "h-20 w-20 rounded-full flex items-center justify-center mb-2",
+                                failedCount > 0
+                                    ? "bg-amber-100 text-amber-600"
+                                    : "bg-emerald-100 text-emerald-600"
+                            )}>
+                                {failedCount > 0
+                                    ? <AlertTriangle size={40} strokeWidth={2.5} />
+                                    : <Check size={40} strokeWidth={3} />
+                                }
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-900">¡Importación Completada!</h2>
-                            <p className="text-gray-500">Los leads han sido añadidos correctamente.</p>
+                            <h2 className="text-2xl font-bold text-gray-900">
+                                {failedCount > 0 ? 'Importación Parcial' : '¡Importación Completada!'}
+                            </h2>
+
+                            {/* Summary stats */}
+                            <div className="flex items-center gap-6 text-center">
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-6 py-4">
+                                    <p className="text-2xl font-bold text-emerald-600">{formatNumber(importedCount)}</p>
+                                    <p className="text-xs text-emerald-700 font-medium mt-1">Leads importados</p>
+                                </div>
+                                {failedCount > 0 && (
+                                    <div className="bg-red-50 border border-red-100 rounded-2xl px-6 py-4">
+                                        <p className="text-2xl font-bold text-red-500">{formatNumber(failedCount)}</p>
+                                        <p className="text-xs text-red-600 font-medium mt-1">Leads fallidos</p>
+                                    </div>
+                                )}
+                                <div className="bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4">
+                                    <p className="text-2xl font-bold text-gray-700">{formatNumber(totalToImport)}</p>
+                                    <p className="text-xs text-gray-500 font-medium mt-1">Total procesados</p>
+                                </div>
+                            </div>
+
+                            {failedCount > 0 && (
+                                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
+                                    Algunos leads no se pudieron importar. Revisa la consola para más detalles.
+                                </p>
+                            )}
+
                             <div className="flex gap-4">
                                 <button onClick={onClose} className="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black">
                                     Cerrar

@@ -159,23 +159,43 @@ export default function ProtectedLayout({
 
     return (
         <div className="flex h-screen overflow-hidden bg-white">
-            {/* Mobile Menu Button */}
+            {/* Mobile Menu Button — Liquid Glass */}
             <div className="md:hidden fixed top-4 right-4 z-50">
                 <button
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="p-2 bg-white rounded-lg shadow-sm border border-gray-200"
+                    className="relative w-10 h-10 rounded-2xl backdrop-blur-xl bg-white/60 border border-white/40 shadow-[0_4px_24px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.6)] active:scale-90 transition-all duration-300 flex items-center justify-center group"
                 >
-                    {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/40 via-white/10 to-indigo-50/30 opacity-80" />
+                    <div className="relative w-[18px] h-[14px] flex flex-col justify-between">
+                        <span className={clsx(
+                            "block h-[2px] rounded-full bg-gray-700 transition-all duration-300 origin-center",
+                            isMobileMenuOpen ? "rotate-45 translate-y-[6px]" : ""
+                        )} />
+                        <span className={clsx(
+                            "block h-[2px] rounded-full bg-gray-700 transition-all duration-300",
+                            isMobileMenuOpen ? "opacity-0 scale-x-0" : "opacity-100"
+                        )} />
+                        <span className={clsx(
+                            "block h-[2px] rounded-full bg-gray-700 transition-all duration-300 origin-center",
+                            isMobileMenuOpen ? "-rotate-45 -translate-y-[6px]" : ""
+                        )} />
+                    </div>
                 </button>
             </div>
 
             {/* Sidebar */}
             <div className={clsx(
-                "fixed inset-y-0 left-0 z-40 bg-white border-r border-gray-200 transform transition-all duration-300 ease-in-out md:translate-x-0",
-                isCollapsed ? "w-20" : "w-64",
-                isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+                "fixed z-40 transform transition-all duration-300 ease-in-out md:translate-x-0",
+                // Desktop: standard sidebar
+                "md:inset-y-0 md:left-0 md:bg-white md:border-r md:border-gray-200 md:rounded-none",
+                // Mobile: floating liquid glass
+                "max-md:top-3 max-md:bottom-3 max-md:left-3 max-md:rounded-[20px] max-md:backdrop-blur-2xl max-md:bg-white/70 max-md:border max-md:border-white/50 max-md:shadow-[0_8px_40px_rgba(99,102,241,0.15),inset_0_1px_0_rgba(255,255,255,0.7)]",
+                isCollapsed ? "w-20" : "md:w-64 max-md:w-[270px]",
+                isMobileMenuOpen ? "translate-x-0" : "-translate-x-[calc(100%+20px)] md:translate-x-0"
             )}>
-                <div className="flex flex-col h-full">
+                {/* Liquid glass gradient overlay — mobile only */}
+                <div className="absolute inset-0 rounded-[20px] bg-gradient-to-br from-white/50 via-white/20 to-indigo-50/30 pointer-events-none md:hidden" />
+                <div className="relative flex flex-col h-full">
                     <div className={clsx(
                         "flex items-center border-b border-gray-100 h-[88px] transition-all duration-300",
                         isCollapsed ? "px-2 justify-center" : "px-6 justify-between"

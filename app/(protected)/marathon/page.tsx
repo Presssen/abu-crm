@@ -25,16 +25,19 @@ import {
     Target,
     Tag,
     Star,
-    Trash2
+    Trash2,
+    X,
+    Lock
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
 import ApolloEnrichmentModal from '../components/ApolloEnrichmentModal'
-import { enrichLead } from '@/app/actions/enrich-lead'
+// enrichLead no longer used — enrichment now goes through Apollo API
 import SendEmailModal from '../components/SendEmailModal'
 import CreateMeetingModal from '../components/CreateMeetingModal'
 import CreateTaskModal from '../components/CreateTaskModal'
 import LogCallModal from '../components/LogCallModal'
+import { enrichLead } from '@/app/actions/enrich-lead'
 import { useNotification } from '../components/ui/NotificationProvider'
 import MobileMarathon from '../components/MobileMarathon'
 
@@ -70,6 +73,8 @@ export default function MarathonPage() {
     // Filters state
     const [planFilter, setPlanFilter] = useState<string>('all')
     const [excludePasswordProtected, setExcludePasswordProtected] = useState<boolean>(true)
+    const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
+    const [isAdmin, setIsAdmin] = useState(false)
 
     // Activity state
     const [emailHistory, setEmailHistory] = useState<any[]>([])
@@ -88,6 +93,9 @@ export default function MarathonPage() {
 
     const [isEditingLead, setIsEditingLead] = useState(false)
     const [contacts, setContacts] = useState<any[]>([])
+    const [revealingContact, setRevealingContact] = useState(false)
+    const [contactToReveal, setContactToReveal] = useState<any>(null)
+    const [showRevealConfirm, setShowRevealConfirm] = useState(false)
     const [editForm, setEditForm] = useState({
         company_name: '',
         contact_name: '',
@@ -119,20 +127,23 @@ export default function MarathonPage() {
     useEffect(() => {
         const savedPlan = localStorage.getItem('marathon_plan_filter')
         const savedExclude = localStorage.getItem('marathon_exclude_password')
+        const savedViewMode = localStorage.getItem('marathon_view_mode')
         if (savedPlan) setPlanFilter(savedPlan)
         if (savedExclude !== null) setExcludePasswordProtected(savedExclude === 'true')
+        if (savedViewMode === 'mine' || savedViewMode === 'all') setViewMode(savedViewMode)
     }, [])
 
     // Save filters to localStorage
     useEffect(() => {
         localStorage.setItem('marathon_plan_filter', planFilter)
         localStorage.setItem('marathon_exclude_password', String(excludePasswordProtected))
-    }, [planFilter, excludePasswordProtected])
+        localStorage.setItem('marathon_view_mode', viewMode)
+    }, [planFilter, excludePasswordProtected, viewMode])
 
     useEffect(() => {
         fetchLeads()
         fetchUserGoal()
-    }, [planFilter, excludePasswordProtected])
+    }, [planFilter, excludePasswordProtected, viewMode])
 
     useEffect(() => {
         if (leads[currentIndex]) {
@@ -214,7 +225,8 @@ export default function MarathonPage() {
         try {
             const { data: { user } } = await supabase.auth.getUser()
             const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
-            const isAdmin = profile?.role === 'admin'
+            const userIsAdmin = profile?.role === 'admin'
+            setIsAdmin(userIsAdmin)
 
             // Fetch leads that are 'new'
             let query = supabase
@@ -233,7 +245,10 @@ export default function MarathonPage() {
             }
 
             // If not admin, only show leads owned by the user
-            if (!isAdmin && user) {
+            // If admin and viewMode is 'mine', only show own leads
+            if (!userIsAdmin && user) {
+                query = query.eq('owner_id', user.id)
+            } else if (userIsAdmin && viewMode === 'mine' && user) {
                 query = query.eq('owner_id', user.id)
             }
 
@@ -291,7 +306,25 @@ export default function MarathonPage() {
             setMeetings(meetingsData.data || [])
             setTasks(tasksData.data || [])
             setCalls(callsData.data || [])
-            setContacts(contactsData.data || [])
+
+            // Auto-fix: if multiple contacts are marked as primary, keep only the first one
+            const contactsList = contactsData.data || []
+            const primaries = contactsList.filter((c: any) => c.is_primary)
+            if (primaries.length > 1) {
+                // Keep the first primary, unset the rest
+                const idsToUnset = primaries.slice(1).map((c: any) => c.id)
+                await supabase
+                    .from('lead_contacts')
+                    .update({ is_primary: false })
+                    .in('id', idsToUnset)
+                // Update local state too
+                const fixed = contactsList.map((c: any) =>
+                    idsToUnset.includes(c.id) ? { ...c, is_primary: false } : c
+                )
+                setContacts(fixed)
+            } else {
+                setContacts(contactsList)
+            }
         } catch (error) {
             console.error('Error fetching activity:', error)
         }
@@ -336,57 +369,80 @@ export default function MarathonPage() {
 
     const handleEnrich = async () => {
         if (!currentLead?.domain) {
-            showSuccess('Web no disponible para investigar')
+            showError('Dominio no disponible para investigar')
             return
         }
 
         setEnriching(true)
         try {
-            const result = await enrichLead(currentLead.id, currentLead.domain, currentLead.phone)
+            const cleanDomain = currentLead.domain
+                .replace(/^https?:\/\//, '')
+                .replace(/^www\./, '')
+                .replace(/\/.*$/, '')
+                .trim()
 
-            if (result.success && result.data) {
-                const { responsible_name, responsible_role, emails: newEmails, phone: newPhone } = result.data
+            const currentName = currentLead.company_name || ''
 
-                // Construct new values
-                // If we found a responsible person, we use them as contact_name
-                const updatedContact = responsible_name || currentLead.contact_name
+            // 1. Call AI to extract company name from the website
+            let aiCompanyName = ''
+            let aiContactName = ''
 
-                const currentEmails = currentLead.email ? currentLead.email.split(':').map(e => e.trim()) : []
-                const mergedEmails = Array.from(new Set([...currentEmails, ...(newEmails || [])])).join(' : ')
-
-                // Only update phone if it was empty before
-                const mergedPhones = !currentLead.phone && newPhone ? newPhone : currentLead.phone
-
-                // Update DB
-                const { error } = await supabase
-                    .from('leads')
-                    .update({
-                        contact_name: updatedContact,
-                        contact_role: responsible_role || currentLead.contact_role,
-                        email: mergedEmails,
-                        phone: mergedPhones
-                    })
-                    .eq('id', currentLead.id)
-
-                if (error) throw error
-
-                // Update Local State
-                const updatedLeads = [...leads]
-                updatedLeads[currentIndex] = {
-                    ...currentLead,
-                    contact_name: updatedContact,
-                    contact_role: responsible_role || currentLead.contact_role,
-                    email: mergedEmails,
-                    phone: mergedPhones
+            try {
+                const aiResult = await enrichLead(currentLead.id, currentLead.domain)
+                if (aiResult.success && aiResult.data) {
+                    if (aiResult.data.company_name) aiCompanyName = aiResult.data.company_name
+                    if (aiResult.data.responsible_name) aiContactName = aiResult.data.responsible_name
                 }
-                setLeads(updatedLeads)
-                showSuccess(`Datos actualizados: ${responsible_role || 'Contacto'} encontrado`)
-            } else {
-                showSuccess('No se encontró información nueva')
+            } catch (aiErr) {
+                console.error('Error with AI enrichment:', aiErr)
             }
+
+            // 2. Determine company name — priority: AI > domain fallback
+            let finalCompanyName = aiCompanyName
+            if (!finalCompanyName) {
+                // Fallback: derive from domain name intelligently
+                const parts = cleanDomain.split(/[.-]/)
+                const nonCommon = parts.filter(p => !['www', 'com', 'es', 'net', 'org', 'co', 'uk', 'store', 'shop', 'io', 'dev'].includes(p.toLowerCase()))
+                const capitalized = nonCommon.map(p => p.charAt(0).toUpperCase() + p.slice(1))
+                finalCompanyName = capitalized.join(' ') || cleanDomain
+            }
+
+            // 3. Build DB update for the lead
+            const leadUpdate: any = {}
+            if (finalCompanyName && finalCompanyName !== currentName) {
+                leadUpdate.company_name = finalCompanyName
+            }
+            let finalContactName = currentLead.contact_name
+            if (!finalContactName && aiContactName) {
+                finalContactName = aiContactName
+                leadUpdate.contact_name = finalContactName
+            }
+
+            if (Object.keys(leadUpdate).length > 0) {
+                await supabase
+                    .from('leads')
+                    .update(leadUpdate)
+                    .eq('id', currentLead.id)
+            }
+
+            // 4. Update local leads state
+            const updatedLeads = [...leads]
+            updatedLeads[currentIndex] = {
+                ...currentLead,
+                ...leadUpdate,
+            }
+            setLeads(updatedLeads)
+
+            // 5. Feedback
+            const messages: string[] = []
+            if (finalCompanyName && finalCompanyName !== currentName) messages.push(`Empresa: ${finalCompanyName}`)
+            if (aiContactName) messages.push(`Contacto: ${aiContactName}`)
+            if (messages.length === 0) messages.push('Lead enriquecido correctamente')
+
+            showSuccess(messages.join(' · '))
         } catch (error: any) {
             console.error('Enrichment error:', error)
-            showSuccess('Error al investigar')
+            showError('Error: ' + (error.message || 'desconocido'))
         } finally {
             setEnriching(false)
         }
@@ -406,6 +462,80 @@ export default function MarathonPage() {
 
         if (!error && data) {
             setContacts([...contacts, data])
+        }
+    }
+
+    const [revealingContactId, setRevealingContactId] = useState<string | null>(null)
+
+    const revealContactData = async (contact: any, type: 'email' | 'phone') => {
+        if (!currentLead) return
+        setRevealingContactId(contact.id)
+
+        try {
+            const nameParts = (contact.name || '').split(' ')
+            const firstName = nameParts[0] || ''
+            const lastName = nameParts.slice(1).join(' ') || ''
+            const domain = currentLead.domain?.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '') || ''
+
+            const response = await fetch('/api/enrich/apollo/reveal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    firstName,
+                    lastName,
+                    domain,
+                    organizationName: currentLead.company_name,
+                    revealType: type,
+                })
+            })
+
+            const data = await response.json()
+
+            if (data.success && data.person) {
+                const updates: any = {}
+                if (type === 'email' && data.person.email) {
+                    updates.email = data.person.email
+                }
+                if (type === 'phone' && data.person.phone) {
+                    updates.phone = data.person.phone
+                }
+                // Also update name if it was obfuscated
+                if (data.person.name && contact.name.includes('***')) {
+                    updates.name = data.person.name
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    await supabase
+                        .from('lead_contacts')
+                        .update(updates)
+                        .eq('id', contact.id)
+
+                    setContacts(prev => prev.map(c =>
+                        c.id === contact.id ? { ...c, ...updates } : c
+                    ))
+
+                    // Also update lead if primary
+                    if (contact.is_primary) {
+                        const leadUpdates: any = {}
+                        if (updates.email) leadUpdates.email = updates.email
+                        if (updates.phone) leadUpdates.phone = updates.phone
+                        if (updates.name) leadUpdates.contact_name = updates.name
+                        if (Object.keys(leadUpdates).length > 0) {
+                            await supabase.from('leads').update(leadUpdates).eq('id', currentLead.id)
+                        }
+                    }
+                } else if (data.phoneUnavailable) {
+                    showError('El desbloqueo de teléfono requiere HTTPS (producción)')
+                } else {
+                    showError(`Apollo no tiene ${type === 'email' ? 'email' : 'teléfono'} para este contacto`)
+                }
+            } else {
+                showError(data.error || 'Error al desbloquear')
+            }
+        } catch (err: any) {
+            showError(err.message || 'Error al desbloquear')
+        } finally {
+            setRevealingContactId(null)
         }
     }
 
@@ -487,6 +617,28 @@ export default function MarathonPage() {
                                 Excluir Tiendas con Contraseña
                             </span>
                         </label>
+
+                        {isAdmin && (
+                            <div>
+                                <label className="text-xs font-bold text-gray-600 block mb-2">Ver:</label>
+                                <div className="flex bg-gray-100 rounded-lg p-0.5">
+                                    <button
+                                        onClick={() => { setViewMode('all'); setCurrentIndex(0) }}
+                                        className={`flex-1 px-3 py-2 rounded-md text-xs font-bold transition-all ${viewMode === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                            }`}
+                                    >
+                                        Todos los leads
+                                    </button>
+                                    <button
+                                        onClick={() => { setViewMode('mine'); setCurrentIndex(0) }}
+                                        className={`flex-1 px-3 py-2 rounded-md text-xs font-bold transition-all ${viewMode === 'mine' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                            }`}
+                                    >
+                                        Mis leads
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -509,11 +661,13 @@ export default function MarathonPage() {
             <>
                 <MobileMarathon
                     lead={currentLead}
+                    contacts={contacts}
                     currentIndex={currentIndex}
                     totalLeads={leads.length}
                     onNext={handleNext}
                     onPrev={handlePrev}
                     onEnrich={handleEnrich}
+                    onSearchApollo={() => setShowApolloModal(true)}
                     onLogCall={handleLogCall}
                     onSendEmail={(email) => {
                         setEmailInitialTo(email)
@@ -526,9 +680,348 @@ export default function MarathonPage() {
                     }}
                     onAction={handleAction}
                     onEdit={() => setIsEditingLead(true)}
+                    onRevealContact={(contact) => {
+                        setContactToReveal(contact)
+                        setShowRevealConfirm(true)
+                    }}
                     enriching={enriching}
                     saving={savingDetails}
                 />
+
+                {/* Apollo Reveal Confirmation */}
+                {showRevealConfirm && contactToReveal && (
+                    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 animate-in fade-in duration-200">
+                        <div className="w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 animate-in slide-in-from-bottom duration-300">
+                            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="h-12 w-12 rounded-full bg-violet-100 flex items-center justify-center">
+                                    <span className="text-lg font-bold text-violet-600">{contactToReveal.name?.charAt(0)?.toUpperCase()}</span>
+                                </div>
+                                <div>
+                                    <p className="font-bold text-gray-900">{contactToReveal.name}</p>
+                                    {contactToReveal.role && <p className="text-xs text-gray-500">{contactToReveal.role}</p>}
+                                </div>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-1">¿Desvelar el email y teléfono personal?</p>
+                            <p className="text-xs text-gray-400 mb-5">Esto consumirá <span className="font-bold text-violet-600">1 crédito</span> de Apollo.</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowRevealConfirm(false)
+                                        setContactToReveal(null)
+                                    }}
+                                    className="py-3 text-sm font-bold text-gray-500 bg-gray-100 rounded-xl active:bg-gray-200 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        setShowRevealConfirm(false)
+                                        setRevealingContact(true)
+                                        try {
+                                            // First search for the person via Apollo free search
+                                            const searchRes = await fetch('/api/enrich/apollo/search', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    domain: currentLead.domain?.replace(/^https?:\/\//, ''),
+                                                    name: contactToReveal.name,
+                                                    leadId: currentLead.id
+                                                })
+                                            })
+                                            const searchData = await searchRes.json()
+
+                                            if (!searchData.people?.length) {
+                                                showError('No se encontró a ' + contactToReveal.name + ' en Apollo')
+                                                return
+                                            }
+
+                                            // Find the best match
+                                            const match = searchData.people.find((p: any) =>
+                                                p.name?.toLowerCase().includes(contactToReveal.name.toLowerCase().split(' ')[0])
+                                            ) || searchData.people[0]
+
+                                            // Now enrich with credits
+                                            const enrichRes = await fetch('/api/enrich/apollo/enrich', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    contactIds: [match.id],
+                                                    leadId: currentLead.id
+                                                })
+                                            })
+                                            const enrichData = await enrichRes.json()
+
+                                            if (enrichData.error) {
+                                                showError(enrichData.error)
+                                            } else {
+                                                showSuccess(`Datos de ${contactToReveal.name} desvelados`)
+                                                // Refresh contacts
+                                                const { data: freshContacts } = await supabase
+                                                    .from('lead_contacts')
+                                                    .select('*')
+                                                    .eq('lead_id', currentLead.id)
+                                                if (freshContacts) setContacts(freshContacts)
+                                            }
+                                        } catch (err: any) {
+                                            showError('Error: ' + (err.message || 'desconocido'))
+                                        } finally {
+                                            setRevealingContact(false)
+                                            setContactToReveal(null)
+                                        }
+                                    }}
+                                    disabled={revealingContact}
+                                    className="py-3 text-sm font-bold text-white bg-violet-600 rounded-xl active:bg-violet-700 transition-colors disabled:opacity-50"
+                                >
+                                    {revealingContact ? 'Desvelando...' : 'Desvelar (1 crédito)'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Mobile Edit Overlay */}
+                {isEditingLead && (
+                    <div className="fixed inset-0 z-50 flex flex-col bg-white animate-in slide-in-from-bottom duration-300">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+                            <h2 className="text-lg font-black text-gray-900">Editar Lead</h2>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setIsEditingLead(false)}
+                                    className="px-3 py-1.5 text-xs font-bold text-gray-500 bg-gray-100 rounded-lg active:bg-gray-200 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={async () => { await handleUpdateLead(); }}
+                                    disabled={savingDetails}
+                                    className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg active:bg-indigo-700 transition-colors disabled:opacity-50"
+                                >
+                                    {savingDetails ? 'Guardando...' : 'Guardar'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Scrollable form */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Empresa</label>
+                                <input
+                                    type="text"
+                                    value={editForm.company_name}
+                                    onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
+                                    className="w-full text-base font-bold bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                    placeholder="Nombre de empresa"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Contacto</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.contact_name}
+                                        onChange={(e) => setEditForm({ ...editForm, contact_name: e.target.value })}
+                                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="Nombre"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Cargo</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.contact_role}
+                                        onChange={(e) => setEditForm({ ...editForm, contact_role: e.target.value })}
+                                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="CEO, Manager..."
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5 flex items-center">
+                                    <Mail size={12} className="mr-1.5" /> Emails
+                                </label>
+                                <div className="space-y-2">
+                                    {editForm.emails.map((email: string, idx: number) => (
+                                        <div key={idx} className="flex items-center gap-2">
+                                            <input
+                                                type="email"
+                                                value={email}
+                                                onChange={(e) => {
+                                                    const newEmails = [...editForm.emails]
+                                                    newEmails[idx] = e.target.value
+                                                    setEditForm({ ...editForm, emails: newEmails })
+                                                }}
+                                                className="flex-1 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                placeholder="email@empresa.com"
+                                            />
+                                            {editForm.emails.length > 1 && (
+                                                <button
+                                                    onClick={() => {
+                                                        const newEmails = editForm.emails.filter((_: string, i: number) => i !== idx)
+                                                        setEditForm({ ...editForm, emails: newEmails.length ? newEmails : [''] })
+                                                    }}
+                                                    className="p-2 text-gray-400 active:text-rose-500 rounded-lg"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button
+                                        onClick={() => setEditForm({ ...editForm, emails: [...editForm.emails, ''] })}
+                                        className="text-[11px] font-bold text-indigo-600 flex items-center gap-1 py-1"
+                                    >
+                                        <Plus size={14} /> Añadir Email
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5 flex items-center">
+                                    <Phone size={12} className="mr-1.5" /> Teléfonos
+                                </label>
+                                <div className="space-y-2">
+                                    {editForm.phones.map((phone: string, idx: number) => (
+                                        <div key={idx} className="flex items-center gap-2">
+                                            <input
+                                                type="tel"
+                                                value={phone}
+                                                onChange={(e) => {
+                                                    const newPhones = [...editForm.phones]
+                                                    newPhones[idx] = e.target.value
+                                                    setEditForm({ ...editForm, phones: newPhones })
+                                                }}
+                                                className="flex-1 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                placeholder="+34..."
+                                            />
+                                            {editForm.phones.length > 1 && (
+                                                <button
+                                                    onClick={() => {
+                                                        const newPhones = editForm.phones.filter((_: string, i: number) => i !== idx)
+                                                        setEditForm({ ...editForm, phones: newPhones.length ? newPhones : [''] })
+                                                    }}
+                                                    className="p-2 text-gray-400 active:text-rose-500 rounded-lg"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button
+                                        onClick={() => setEditForm({ ...editForm, phones: [...editForm.phones, ''] })}
+                                        className="text-[11px] font-bold text-indigo-600 flex items-center gap-1 py-1"
+                                    >
+                                        <Plus size={14} /> Añadir Teléfono
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Web</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.domain}
+                                        onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })}
+                                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="www.empresa.com"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Estado</label>
+                                    <select
+                                        value={editForm.status}
+                                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                        <option value="new">Nuevo</option>
+                                        <option value="contacted">Contactado</option>
+                                        <option value="demo_scheduled">Demo Agendada</option>
+                                        <option value="proposal_sent">Propuesta Enviada</option>
+                                        <option value="won">Ganado</option>
+                                        <option value="lost">Perdido</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Ciudad</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.city}
+                                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="Madrid"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">País</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.country}
+                                        onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="España"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Sector</label>
+                                <input
+                                    type="text"
+                                    value={editForm.categories}
+                                    onChange={(e) => setEditForm({ ...editForm, categories: e.target.value })}
+                                    className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    placeholder="Tecnología, Retail..."
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Plan Shopify</label>
+                                    <select
+                                        value={editForm.plan}
+                                        onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
+                                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                        <option value="">Sin especificar</option>
+                                        <option value="Shopify Plus">Shopify Plus</option>
+                                        <option value="Shopify Standard">Shopify Standard</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Estado Tienda</label>
+                                    <select
+                                        value={editForm.shopify_status}
+                                        onChange={(e) => setEditForm({ ...editForm, shopify_status: e.target.value })}
+                                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                        <option value="">Sin especificar</option>
+                                        <option value="Active">Active</option>
+                                        <option value="Password Protected">Password Protected</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Notas</label>
+                                <textarea
+                                    value={editForm.notes}
+                                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                    className="w-full h-28 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                                    placeholder="Notas sobre este lead..."
+                                />
+                            </div>
+
+                            <div className="h-6" />
+                        </div>
+                    </div>
+                )}
 
                 <SendEmailModal
                     isOpen={isEmailModalOpen}
@@ -566,6 +1059,7 @@ export default function MarathonPage() {
                     onClose={() => setShowApolloModal(false)}
                     leadId={currentLead?.id || ''}
                     domain={currentLead?.domain || ''}
+                    companyName={currentLead?.company_name || ''}
                     onSuccess={handleApolloSuccess}
                 />
             </>
@@ -630,6 +1124,27 @@ export default function MarathonPage() {
                     </select>
                 </div>
                 <div className="h-4 w-px bg-gray-200" />
+                {isAdmin && (
+                    <>
+                        <div className="flex bg-gray-100 rounded-lg p-0.5">
+                            <button
+                                onClick={() => { setViewMode('all'); setCurrentIndex(0) }}
+                                className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                Todos
+                            </button>
+                            <button
+                                onClick={() => { setViewMode('mine'); setCurrentIndex(0) }}
+                                className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${viewMode === 'mine' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                Mis leads
+                            </button>
+                        </div>
+                        <div className="h-4 w-px bg-gray-200" />
+                    </>
+                )}
                 <label className="flex items-center space-x-2 cursor-pointer group">
                     <input
                         type="checkbox"
@@ -1131,7 +1646,7 @@ export default function MarathonPage() {
                                                     )}
                                                 </div>
                                                 <div className="space-y-1.5 pt-2 border-t border-gray-100">
-                                                    {contact.email && (
+                                                    {contact.email && !contact.email.includes('email_not_unlocked') ? (
                                                         <div className="flex items-center justify-between group">
                                                             <div className="flex items-center gap-2 min-w-0">
                                                                 <Mail size={10} className="text-gray-400 shrink-0" />
@@ -1147,8 +1662,21 @@ export default function MarathonPage() {
                                                                 <Mail size={8} />
                                                             </button>
                                                         </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => revealContactData(contact, 'email')}
+                                                            disabled={revealingContactId === contact.id}
+                                                            className="flex items-center gap-1.5 text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors disabled:opacity-50"
+                                                        >
+                                                            {revealingContactId === contact.id ? (
+                                                                <Loader2 size={10} className="animate-spin" />
+                                                            ) : (
+                                                                <Lock size={10} />
+                                                            )}
+                                                            Desbloquear email
+                                                        </button>
                                                     )}
-                                                    {contact.phone && (
+                                                    {contact.phone ? (
                                                         <div className="flex items-center gap-2">
                                                             <Phone size={10} className="text-gray-400 shrink-0" />
                                                             <a
@@ -1158,6 +1686,19 @@ export default function MarathonPage() {
                                                                 {contact.phone}
                                                             </a>
                                                         </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => revealContactData(contact, 'phone')}
+                                                            disabled={revealingContactId === contact.id}
+                                                            className="flex items-center gap-1.5 text-[10px] text-emerald-600 hover:text-emerald-800 font-medium transition-colors disabled:opacity-50"
+                                                        >
+                                                            {revealingContactId === contact.id ? (
+                                                                <Loader2 size={10} className="animate-spin" />
+                                                            ) : (
+                                                                <Lock size={10} />
+                                                            )}
+                                                            Desbloquear teléfono
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
@@ -1261,17 +1802,27 @@ export default function MarathonPage() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         onClick={() => setIsEmailModalOpen(true)}
-                                        className="flex flex-col items-center justify-center p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm transition-all group"
+                                        className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm transition-all group"
                                     >
-                                        <Mail size={20} className="text-gray-400 group-hover:text-blue-500 mb-2 transition-colors" />
-                                        <span className="text-xs font-bold text-gray-700">Email</span>
+                                        <div className="flex items-center">
+                                            <div className="bg-blue-50 p-2 rounded-full mr-3">
+                                                <Mail size={18} className="text-blue-500" />
+                                            </div>
+                                            <span className="text-xs font-bold text-gray-700">Email</span>
+                                        </div>
+                                        <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-400 transition-colors" />
                                     </button>
                                     <button
                                         onClick={() => setIsMeetingModalOpen(true)}
-                                        className="flex flex-col items-center justify-center p-4 bg-white border border-gray-200 rounded-xl hover:border-purple-200 hover:bg-purple-50/50 hover:shadow-sm transition-all group"
+                                        className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:border-purple-200 hover:bg-purple-50/50 hover:shadow-sm transition-all group"
                                     >
-                                        <Calendar size={20} className="text-gray-400 group-hover:text-purple-500 mb-2 transition-colors" />
-                                        <span className="text-xs font-bold text-gray-700">Reunión</span>
+                                        <div className="flex items-center">
+                                            <div className="bg-purple-50 p-2 rounded-full mr-3">
+                                                <Calendar size={18} className="text-purple-500" />
+                                            </div>
+                                            <span className="text-xs font-bold text-gray-700">Reunión</span>
+                                        </div>
+                                        <ChevronRight size={14} className="text-gray-300 group-hover:text-purple-400 transition-colors" />
                                     </button>
                                 </div>
 
@@ -1280,10 +1831,15 @@ export default function MarathonPage() {
                                         setTaskInitialTitle('Volver a llamar')
                                         setIsTaskModalOpen(true)
                                     }}
-                                    className="w-full flex items-center justify-center p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all"
+                                    className="w-full flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:border-amber-200 hover:bg-amber-50/50 hover:shadow-sm transition-all group"
                                 >
-                                    <Clock size={14} className="mr-2" />
-                                    Programar Recordatorio
+                                    <div className="flex items-center">
+                                        <div className="bg-amber-50 p-2 rounded-full mr-3">
+                                            <Clock size={18} className="text-amber-500" />
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-700">Programar Recordatorio</span>
+                                    </div>
+                                    <ChevronRight size={14} className="text-gray-300 group-hover:text-amber-400 transition-colors" />
                                 </button>
                             </div>
 
@@ -1321,22 +1877,33 @@ export default function MarathonPage() {
                                 </button>
                             </div>
 
-                            {/* Outcome Buttons - Sticky Bottom mobile, or just at bottom of flow */}
+                            {/* Outcome Buttons */}
                             <div className="pt-4 mt-auto">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3 opacity-0">Clasificación</label>
-                                <div className="grid grid-cols-2 gap-3">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3">Clasificación</label>
+                                <div className="space-y-2">
                                     <button
-                                        onClick={() => handleAction('disqualify')}
-                                        className="py-3 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all"
+                                        onClick={() => handleAction('qualify')}
+                                        className="w-full py-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 hover:border-emerald-300 transition-all flex items-center justify-center gap-2"
                                     >
-                                        Descartar
+                                        <CheckCircle2 size={14} />
+                                        Cualificar
                                     </button>
-                                    <button
-                                        onClick={handleNext}
-                                        className="py-3 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 hover:text-gray-900 transition-all"
-                                    >
-                                        Saltar
-                                    </button>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            onClick={() => handleAction('disqualify')}
+                                            className="py-3 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <XCircle size={14} />
+                                            Descartar
+                                        </button>
+                                        <button
+                                            onClick={handleNext}
+                                            className="py-3 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 hover:text-gray-900 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <ChevronRight size={14} />
+                                            Saltar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1376,6 +1943,15 @@ export default function MarathonPage() {
                 onSuccess={() => fetchActivity(currentLead.id)}
                 leadId={currentLead.id}
                 leadName={currentLead.company_name}
+            />
+
+            <ApolloEnrichmentModal
+                isOpen={showApolloModal}
+                onClose={() => setShowApolloModal(false)}
+                leadId={currentLead?.id || ''}
+                domain={currentLead?.domain || ''}
+                companyName={currentLead?.company_name || ''}
+                onSuccess={handleApolloSuccess}
             />
         </div>
     )

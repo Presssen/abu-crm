@@ -101,6 +101,7 @@ export default function LeadsPage() {
     const [cityFilter, setCityFilter] = useState('all')
     const [showFilters, setShowFilters] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
+    const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         setIsScrolled(e.currentTarget.scrollTop > 10)
@@ -111,11 +112,15 @@ export default function LeadsPage() {
         try {
             let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
 
-            // Filter out won/lost leads if not admin
+            // Non-admin: only own leads, no won/lost
             if (!isAdmin) {
                 query = query.not('status', 'in', '("won","lost")')
-
-                // Each user only sees their leads (created by them or assigned by admin)
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    query = query.eq('owner_id', user.id)
+                }
+            } else if (viewMode === 'mine') {
+                // Admin chose to see only their leads
                 const { data: { user } } = await supabase.auth.getUser()
                 if (user) {
                     query = query.eq('owner_id', user.id)
@@ -185,7 +190,7 @@ export default function LeadsPage() {
     useEffect(() => {
         setPage(1)
         fetchLeads()
-    }, [statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter])
+    }, [statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter, viewMode, isAdmin])
 
     useEffect(() => {
         fetchLeads()
@@ -284,6 +289,28 @@ export default function LeadsPage() {
                             />
                         </div>
                         <div className="flex items-center gap-2">
+                            {isAdmin && (
+                                <div className="flex bg-gray-100 rounded-xl p-0.5">
+                                    <button
+                                        onClick={() => setViewMode('all')}
+                                        className={clsx(
+                                            "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                                            viewMode === 'all' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                                        )}
+                                    >
+                                        Todos
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('mine')}
+                                        className={clsx(
+                                            "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                                            viewMode === 'mine' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                                        )}
+                                    >
+                                        Mis leads
+                                    </button>
+                                </div>
+                            )}
                             <Filter className="h-4 w-4 text-gray-500" />
                             <select
                                 className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"

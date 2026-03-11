@@ -19,12 +19,20 @@ import {
     Mail,
     PhoneCall,
     Filter,
-    X
+    X,
+    ChevronDown
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
 import CreateMeetingModal from '../components/CreateMeetingModal'
 import EventDetailModal from '../components/EventDetailModal'
+
+type TeamProfile = {
+    id: string
+    email: string
+    first_name: string | null
+    last_name: string | null
+}
 
 type DateRange = {
     start: Date;
@@ -56,18 +64,39 @@ export default function DashboardPage() {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
+    // Admin user filter
+    const [isAdmin, setIsAdmin] = useState(false)
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+    const [teamProfiles, setTeamProfiles] = useState<TeamProfile[]>([])
+    const [selectedUserId, setSelectedUserId] = useState<string>('all')
+    const [showUserPicker, setShowUserPicker] = useState(false)
+
+    // Fetch user role and team profiles on mount
     useEffect(() => {
-        const start = new Date()
-        start.setDate(start.getDate() - 30)
-        start.setHours(0, 0, 0, 0)
-        // Ensure accurate initial fetch
-        // fetchStats() and fetchDailyMeetings are called in the next useEffect
+        const initAdmin = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            setCurrentUserId(user.id)
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+            const admin = profile?.role === 'admin'
+            setIsAdmin(admin)
+            if (admin) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('id, email, first_name, last_name')
+                    .order('email')
+                setTeamProfiles(profiles || [])
+            }
+        }
+        initAdmin()
     }, [])
 
     useEffect(() => {
-        fetchStats()
-        fetchDailyMeetings(selectedDate)
-    }, [dateRange, selectedDate])
+        if (currentUserId) {
+            fetchStats()
+            fetchDailyMeetings(selectedDate)
+        }
+    }, [dateRange, selectedDate, selectedUserId, currentUserId])
 
     const fetchStats = async () => {
         try {
@@ -75,9 +104,10 @@ export default function DashboardPage() {
             const startStr = dateRange.start.toISOString()
             const endStr = dateRange.end.toISOString()
 
-            const { data: { user } } = await supabase.auth.getUser()
-            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
-            const isAdmin = profile?.role === 'admin'
+            // Determine which owner_id to filter by
+            const filterByOwner = isAdmin
+                ? (selectedUserId !== 'all' ? selectedUserId : null)
+                : currentUserId
 
             // 1. Leads counts
             let totalLeadsQuery = supabase
@@ -93,9 +123,9 @@ export default function DashboardPage() {
                 .gte('won_at', startStr)
                 .lte('won_at', endStr)
 
-            if (!isAdmin && user) {
-                totalLeadsQuery = totalLeadsQuery.eq('owner_id', user.id)
-                wonLeadsQuery = wonLeadsQuery.eq('owner_id', user.id)
+            if (filterByOwner) {
+                totalLeadsQuery = totalLeadsQuery.eq('owner_id', filterByOwner)
+                wonLeadsQuery = wonLeadsQuery.eq('owner_id', filterByOwner)
             }
 
             const { count: totalLeads } = await totalLeadsQuery
@@ -120,10 +150,10 @@ export default function DashboardPage() {
                 .gte('created_at', startStr)
                 .lte('created_at', endStr)
 
-            if (!isAdmin && user) {
-                meetingsQuery = meetingsQuery.eq('owner_id', user.id)
-                emailsQuery = emailsQuery.eq('owner_id', user.id)
-                callsQuery = callsQuery.eq('owner_id', user.id)
+            if (filterByOwner) {
+                meetingsQuery = meetingsQuery.eq('owner_id', filterByOwner)
+                emailsQuery = emailsQuery.eq('owner_id', filterByOwner)
+                callsQuery = callsQuery.eq('owner_id', filterByOwner)
             }
 
             const { count: meetingsCount } = await meetingsQuery
@@ -143,8 +173,8 @@ export default function DashboardPage() {
                 .from('leads')
                 .select('status')
 
-            if (!isAdmin && user) {
-                pipelineQuery = pipelineQuery.eq('owner_id', user.id)
+            if (filterByOwner) {
+                pipelineQuery = pipelineQuery.eq('owner_id', filterByOwner)
             }
 
             const { data: pipelineData } = await pipelineQuery
@@ -174,15 +204,15 @@ export default function DashboardPage() {
 
             // 4. Fetch Activities for Feed
             let emailsActQuery = supabase.from('emails').select('id, subject, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5)
-            let meetingsActQuery = supabase.from('meetings').select('id, location, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5)
+            let meetingsActQuery = supabase.from('meetings').select('id, title, notes, location, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5)
             let callsActQuery = supabase.from('calls').select('id, notes, created_at, leads(company_name)').order('created_at', { ascending: false }).limit(5)
             let leadsActQuery = supabase.from('leads').select('id, company_name, created_at').order('created_at', { ascending: false }).limit(5)
 
-            if (!isAdmin && user) {
-                emailsActQuery = emailsActQuery.eq('owner_id', user.id)
-                meetingsActQuery = meetingsActQuery.eq('owner_id', user.id)
-                callsActQuery = callsActQuery.eq('owner_id', user.id)
-                leadsActQuery = leadsActQuery.eq('owner_id', user.id)
+            if (filterByOwner) {
+                emailsActQuery = emailsActQuery.eq('owner_id', filterByOwner)
+                meetingsActQuery = meetingsActQuery.eq('owner_id', filterByOwner)
+                callsActQuery = callsActQuery.eq('owner_id', filterByOwner)
+                leadsActQuery = leadsActQuery.eq('owner_id', filterByOwner)
             }
 
             const [emailsAct, meetingsAct, callsAct, leadsAct] = await Promise.all([
@@ -199,7 +229,8 @@ export default function DashboardPage() {
             })
             meetingsAct.data?.forEach(m => {
                 const lead = Array.isArray(m.leads) ? m.leads[0] : m.leads
-                activities.push({ id: m.id, type: 'meeting', title: `Reunión: ${m.location} con ${lead?.company_name || 'Desconocido'}`, date: m.created_at })
+                const meetingName = m.title || m.notes || (lead?.company_name ? `Reunión con ${lead.company_name}` : null) || 'Reunión'
+                activities.push({ id: m.id, type: 'meeting', title: meetingName, date: m.created_at })
             })
             callsAct.data?.forEach(c => {
                 const lead = Array.isArray(c.leads) ? c.leads[0] : c.leads
@@ -222,9 +253,9 @@ export default function DashboardPage() {
         const endOfDay = new Date(date)
         endOfDay.setHours(23, 59, 59, 999)
 
-        const { data: { user } } = await supabase.auth.getUser()
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
-        const isAdmin = profile?.role === 'admin'
+        const filterByOwner = isAdmin
+            ? (selectedUserId !== 'all' ? selectedUserId : null)
+            : currentUserId
 
         let query = supabase
             .from('meetings')
@@ -233,8 +264,8 @@ export default function DashboardPage() {
             .lte('start_time', endOfDay.toISOString())
             .order('start_time', { ascending: true })
 
-        if (!isAdmin && user) {
-            query = query.eq('owner_id', user.id)
+        if (filterByOwner) {
+            query = query.eq('owner_id', filterByOwner)
         }
 
         const { data, error } = await query
@@ -319,71 +350,144 @@ export default function DashboardPage() {
         setShowDatePicker(false)
     }
 
+    const getUserDisplayName = (p: TeamProfile) => {
+        if (p.first_name) return `${p.first_name} ${p.last_name || ''}`.trim()
+        return p.email
+    }
+
+    const selectedUserLabel = selectedUserId === 'all'
+        ? 'Todos'
+        : selectedUserId === currentUserId
+            ? 'Mis datos'
+            : getUserDisplayName(teamProfiles.find(p => p.id === selectedUserId) || { id: '', email: '', first_name: null, last_name: null })
+
     return (
-        <div className="h-full overflow-y-auto p-6 space-y-8 animate-in fade-in duration-500">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="h-full overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 md:space-y-8 animate-in fade-in duration-500">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
-                    <p className="mt-1 text-gray-500">Visualiza el rendimiento real de tu equipo.</p>
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
+                    <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">Visualiza el rendimiento real de tu equipo.</p>
                 </div>
 
-                {/* Date Picker Component */}
-                <div className="relative">
-                    <button
-                        onClick={() => setShowDatePicker(!showDatePicker)}
-                        className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-gray-300 transition-all text-sm font-semibold text-gray-700 active:scale-95"
-                    >
-                        <Filter size={16} className="text-gray-400" />
-                        <span>{dateRange.label}</span>
-                    </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {/* Admin User Filter */}
+                    {isAdmin && (
+                        <div className="relative flex-1 sm:flex-initial">
+                            <button
+                                onClick={() => { setShowUserPicker(!showUserPicker); setShowDatePicker(false) }}
+                                className="flex items-center justify-center space-x-2 w-full sm:w-auto px-3 py-2.5 sm:px-4 sm:py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-gray-300 transition-all text-xs sm:text-sm font-semibold text-gray-700 active:scale-95"
+                            >
+                                <Users size={16} className="text-indigo-500 shrink-0" />
+                                <span className="truncate">{selectedUserLabel}</span>
+                                <ChevronDown size={14} className="text-gray-400 shrink-0" />
+                            </button>
 
-                    {showDatePicker && (
-                        <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 p-2 animate-in slide-in-from-top-2 duration-200">
-                            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-50 mb-1">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Filtrar Período</span>
-                                <button onClick={() => setShowDatePicker(false)} className="text-gray-300 hover:text-gray-600">
-                                    <X size={14} />
-                                </button>
-                            </div>
-                            <div className="space-y-1">
-                                {[
-                                    { id: 'today', label: 'Hoy' },
-                                    { id: 'week', label: 'Últimos 7 días' },
-                                    { id: 'month', label: 'Últimos 30 días' },
-                                    { id: 'total', label: 'Todo el período' }
-                                ].map((option) => (
-                                    <button
-                                        key={option.id}
-                                        onClick={() => setRange(option.id as any)}
-                                        className={clsx(
-                                            "w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors",
-                                            dateRange.label === option.label ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50"
+                            {showUserPicker && (
+                                <div className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-64 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 p-2 animate-in slide-in-from-top-2 duration-200">
+                                    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-50 mb-1">
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Filtrar por persona</span>
+                                        <button onClick={() => setShowUserPicker(false)} className="text-gray-300 hover:text-gray-600">
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="space-y-0.5 max-h-64 overflow-y-auto">
+                                        <button
+                                            onClick={() => { setSelectedUserId('all'); setShowUserPicker(false) }}
+                                            className={clsx(
+                                                "w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors",
+                                                selectedUserId === 'all' ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50"
+                                            )}
+                                        >
+                                            👥 Todos
+                                        </button>
+                                        {currentUserId && (
+                                            <button
+                                                onClick={() => { setSelectedUserId(currentUserId); setShowUserPicker(false) }}
+                                                className={clsx(
+                                                    "w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors",
+                                                    selectedUserId === currentUserId ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50"
+                                                )}
+                                            >
+                                                🙋 Mis datos
+                                            </button>
                                         )}
-                                    >
-                                        {option.label}
-                                    </button>
-                                ))}
-                            </div>
+                                        <div className="border-t border-gray-100 my-1" />
+                                        {teamProfiles.filter(p => p.id !== currentUserId).map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => { setSelectedUserId(p.id); setShowUserPicker(false) }}
+                                                className={clsx(
+                                                    "w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors truncate",
+                                                    selectedUserId === p.id ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50"
+                                                )}
+                                            >
+                                                {getUserDisplayName(p)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
+
+                    {/* Date Picker Component */}
+                    <div className="relative flex-1 sm:flex-initial">
+                        <button
+                            onClick={() => { setShowDatePicker(!showDatePicker); setShowUserPicker(false) }}
+                            className="flex items-center justify-center space-x-2 w-full sm:w-auto px-3 py-2.5 sm:px-4 sm:py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-gray-300 transition-all text-xs sm:text-sm font-semibold text-gray-700 active:scale-95"
+                        >
+                            <Filter size={16} className="text-gray-400 shrink-0" />
+                            <span>{dateRange.label}</span>
+                        </button>
+
+                        {showDatePicker && (
+                            <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 p-2 animate-in slide-in-from-top-2 duration-200">
+                                <div className="flex items-center justify-between px-3 py-2 border-b border-gray-50 mb-1">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Filtrar Período</span>
+                                    <button onClick={() => setShowDatePicker(false)} className="text-gray-300 hover:text-gray-600">
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                                <div className="space-y-1">
+                                    {[
+                                        { id: 'today', label: 'Hoy' },
+                                        { id: 'week', label: 'Últimos 7 días' },
+                                        { id: 'month', label: 'Últimos 30 días' },
+                                        { id: 'total', label: 'Todo el período' }
+                                    ].map((option) => (
+                                        <button
+                                            key={option.id}
+                                            onClick={() => setRange(option.id as any)}
+                                            className={clsx(
+                                                "w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors",
+                                                dateRange.label === option.label ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50"
+                                            )}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* KPI Grid */}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6 sm:grid-cols-3 lg:grid-cols-5">
                 {kpis.map((kpi) => (
                     <div
                         key={kpi.name}
-                        className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm border border-gray-100 transition-all hover:shadow-md"
+                        className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-white p-3 sm:p-4 md:p-6 shadow-sm border border-gray-100 transition-all hover:shadow-md"
                     >
                         <div className="flex items-center justify-between">
-                            <div className={clsx("p-2.5 rounded-lg", kpi.bg)}>
-                                <kpi.icon className={clsx("h-5 w-5", kpi.color)} />
+                            <div className={clsx("p-1.5 sm:p-2 md:p-2.5 rounded-lg", kpi.bg)}>
+                                <kpi.icon className={clsx("h-4 w-4 sm:h-5 sm:w-5", kpi.color)} />
                             </div>
                         </div>
-                        <div className="mt-4">
-                            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{kpi.name}</h3>
-                            <p className="mt-1 text-2xl font-bold text-gray-900 tabular-nums">
+                        <div className="mt-2 sm:mt-3 md:mt-4">
+                            <h3 className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest">{kpi.name}</h3>
+                            <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl md:text-2xl font-bold text-gray-900 tabular-nums">
                                 {loading ? '...' : kpi.value}
                             </p>
                         </div>
@@ -392,60 +496,63 @@ export default function DashboardPage() {
             </div>
 
             {/* Main Sections Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* 1. Agenda (Previamente era col-span-8, ahora col-span-12 para protagonismo) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 md:gap-8">
+                {/* 1. Agenda */}
                 <div className="lg:col-span-12">
-                    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col h-[500px]">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center space-x-4">
-                                <div className="p-2 bg-indigo-50 rounded-lg">
-                                    <Calendar className="h-5 w-5 text-indigo-600" />
+                    <div className="rounded-xl sm:rounded-2xl bg-white p-3 sm:p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col h-[350px] sm:h-[400px] md:h-[500px]">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
+                            <div className="flex items-center space-x-3 sm:space-x-4">
+                                <div className="p-1.5 sm:p-2 bg-indigo-50 rounded-lg">
+                                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold text-gray-900">Agenda</h2>
-                                    <p className="text-xs text-gray-500">Tus compromisos para el día</p>
+                                    <h2 className="text-base sm:text-lg font-bold text-gray-900">Agenda</h2>
+                                    <p className="text-[10px] sm:text-xs text-gray-500">Tus compromisos para el día</p>
                                 </div>
                             </div>
-                            <div className="flex items-center space-x-3">
-                                <div className="flex items-center bg-gray-50 border border-gray-100 rounded-lg p-1">
+                            <div className="flex items-center space-x-2 sm:space-x-3">
+                                <div className="flex items-center bg-gray-50 border border-gray-100 rounded-lg p-0.5 sm:p-1">
                                     <button
                                         onClick={prevDay}
                                         className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
                                     >
-                                        <ChevronLeft size={16} />
+                                        <ChevronLeft size={14} className="sm:hidden" />
+                                        <ChevronLeft size={16} className="hidden sm:block" />
                                     </button>
-                                    <span className="px-3 text-xs font-bold text-gray-700 min-w-[120px] text-center capitalize">
+                                    <span className="px-2 sm:px-3 text-[11px] sm:text-xs font-bold text-gray-700 min-w-[100px] sm:min-w-[120px] text-center capitalize">
                                         {selectedDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
                                     </span>
                                     <button
                                         onClick={nextDay}
                                         className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-500"
                                     >
-                                        <ChevronRight size={16} />
+                                        <ChevronRight size={14} className="sm:hidden" />
+                                        <ChevronRight size={16} className="hidden sm:block" />
                                     </button>
                                 </div>
                                 <button
                                     onClick={() => setSelectedDate(new Date())}
-                                    className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-indigo-600 transition-colors"
+                                    className="px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-gray-500 hover:text-indigo-600 transition-colors"
                                 >
                                     Hoy
                                 </button>
                                 <button
                                     onClick={() => setIsCreateModalOpen(true)}
-                                    className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all active:scale-95"
+                                    className="p-1.5 sm:p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all active:scale-95"
                                 >
-                                    <Plus size={16} />
+                                    <Plus size={14} className="sm:hidden" />
+                                    <Plus size={16} className="hidden sm:block" />
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 space-y-2 sm:space-y-4 custom-scrollbar">
                             {dailyMeetings.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-center py-10 opacity-60">
-                                    <div className="p-4 bg-gray-50 rounded-full mb-4">
-                                        <Calendar className="h-10 w-10 text-gray-300" />
+                                <div className="flex flex-col items-center justify-center h-full text-center py-6 sm:py-10 opacity-60">
+                                    <div className="p-3 sm:p-4 bg-gray-50 rounded-full mb-3 sm:mb-4">
+                                        <Calendar className="h-8 w-8 sm:h-10 sm:w-10 text-gray-300" />
                                     </div>
-                                    <p className="text-sm font-medium text-gray-500">No hay reuniones para este día</p>
+                                    <p className="text-xs sm:text-sm font-medium text-gray-500">No hay reuniones para este día</p>
                                 </div>
                             ) : (
                                 dailyMeetings.map((meeting) => (
@@ -455,29 +562,31 @@ export default function DashboardPage() {
                                             setSelectedEventId(meeting.id)
                                             setIsDetailModalOpen(true)
                                         }}
-                                        className="group flex gap-4 p-4 rounded-xl border border-gray-100 hover:border-indigo-100 hover:bg-indigo-50/10 transition-all cursor-pointer"
+                                        className="group flex gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-gray-100 hover:border-indigo-100 hover:bg-indigo-50/10 transition-all cursor-pointer"
                                     >
-                                        <div className="flex flex-col items-center justify-center min-w-[70px] border-r border-gray-100 pr-4">
-                                            <span className="text-sm font-bold text-gray-900">
+                                        <div className="flex flex-col items-center justify-center min-w-[55px] sm:min-w-[70px] border-r border-gray-100 pr-2 sm:pr-4">
+                                            <span className="text-xs sm:text-sm font-bold text-gray-900">
                                                 {new Date(meeting.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
-                                            <span className="text-[10px] font-medium text-gray-400 mt-1">
+                                            <span className="text-[9px] sm:text-[10px] font-medium text-gray-400 mt-0.5 sm:mt-1">
                                                 {new Date(meeting.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors truncate">
-                                                {meeting.leads?.company_name || 'Reunión'}
+                                            <h3 className="font-bold text-sm sm:text-base text-gray-900 group-hover:text-indigo-600 transition-colors truncate">
+                                                {meeting.title || meeting.notes || meeting.leads?.company_name || 'Reunión'}
                                             </h3>
-                                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 sm:mt-2 text-[10px] sm:text-xs text-gray-500">
                                                 {meeting.location && (
-                                                    <span className="flex items-center">
-                                                        <MapPin size={12} className="mr-1.5 text-rose-500" />
-                                                        {meeting.location}
+                                                    <span className="flex items-center truncate max-w-[150px] sm:max-w-none">
+                                                        <MapPin size={10} className="sm:hidden mr-1 text-rose-500 shrink-0" />
+                                                        <MapPin size={12} className="hidden sm:block mr-1.5 text-rose-500 shrink-0" />
+                                                        <span className="truncate">{meeting.location}</span>
                                                     </span>
                                                 )}
                                                 <span className="flex items-center">
-                                                    <Clock size={12} className="mr-1.5 text-indigo-500" />
+                                                    <Clock size={10} className="sm:hidden mr-1 text-indigo-500" />
+                                                    <Clock size={12} className="hidden sm:block mr-1.5 text-indigo-500" />
                                                     {Math.round((new Date(meeting.end_time).getTime() - new Date(meeting.start_time).getTime()) / 60000)} min
                                                 </span>
                                             </div>
@@ -491,25 +600,25 @@ export default function DashboardPage() {
 
                 {/* 2. Pipeline Funnel (Lado a lado con Actividad) */}
                 <div className="lg:col-span-6">
-                    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col h-[450px]">
-                        <div className="flex items-center justify-between mb-6">
+                    <div className="rounded-xl sm:rounded-2xl bg-white p-3 sm:p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col h-auto min-h-[280px] sm:min-h-[350px] md:h-[450px]">
+                        <div className="flex items-center justify-between mb-4 sm:mb-6">
                             <div>
-                                <h2 className="text-lg font-bold text-gray-900">Embudo de Ventas</h2>
-                                <p className="text-xs text-gray-500">Conversión por etapa</p>
+                                <h2 className="text-base sm:text-lg font-bold text-gray-900">Embudo de Ventas</h2>
+                                <p className="text-[10px] sm:text-xs text-gray-500">Conversión por etapa</p>
                             </div>
-                            <Link href="/pipeline" className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors">
+                            <Link href="/pipeline" className="text-[10px] sm:text-xs font-bold text-indigo-600 bg-indigo-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg hover:bg-indigo-100 transition-colors">
                                 Ver Tablero
                             </Link>
                         </div>
 
-                        <div className="flex-1 flex flex-col justify-center space-y-3 px-4">
+                        <div className="flex-1 flex flex-col justify-center space-y-2 sm:space-y-3 px-0 sm:px-2 md:px-4">
                             {pipelineStats.length > 0 ? pipelineStats.map((stage) => (
                                 <div key={stage.name} className="relative group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-24 text-right">
-                                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{stage.name}</p>
+                                    <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+                                        <div className="w-16 sm:w-20 md:w-24 text-right">
+                                            <p className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-tight">{stage.name}</p>
                                         </div>
-                                        <div className="flex-1 h-8 bg-gray-50 rounded-r-lg relative overflow-hidden flex items-center">
+                                        <div className="flex-1 h-6 sm:h-7 md:h-8 bg-gray-50 rounded-r-lg relative overflow-hidden flex items-center">
                                             <div
                                                 className="h-full rounded-r-lg transition-all duration-1000 ease-out flex items-center"
                                                 style={{
@@ -517,19 +626,19 @@ export default function DashboardPage() {
                                                     backgroundColor: stage.color
                                                 }}
                                             >
-                                                <span className="ml-3 text-xs font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                <span className="ml-2 sm:ml-3 text-[10px] sm:text-xs font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                                     {stage.count} Leads
                                                 </span>
                                             </div>
                                             <span
-                                                className="absolute right-3 text-xs font-bold text-gray-700 tabular-nums"
+                                                className="absolute right-2 sm:right-3 text-[10px] sm:text-xs font-bold text-gray-700 tabular-nums"
                                                 style={{ opacity: stage.percent > 90 ? 0 : 1 }}
                                             >
                                                 {stage.count}
                                             </span>
                                         </div>
-                                        <div className="w-12 text-right">
-                                            <span className="text-xs font-bold text-gray-400">
+                                        <div className="w-8 sm:w-10 md:w-12 text-right">
+                                            <span className="text-[10px] sm:text-xs font-bold text-gray-400">
                                                 {stage.totalPercent}%
                                             </span>
                                         </div>
@@ -546,32 +655,37 @@ export default function DashboardPage() {
 
                 {/* 3. Actividad Reciente (Equilibrado con Funnel) */}
                 <div className="lg:col-span-6">
-                    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col h-[450px]">
-                        <div className="flex items-center justify-between mb-6">
+                    <div className="rounded-xl sm:rounded-2xl bg-white p-3 sm:p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col h-auto min-h-[280px] sm:min-h-[350px] md:h-[450px]">
+                        <div className="flex items-center justify-between mb-4 sm:mb-6">
                             <div>
-                                <h2 className="text-lg font-bold text-gray-900">Actividad Reciente</h2>
-                                <p className="text-xs text-gray-500">Últimas acciones realizadas</p>
+                                <h2 className="text-base sm:text-lg font-bold text-gray-900">Actividad Reciente</h2>
+                                <p className="text-[10px] sm:text-xs text-gray-500">Últimas acciones realizadas</p>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto pr-2 space-y-5 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 space-y-3 sm:space-y-5 custom-scrollbar">
                             {recentActivity.length > 0 ? recentActivity.map((act) => (
-                                <div key={act.id + act.type} className="flex items-start space-x-4 group p-2 hover:bg-gray-50 rounded-xl transition-all cursor-default">
+                                <div key={act.id + act.type} className="flex items-start space-x-2.5 sm:space-x-4 group p-1.5 sm:p-2 hover:bg-gray-50 rounded-xl transition-all cursor-default">
                                     <div className={clsx(
-                                        "mt-1 p-2 rounded-lg shadow-sm transition-transform group-hover:scale-110",
+                                        "mt-0.5 sm:mt-1 p-1.5 sm:p-2 rounded-lg shadow-sm transition-transform group-hover:scale-110 shrink-0",
                                         act.type === 'lead' ? "bg-blue-50 text-blue-600" :
                                             act.type === 'meeting' ? "bg-indigo-50 text-indigo-600" :
                                                 act.type === 'email' ? "bg-purple-50 text-purple-600" :
                                                     "bg-rose-50 text-rose-600"
                                     )}>
-                                        {act.type === 'lead' ? <Users size={14} /> :
-                                            act.type === 'meeting' ? <Calendar size={14} /> :
-                                                act.type === 'email' ? <Mail size={14} /> :
-                                                    <PhoneCall size={14} />}
+                                        {act.type === 'lead' ? <Users size={12} className="sm:hidden" /> :
+                                            act.type === 'meeting' ? <Calendar size={12} className="sm:hidden" /> :
+                                                act.type === 'email' ? <Mail size={12} className="sm:hidden" /> :
+                                                    <PhoneCall size={12} className="sm:hidden" />}
+                                        {act.type === 'lead' ? <Users size={14} className="hidden sm:block" /> :
+                                            act.type === 'meeting' ? <Calendar size={14} className="hidden sm:block" /> :
+                                                act.type === 'email' ? <Mail size={14} className="hidden sm:block" /> :
+                                                    <PhoneCall size={14} className="hidden sm:block" />}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors">{act.title}</p>
-                                        <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-wider flex items-center">
-                                            <Clock size={10} className="mr-1" />
+                                        <p className="text-xs sm:text-sm font-bold text-gray-900 leading-tight group-hover:text-indigo-600 transition-colors truncate">{act.title}</p>
+                                        <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5 sm:mt-1 uppercase font-bold tracking-wider flex items-center">
+                                            <Clock size={9} className="sm:hidden mr-0.5" />
+                                            <Clock size={10} className="hidden sm:block mr-1" />
                                             {new Date(act.date).toLocaleDateString()} • {new Date(act.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </p>
                                     </div>

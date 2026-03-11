@@ -19,6 +19,7 @@ import EventDetailModal from '../components/EventDetailModal'
 interface Meeting {
     id: string
     lead_id: string
+    title: string
     start_time: string
     end_time: string
     attendees: string[]
@@ -178,7 +179,7 @@ export default function MeetingsPage() {
                                                 <div className="flex items-center space-x-1.5">
                                                     <div className="h-1 w-1 bg-emerald-500 rounded-full" />
                                                     <span>{new Date(m.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                    <span className="opacity-60 font-medium">{m.leads?.company_name}</span>
+                                                    <span className="opacity-60 font-medium truncate">{m.title || m.notes || m.leads?.company_name || 'Reunión'}</span>
                                                 </div>
                                             </button>
                                         ))}
@@ -224,7 +225,10 @@ export default function MeetingsPage() {
                                             <div className="h-1 w-1 bg-emerald-500 rounded-full" />
                                             <span>{new Date(m.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
-                                        <div className="font-bold text-slate-900 line-clamp-2 leading-relaxed">{m.leads?.company_name}</div>
+                                        <div className="font-bold text-slate-900 line-clamp-2 leading-relaxed">{m.title || m.notes || m.leads?.company_name || 'Reunión'}</div>
+                                        {(m.title || m.notes) && m.leads?.company_name && (
+                                            <div className="text-[9px] text-slate-400 font-medium mt-0.5 truncate">{m.leads.company_name}</div>
+                                        )}
                                     </div>
                                 ))
                             }
@@ -274,7 +278,10 @@ export default function MeetingsPage() {
                                     </span>
                                 </div>
                                 <div className="flex-1">
-                                    <h3 className="font-bold text-slate-900 text-xl tracking-tight group-hover:text-emerald-600 transition-colors">{m.leads?.company_name || 'Reunión Estratégica'}</h3>
+                                    <h3 className="font-bold text-slate-900 text-xl tracking-tight group-hover:text-emerald-600 transition-colors">{m.title || m.notes || m.leads?.company_name || 'Reunión'}</h3>
+                                    {(m.title || m.notes) && m.leads?.company_name && (
+                                        <p className="text-sm text-slate-400 font-medium mt-1">{m.leads.company_name}</p>
+                                    )}
                                     <div className="flex items-center gap-6 mt-3 text-xs font-bold text-slate-400 uppercase tracking-widest">
                                         {m.location && <span className="flex items-center"><MapPin size={12} className="mr-2 text-emerald-500" /> {m.location}</span>}
                                         <span className="flex items-center"><User size={12} className="mr-2 text-amber-500" /> {m.attendees?.length || 0} Participantes</span>

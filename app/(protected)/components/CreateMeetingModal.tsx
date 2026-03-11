@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/auth/client'
-import { X, Calendar, Clock, MapPin, AlignLeft, User, Send, Search, Plus, Trash2, ChevronLeft, ChevronRight, Timer } from 'lucide-react'
+import { X, Calendar, Clock, MapPin, Send, Search, Plus, Trash2, ChevronLeft, ChevronRight, User } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useNotification } from './ui/NotificationProvider'
 
@@ -17,10 +17,19 @@ const DURATIONS = [
     { label: '15 min', value: 15 },
     { label: '30 min', value: 30 },
     { label: '45 min', value: 45 },
-    { label: '1 hora', value: 60 },
-    { label: '1.5 horas', value: 90 },
-    { label: '2 horas', value: 120 },
+    { label: '1h', value: 60 },
+    { label: '1.5h', value: 90 },
+    { label: '2h', value: 120 },
 ]
+
+const MEETING_TIMES = (() => {
+    const slots: string[] = []
+    for (let h = 7; h <= 21; h++) {
+        slots.push(`${String(h).padStart(2, '0')}:00`)
+        slots.push(`${String(h).padStart(2, '0')}:30`)
+    }
+    return slots
+})()
 
 export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initialLeadId }: CreateMeetingModalProps) {
     const supabase = createClient()
@@ -30,16 +39,16 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
     const [searchQuery, setSearchQuery] = useState('')
     const [showSuggestions, setShowSuggestions] = useState(false)
 
-    // Date & Time State
-    const [selectedDate, setSelectedDate] = useState<Date>(() => {
-        const tomorrow = new Date()
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        tomorrow.setHours(8, 0, 0, 0)
-        return tomorrow
-    })
+    const [selectedDate, setSelectedDate] = useState('')
+    const [selectedTime, setSelectedTime] = useState('10:00')
     const [duration, setDuration] = useState(30)
     const [newGuest, setNewGuest] = useState('')
     const [guests, setGuests] = useState<string[]>([])
+
+    const [calendarMonth, setCalendarMonth] = useState(() => {
+        const now = new Date()
+        return { year: now.getFullYear(), month: now.getMonth() }
+    })
 
     const [formData, setFormData] = useState({
         lead_id: initialLeadId || '',
@@ -49,19 +58,18 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
     })
 
     const searchRef = useRef<HTMLDivElement>(null)
-    const hoursRef = useRef<HTMLDivElement>(null)
-    const minutesRef = useRef<HTMLDivElement>(null)
+    const timeGridRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         if (isOpen) {
             fetchLeads()
-            // Reset to tomorrow 8am when opening
             const tomorrow = new Date()
             tomorrow.setDate(tomorrow.getDate() + 1)
-            tomorrow.setHours(8, 0, 0, 0)
-            setSelectedDate(tomorrow)
+            setSelectedDate(`${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`)
+            setSelectedTime('10:00')
             setDuration(30)
             setGuests([])
+            setNewGuest('')
             setSearchQuery('')
             setShowSuggestions(false)
             setFormData({
@@ -70,6 +78,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                 notes: '',
                 send_confirmation: true
             })
+            setCalendarMonth({ year: tomorrow.getFullYear(), month: tomorrow.getMonth() })
         }
     }, [isOpen, initialLeadId])
 
@@ -77,63 +86,50 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
         if (isOpen && initialLeadId && leads.length > 0) {
             const lead = leads.find(l => l.id === initialLeadId)
             if (lead) {
-                setSearchQuery(`${lead.company_name} - ${lead.contact_name}`)
+                setSearchQuery(lead.company_name)
             }
         }
     }, [isOpen, initialLeadId, leads])
 
+    // Scroll time grid to selected time
     useEffect(() => {
-        if (isOpen && hoursRef.current && minutesRef.current) {
-            // Wait for render
+        if (isOpen && timeGridRef.current) {
             setTimeout(() => {
-                const hourBtn = hoursRef.current?.querySelector(`[data-hour="${selectedDate.getHours()}"]`) as HTMLElement
-                const minuteBtn = minutesRef.current?.querySelector(`[data-minute="${selectedDate.getMinutes()}"]`) as HTMLElement
-
-                if (hourBtn) {
-                    hoursRef.current!.scrollTop = hourBtn.offsetTop - 100
+                const selected = timeGridRef.current?.querySelector('[data-selected="true"]') as HTMLElement
+                if (selected) {
+                    selected.scrollIntoView({ block: 'center', behavior: 'smooth' })
                 }
-                if (minuteBtn) {
-                    minutesRef.current!.scrollTop = minuteBtn.offsetTop - 100
-                }
-            }, 100)
+            }, 150)
         }
-    }, [isOpen, selectedDate.getHours(), selectedDate.getMinutes()])
+    }, [isOpen, selectedTime])
 
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
+        function handleClickOutside(event: MouseEvent) {
             if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
                 setShowSuggestions(false)
             }
         }
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [])
 
     const fetchLeads = async () => {
-        const { data } = await supabase.from('leads').select('id, company_name, contact_name, email')
+        const { data } = await supabase.from('leads').select('id, company_name, contact_name, email').order('company_name')
         setLeads(data || [])
     }
 
-    const filteredLeads = leads.filter(lead => {
-        if (!searchQuery) return false
-        const query = searchQuery.toLowerCase()
-        return (
-            lead.company_name?.toLowerCase().includes(query) ||
-            lead.contact_name?.toLowerCase().includes(query) ||
-            lead.email?.toLowerCase().includes(query)
-        )
-    })
+    const filteredLeads = leads.filter(l =>
+        l.company_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        l.contact_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    ).slice(0, 8)
 
     const addGuest = () => {
-        if (newGuest && !guests.includes(newGuest) && newGuest.includes('@')) {
+        if (newGuest && newGuest.includes('@') && !guests.includes(newGuest)) {
             setGuests([...guests, newGuest])
             setNewGuest('')
         }
     }
-
-    const removeGuest = (email: string) => {
-        setGuests(guests.filter(g => g !== email))
-    }
+    const removeGuest = (email: string) => setGuests(guests.filter(g => g !== email))
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -142,21 +138,24 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
         try {
             const { data: userData } = await supabase.auth.getUser()
             const ownerId = userData.user?.id
-
             if (!ownerId) throw new Error('No se pudo encontrar al usuario.')
 
-            const startTime = selectedDate.toISOString()
-            const endTime = new Date(selectedDate.getTime() + duration * 60 * 1000).toISOString()
+            const startDate = new Date(`${selectedDate}T${selectedTime}:00`)
+            const startTime = startDate.toISOString()
+            const endTime = new Date(startDate.getTime() + duration * 60 * 1000).toISOString()
 
-            // Combine guest emails with lead email for calendar invitation
             const lead = leads.find(l => l.id === formData.lead_id)
             const allAttendees = [...guests]
             if (lead?.email) allAttendees.push(lead.email)
 
             // 1. Create Meeting in DB
+            const meetingTitle = lead
+                ? `Reunión con ${lead.company_name}`
+                : 'Reunión CRM'
             const { data: meeting, error: meetingError } = await supabase.from('meetings').insert([{
                 lead_id: formData.lead_id || null,
                 owner_id: ownerId,
+                title: meetingTitle,
                 start_time: startTime,
                 end_time: endTime,
                 location: formData.location,
@@ -173,9 +172,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        title: meeting.lead_id
-                            ? `Reunión con ${(leads.find(l => l.id === meeting.lead_id) || {}).company_name || 'Lead'}`
-                            : 'Reunión CRM',
+                        title: meetingTitle,
                         start_time: startTime,
                         end_time: endTime,
                         location: formData.location,
@@ -215,14 +212,13 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                         lead_id: lead.id,
                         to: lead.email,
                         subject: `Confirmación de Reunión: ${lead.company_name}`,
-                        body: `Hola ${lead.contact_name || 'hola'},\n\nTe confirmo nuestra reunión programada para el día ${selectedDate.toLocaleDateString()} a las ${selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.\n\nLugar: ${formData.location || (googleMeetLink ? 'Google Meet' : 'Online')}${meetLinkHtml}\n\nNotas: ${formData.notes || 'N/A'}\n\nSaludos.`,
+                        body: `Hola ${lead.contact_name || 'hola'},\n\nTe confirmo nuestra reunión programada para el día ${startDate.toLocaleDateString('es-ES')} a las ${selectedTime}.\n\nLugar: ${formData.location || (googleMeetLink ? 'Google Meet' : 'Online')}${meetLinkHtml}\n\nNotas: ${formData.notes || 'N/A'}\n\nSaludos.`,
                     })
                 })
             }
 
             // 4. Update Lead Status & Last Activity
             if (formData.lead_id) {
-                // If status is 'new' or 'contacted', move to 'demo_scheduled'
                 await supabase
                     .from('leads')
                     .update({
@@ -232,14 +228,13 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                     .eq('id', formData.lead_id)
                     .in('status', ['new', 'contacted'])
 
-                // Always update last_activity_at regardless of status (if not already covered)
                 await supabase
                     .from('leads')
                     .update({ last_activity_at: new Date().toISOString() })
                     .eq('id', formData.lead_id)
             }
 
-            showSuccess('Reunión agendada correctamente')
+            showSuccess('Reunión agendada')
             onSuccess()
             onClose()
         } catch (error: any) {
@@ -250,370 +245,281 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
         }
     }
 
-    const [currentMonthView, setCurrentMonthView] = useState(new Date())
-    const daysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
-    const firstDayOfMonth = (date: Date) => {
-        const d = new Date(date.getFullYear(), date.getMonth(), 1).getDay()
-        return d === 0 ? 6 : d - 1 // Mon-Sun
-    }
-
-    const handleDateSelect = (day: number) => {
-        const newDate = new Date(selectedDate)
-        newDate.setFullYear(currentMonthView.getFullYear())
-        newDate.setMonth(currentMonthView.getMonth())
-        newDate.setDate(day)
-        setSelectedDate(newDate)
-    }
-
-    const handleTimeSelect = (hour: number, minute: number) => {
-        const newDate = new Date(selectedDate)
-        newDate.setHours(hour, minute, 0, 0)
-        setSelectedDate(newDate)
-    }
-
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col border border-gray-200">
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                    <div>
-                        <h2 className="text-base font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                            <Calendar size={18} className="text-gray-400" />
-                            Agendar Reunión
-                        </h2>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-2">
+                        <Calendar size={16} className="text-gray-400" />
+                        <h2 className="text-base font-semibold text-gray-900">Agendar reunión</h2>
                     </div>
-                    <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded-lg transition-all group">
-                        <X size={16} className="text-gray-400 group-hover:text-gray-900" />
+                    <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                        <X size={18} className="text-gray-400" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        {/* Left Column: Lead & Date */}
-                        <div className="lg:col-span-5 space-y-6">
-                            {/* Lead Selection */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Cliente / Prospecto</label>
-                                <div ref={searchRef} className="relative">
-                                    {!initialLeadId ? (
-                                        <div className="relative group">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={16} />
-                                            <input
-                                                type="text"
-                                                placeholder="Buscar..."
-                                                value={searchQuery}
-                                                onChange={(e) => {
-                                                    setSearchQuery(e.target.value)
-                                                    setShowSuggestions(true)
-                                                }}
-                                                className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-lg border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all text-sm font-medium text-gray-900"
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="p-2 py-1.5 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center justify-between">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <div className="h-6 w-6 rounded bg-indigo-600 flex items-center justify-center text-white font-bold text-[10px] shrink-0">
-                                                    {searchQuery.charAt(0) || 'L'}
-                                                </div>
-                                                <span className="font-bold text-gray-900 text-xs truncate">{searchQuery || 'Lead Seleccionado'}</span>
-                                            </div>
-                                            <span className="text-[8px] font-bold text-indigo-600 bg-white px-1.5 py-0.5 rounded uppercase tracking-wider border border-indigo-100 shrink-0">
-                                                Fijo
-                                            </span>
-                                        </div>
-                                    )}
+                {/* Body */}
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+                    <div className="p-5 space-y-5">
 
-                                    {showSuggestions && filteredLeads.length > 0 && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
-                                            {filteredLeads.map(lead => (
-                                                <button
-                                                    key={lead.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setFormData({ ...formData, lead_id: lead.id })
-                                                        setSearchQuery(`${lead.company_name} - ${lead.contact_name}`)
-                                                        setShowSuggestions(false)
-                                                    }}
-                                                    className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center justify-between group transition-colors border-b border-gray-50 last:border-0"
-                                                >
-                                                    <div className="min-w-0">
-                                                        <div className="font-bold text-xs text-gray-900 group-hover:text-indigo-600 truncate">{lead.company_name}</div>
-                                                        <div className="text-[10px] text-gray-500 truncate">{lead.contact_name}</div>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {formData.lead_id && !initialLeadId && (
-                                        <div className="mt-2 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100 flex items-center gap-2">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[10px] font-bold text-indigo-900 truncate">{searchQuery}</p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setFormData({ ...formData, lead_id: '' })
-                                                    setSearchQuery('')
-                                                }}
-                                                className="p-1 hover:bg-white rounded-md text-gray-400 hover:text-red-500 transition-all shrink-0"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
+                        {/* Lead selection */}
+                        <div ref={searchRef} className="relative">
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Cliente</label>
+                            {!initialLeadId ? (
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar empresa..."
+                                        value={searchQuery}
+                                        onChange={(e) => {
+                                            setSearchQuery(e.target.value)
+                                            setShowSuggestions(true)
+                                            if (formData.lead_id) setFormData({ ...formData, lead_id: '' })
+                                        }}
+                                        onFocus={() => setShowSuggestions(true)}
+                                        className="w-full pl-9 pr-8 py-2.5 bg-white border border-gray-200 rounded-lg focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none transition-all text-sm text-gray-900"
+                                    />
+                                    {formData.lead_id && (
+                                        <button type="button" onClick={() => { setFormData({ ...formData, lead_id: '' }); setSearchQuery('') }}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-100 rounded">
+                                            <X size={13} className="text-gray-400" />
+                                        </button>
                                     )}
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="py-2.5 px-3.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-900">
+                                    {searchQuery || 'Lead seleccionado'}
+                                </div>
+                            )}
 
-                            {/* Date Picker */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Fecha</label>
-                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <span className="text-xs font-bold text-gray-900 capitalize">
-                                            {currentMonthView.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                                        </span>
-                                        <div className="flex gap-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => setCurrentMonthView(new Date(currentMonthView.getFullYear(), currentMonthView.getMonth() - 1, 1))}
-                                                className="p-1 hover:bg-white rounded transition-all"
-                                            >
-                                                <ChevronLeft size={14} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setCurrentMonthView(new Date(currentMonthView.getFullYear(), currentMonthView.getMonth() + 1, 1))}
-                                                className="p-1 hover:bg-white rounded transition-all"
-                                            >
-                                                <ChevronRight size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-7 gap-1 text-center mb-1">
-                                        {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
-                                            <span key={day} className="text-[8px] font-bold text-gray-400 uppercase">{day}</span>
-                                        ))}
-                                    </div>
-                                    <div className="grid grid-cols-7 gap-1">
-                                        {Array.from({ length: firstDayOfMonth(currentMonthView) }).map((_, i) => (
-                                            <div key={`empty-${i}`} />
-                                        ))}
-                                        {Array.from({ length: daysInMonth(currentMonthView) }).map((_, i) => {
-                                            const day = i + 1
-                                            const dateForDay = new Date(currentMonthView.getFullYear(), currentMonthView.getMonth(), day)
-                                            const isSelected = selectedDate.getDate() === day &&
-                                                selectedDate.getMonth() === currentMonthView.getMonth() &&
-                                                selectedDate.getFullYear() === currentMonthView.getFullYear()
-                                            const isToday = new Date().toDateString() === dateForDay.toDateString()
+                            {showSuggestions && searchQuery && !formData.lead_id && (
+                                <div className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden max-h-40 overflow-y-auto">
+                                    {filteredLeads.length > 0 ? filteredLeads.map(lead => (
+                                        <button
+                                            key={lead.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({ ...formData, lead_id: lead.id })
+                                                setSearchQuery(lead.company_name)
+                                                setShowSuggestions(false)
+                                            }}
+                                            className="w-full px-3.5 py-2.5 text-left hover:bg-gray-50 text-sm"
+                                        >
+                                            <span className="font-medium text-gray-900">{lead.company_name}</span>
+                                            {lead.contact_name && <span className="text-gray-400 ml-2 text-xs">· {lead.contact_name}</span>}
+                                        </button>
+                                    )) : (
+                                        <div className="px-3.5 py-2.5 text-xs text-gray-400 text-center">Sin resultados</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
 
-                                            return (
-                                                <button
-                                                    key={day}
-                                                    type="button"
-                                                    onClick={() => handleDateSelect(day)}
+                        {/* Calendar */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-2">Fecha</label>
+                            <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
+                                    <button type="button" onClick={() => setCalendarMonth(prev => {
+                                        const d = new Date(prev.year, prev.month - 1)
+                                        return { year: d.getFullYear(), month: d.getMonth() }
+                                    })} className="p-1 hover:bg-gray-200 rounded transition-colors">
+                                        <ChevronLeft size={14} className="text-gray-500" />
+                                    </button>
+                                    <span className="text-xs font-semibold text-gray-700 capitalize">
+                                        {new Date(calendarMonth.year, calendarMonth.month).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                                    </span>
+                                    <button type="button" onClick={() => setCalendarMonth(prev => {
+                                        const d = new Date(prev.year, prev.month + 1)
+                                        return { year: d.getFullYear(), month: d.getMonth() }
+                                    })} className="p-1 hover:bg-gray-200 rounded transition-colors">
+                                        <ChevronRight size={14} className="text-gray-500" />
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-7 border-b border-gray-100">
+                                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => (
+                                        <div key={d} className="py-1.5 text-center text-[10px] font-medium text-gray-400">{d}</div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-7 p-1 gap-0.5">
+                                    {(() => {
+                                        const firstDay = new Date(calendarMonth.year, calendarMonth.month, 1)
+                                        const lastDay = new Date(calendarMonth.year, calendarMonth.month + 1, 0)
+                                        const startPad = (firstDay.getDay() + 6) % 7
+                                        const todayStr = new Date().toISOString().split('T')[0]
+                                        const cells = []
+                                        for (let i = 0; i < startPad; i++) cells.push(<div key={`pad-${i}`} />)
+                                        for (let day = 1; day <= lastDay.getDate(); day++) {
+                                            const dateStr = `${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                                            const isSelected = selectedDate === dateStr
+                                            const isToday = dateStr === todayStr
+                                            cells.push(
+                                                <button key={day} type="button" onClick={() => setSelectedDate(dateStr)}
                                                     className={clsx(
-                                                        "h-7 w-full flex items-center justify-center rounded-md text-[10px] font-bold transition-all relative",
-                                                        isSelected ? "bg-indigo-600 text-white shadow-sm" :
-                                                            isToday ? "text-indigo-600 bg-white ring-1 ring-inset ring-indigo-100" : "text-gray-700 hover:bg-white hover:shadow-sm"
-                                                    )}
-                                                >
+                                                        "h-8 w-full rounded-md text-xs font-medium transition-all",
+                                                        isSelected ? "bg-gray-900 text-white" : isToday ? "ring-1 ring-gray-300 text-gray-900 hover:bg-gray-100" : "text-gray-700 hover:bg-gray-100"
+                                                    )}>
                                                     {day}
                                                 </button>
                                             )
-                                        })}
-                                    </div>
+                                        }
+                                        return cells
+                                    })()}
                                 </div>
+                                {selectedDate && (
+                                    <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
+                                        <span className="text-xs font-medium text-gray-700">
+                                            {new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Right Column: Time & Details */}
-                        <div className="lg:col-span-7 space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
-                                {/* Time Selector */}
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Hora</label>
-                                    <div className="bg-gray-50 rounded-xl border border-gray-200 p-2 flex flex-col h-[180px]">
-                                        <div className="flex gap-2 h-full overflow-hidden">
-                                            <div ref={hoursRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
-                                                {Array.from({ length: 24 }).map((_, h) => {
-                                                    const isSelected = selectedDate.getHours() === h
-                                                    return (
-                                                        <button
-                                                            key={`h-${h}`}
-                                                            data-hour={h}
-                                                            type="button"
-                                                            onClick={() => handleTimeSelect(h, selectedDate.getMinutes())}
-                                                            className={clsx(
-                                                                "w-full py-1 px-2 rounded-md flex items-center justify-center text-[10px] font-bold transition-all",
-                                                                isSelected ? "bg-white text-indigo-600 shadow-sm ring-1 ring-inset ring-indigo-100" : "text-gray-500 hover:bg-white/50"
-                                                            )}
-                                                        >
-                                                            {h.toString().padStart(2, '0')}
-                                                        </button>
-                                                    )
-                                                })}
-                                            </div>
-                                            <div ref={minutesRef} className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
-                                                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => {
-                                                    const isSelected = selectedDate.getMinutes() === m
-                                                    return (
-                                                        <button
-                                                            key={`m-${m}`}
-                                                            data-minute={m}
-                                                            type="button"
-                                                            onClick={() => handleTimeSelect(selectedDate.getHours(), m)}
-                                                            className={clsx(
-                                                                "w-full py-1 px-2 rounded-md flex items-center justify-center text-[10px] font-bold transition-all",
-                                                                isSelected ? "bg-white text-indigo-600 shadow-sm ring-1 ring-inset ring-indigo-100" : "text-gray-500 hover:bg-white/50"
-                                                            )}
-                                                        >
-                                                            {m.toString().padStart(2, '0')}
-                                                        </button>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                        <div className="mt-2 text-center py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-black">
-                                            {selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Duration & Location */}
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Duración</label>
-                                        <div className="grid grid-cols-3 gap-1.5">
-                                            {DURATIONS.map(d => (
-                                                <button
-                                                    key={d.value}
-                                                    type="button"
-                                                    onClick={() => setDuration(d.value)}
-                                                    className={clsx(
-                                                        "py-1.5 px-1 rounded-lg text-[9px] font-bold transition-all border",
-                                                        duration === d.value ? "bg-gray-900 border-gray-900 text-white" : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-white"
-                                                    )}
-                                                >
-                                                    {d.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Ubicación / Link</label>
-                                        <div className="relative group">
-                                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                                            <input
-                                                type="text"
-                                                placeholder="Link o lugar..."
-                                                value={formData.location}
-                                                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                                className="w-full pl-9 pr-3 py-1.5 bg-gray-50 rounded-lg border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all text-xs font-medium"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Guests & Notes */}
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Invitados</label>
-                                    <div className="flex gap-1.5">
-                                        <input
-                                            type="email"
-                                            placeholder="Añadir email..."
-                                            value={newGuest}
-                                            onChange={(e) => setNewGuest(e.target.value)}
-                                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addGuest())}
-                                            className="flex-1 px-3 py-1.5 bg-gray-50 rounded-lg border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all text-xs font-medium"
-                                        />
+                        {/* Time + Duration row */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Hora</label>
+                                <div ref={timeGridRef} className="border border-gray-200 rounded-lg p-1.5 grid grid-cols-3 gap-1 max-h-28 overflow-y-auto">
+                                    {MEETING_TIMES.map(slot => (
                                         <button
+                                            key={slot}
                                             type="button"
-                                            onClick={addGuest}
-                                            className="px-3 bg-gray-900 text-white rounded-lg text-xs font-bold hover:bg-black transition-all"
+                                            data-selected={selectedTime === slot}
+                                            onClick={() => setSelectedTime(slot)}
+                                            className={clsx(
+                                                "py-1.5 rounded-md text-xs font-medium transition-all",
+                                                selectedTime === slot ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+                                            )}
                                         >
-                                            +
+                                            {slot}
                                         </button>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1 max-h-[60px] overflow-y-auto custom-scrollbar">
-                                        {guests.map(email => (
-                                            <div key={email} className="bg-gray-100 flex items-center gap-1.5 px-2 py-0.5 rounded-md">
-                                                <span className="text-[9px] font-medium text-gray-700">{email}</span>
-                                                <button type="button" onClick={() => removeGuest(email)} className="text-gray-400 hover:text-red-500"><X size={10} /></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Notas</label>
-                                    <textarea
-                                        value={formData.notes}
-                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                        rows={3}
-                                        className="w-full px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 focus:border-indigo-600 focus:bg-white outline-none transition-all text-xs font-medium resize-none"
-                                        placeholder="Temas a tratar..."
-                                    />
+                                    ))}
                                 </div>
                             </div>
-
-                            {/* Options & Submit */}
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
-                                <div className="flex items-center gap-2">
-                                    <div className="h-6 w-6 rounded-md bg-white flex items-center justify-center shadow-sm border border-gray-100">
-                                        <Send className="text-indigo-600" size={12} />
-                                    </div>
-                                    <span className="text-[10px] font-bold text-gray-700">Enviar Confirmación</span>
-                                    <input
-                                        type="checkbox"
-                                        className="w-3.5 h-3.5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
-                                        checked={formData.send_confirmation}
-                                        onChange={e => setFormData({ ...formData, send_confirmation: e.target.checked })}
-                                    />
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={onClose}
-                                        className="text-[10px] font-bold text-gray-400 hover:text-gray-900 uppercase tracking-widest px-2"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={loading || !formData.lead_id}
-                                        className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-xs font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-2 uppercase tracking-tight"
-                                    >
-                                        {loading ? (
-                                            <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        ) : (
-                                            <Clock size={14} />
-                                        )}
-                                        {loading ? 'Programando...' : 'Agendar'}
-                                    </button>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Duración</label>
+                                <div className="border border-gray-200 rounded-lg p-1.5 grid grid-cols-2 gap-1">
+                                    {DURATIONS.map(d => (
+                                        <button
+                                            key={d.value}
+                                            type="button"
+                                            onClick={() => setDuration(d.value)}
+                                            className={clsx(
+                                                "py-2 rounded-md text-xs font-medium transition-all",
+                                                duration === d.value ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+                                            )}
+                                        >
+                                            {d.label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         </div>
+
+                        {/* Location */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Ubicación / Link</label>
+                            <div className="relative">
+                                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                                <input
+                                    type="text"
+                                    placeholder="Google Meet, oficina..."
+                                    value={formData.location}
+                                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                                    className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-gray-200 rounded-lg focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none transition-all text-sm text-gray-900"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Guests */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Invitados</label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="email"
+                                    placeholder="email@ejemplo.com"
+                                    value={newGuest}
+                                    onChange={(e) => setNewGuest(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addGuest() } }}
+                                    className="flex-1 px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none transition-all text-sm text-gray-900"
+                                />
+                                <button type="button" onClick={addGuest} className="px-3 bg-gray-900 text-white rounded-lg hover:bg-black transition-all">
+                                    <Plus size={16} />
+                                </button>
+                            </div>
+                            {guests.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {guests.map(email => (
+                                        <div key={email} className="bg-gray-100 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs">
+                                            <span className="text-gray-700">{email}</span>
+                                            <button type="button" onClick={() => removeGuest(email)} className="text-gray-400 hover:text-red-500">
+                                                <X size={12} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Notas</label>
+                            <textarea
+                                value={formData.notes}
+                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                rows={2}
+                                className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none transition-all text-sm text-gray-900 resize-none"
+                                placeholder="Temas a tratar..."
+                            />
+                        </div>
+
+                        {/* Send confirmation toggle */}
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <div className={clsx(
+                                "relative w-9 h-5 rounded-full transition-colors",
+                                formData.send_confirmation ? "bg-gray-900" : "bg-gray-200"
+                            )} onClick={() => setFormData({ ...formData, send_confirmation: !formData.send_confirmation })}>
+                                <div className={clsx(
+                                    "absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                                    formData.send_confirmation ? "translate-x-4" : "translate-x-0.5"
+                                )} />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <Send size={13} className="text-gray-400" />
+                                <span className="text-xs font-medium text-gray-600">Enviar email de confirmación</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 bg-gray-50/50">
+                        <button type="button" onClick={onClose}
+                            className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors">
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading || !formData.lead_id || !selectedDate}
+                            className={clsx(
+                                "px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2",
+                                loading || !formData.lead_id || !selectedDate ? "opacity-50" : "hover:bg-black active:scale-[0.98]"
+                            )}
+                        >
+                            {loading ? (
+                                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <Calendar size={15} />
+                            )}
+                            {loading ? 'Agendando...' : 'Agendar'}
+                        </button>
                     </div>
                 </form>
-
-                <style jsx>{`
-                    .custom-scrollbar::-webkit-scrollbar {
-                        width: 4px;
-                    }
-                    .custom-scrollbar::-webkit-scrollbar-track {
-                        background: transparent;
-                    }
-                    .custom-scrollbar::-webkit-scrollbar-thumb {
-                        background: rgba(0, 0, 0, 0.05);
-                        border-radius: 20px;
-                    }
-                    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                        background: rgba(0, 0, 0, 0.1);
-                    }
-                `}</style>
             </div>
         </div>
     )
