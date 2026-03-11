@@ -28,7 +28,11 @@ import {
     Store,
     Info,
     Eye,
-    EyeOff
+    EyeOff,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -80,6 +84,9 @@ function AdminContent() {
     const [importBatches, setImportBatches] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [totalLeadsCount, setTotalLeadsCount] = useState(0)
+    const [availableCountries, setAvailableCountries] = useState<string[]>([])
+    const [availableCategories, setAvailableCategories] = useState<string[]>([])
 
     // Toast notifications
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
@@ -113,25 +120,31 @@ function AdminContent() {
         owner: 'all' // all, assigned, unassigned
     })
 
+    const updateFilter = (newFilter: Partial<typeof filters>) => {
+        setFilters(prev => ({ ...prev, ...newFilter }))
+        setCurrentPage(1)
+    }
+
+    // Pagination
+    const LEADS_PER_PAGE = 50
+    const [currentPage, setCurrentPage] = useState(1)
+
     const showToast = (message: string, type: 'success' | 'error' | 'info') => {
         setToast({ message, type })
     }
 
-    const filteredLeads = leads.filter(lead => {
-        if (filters.country && lead.country !== filters.country) return false
-        if (filters.categories && lead.categories !== filters.categories) return false
-        if (filters.status && lead.status !== filters.status) return false
-        if (filters.owner === 'assigned' && !lead.owner_id) return false
-        if (filters.owner === 'unassigned' && lead.owner_id) return false
-        return true
-    })
-
-    const countries = Array.from(new Set(leads.map(l => l.country).filter(Boolean)))
-    const categories = Array.from(new Set(leads.map(l => l.categories).filter(Boolean)))
+    const totalPages = Math.max(1, Math.ceil(totalLeadsCount / LEADS_PER_PAGE))
 
     useEffect(() => {
         fetchData()
     }, [activeTab])
+
+    // Refetch leads when page or filters change
+    useEffect(() => {
+        if (activeTab === 'leads') {
+            fetchLeadsPage()
+        }
+    }, [currentPage, filters])
 
     const fetchData = async () => {
         setLoading(true)
@@ -197,16 +210,18 @@ function AdminContent() {
                     .single()
                 if (mGoal) setMarathonGoal(mGoal?.value || '20')
             } else if (activeTab === 'leads') {
-                const { data, error } = await supabase
-                    .from('leads')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-                if (error) throw error
-                setLeads(data || [])
-
-                // Also fetch profiles for the reassignment dropdown (include marathon fields for consistency)
+                // Fetch profiles for the reassignment dropdown
                 const { data: profData } = await supabase.from('profiles').select('*').order('email')
                 setProfiles(profData || [])
+
+                // Fetch distinct countries and categories for filter dropdowns
+                const { data: countryData } = await supabase.from('leads').select('country').not('country', 'is', null)
+                const { data: catData } = await supabase.from('leads').select('categories').not('categories', 'is', null)
+                if (countryData) setAvailableCountries(Array.from(new Set(countryData.map((r: any) => r.country).filter(Boolean))))
+                if (catData) setAvailableCategories(Array.from(new Set(catData.map((r: any) => r.categories).filter(Boolean))))
+
+                // Fetch first page of leads
+                await fetchLeadsPage()
             } else if (activeTab === 'imports') {
                 const { data, error } = await supabase
                     .from('import_batches')
@@ -217,6 +232,36 @@ function AdminContent() {
             }
         } catch (error) {
             console.error('Error fetching data:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const fetchLeadsPage = async () => {
+        setLoading(true)
+        try {
+            const from = (currentPage - 1) * LEADS_PER_PAGE
+            const to = from + LEADS_PER_PAGE - 1
+
+            let query = supabase
+                .from('leads')
+                .select('*', { count: 'exact' })
+
+            // Apply server-side filters
+            if (filters.country) query = query.eq('country', filters.country)
+            if (filters.categories) query = query.eq('categories', filters.categories)
+            if (filters.status) query = query.eq('status', filters.status)
+            if (filters.owner === 'assigned') query = query.not('owner_id', 'is', null)
+            if (filters.owner === 'unassigned') query = query.is('owner_id', null)
+
+            query = query.order('created_at', { ascending: false }).range(from, to)
+
+            const { data, error, count } = await query
+            if (error) throw error
+            setLeads(data || [])
+            setTotalLeadsCount(count ?? 0)
+        } catch (error) {
+            console.error('Error fetching leads page:', error)
         } finally {
             setLoading(false)
         }
@@ -359,7 +404,7 @@ function AdminContent() {
             const { error } = await supabase.from('leads').update(updates).eq('id', leadId)
             if (error) throw error
             showToast('Lead reasignado correctamente', 'success')
-            fetchData()
+            fetchLeadsPage()
         } catch (error: any) {
             showToast('Error al reasignar lead: ' + error.message, 'error')
         }
@@ -379,7 +424,7 @@ function AdminContent() {
 
             showToast(`Se han reasignado ${leadIds.length} leads correctamente`, 'success')
             setSelectedLeads([])
-            fetchData()
+            fetchLeadsPage()
         } catch (error: any) {
             showToast('Error en actualización masiva: ' + error.message, 'error')
         } finally {
@@ -388,10 +433,12 @@ function AdminContent() {
     }
 
     const toggleSelectAll = () => {
-        if (selectedLeads.length === filteredLeads.length) {
-            setSelectedLeads([])
+        const currentPageIds = leads.map(l => l.id)
+        const allSelected = currentPageIds.every(id => selectedLeads.includes(id))
+        if (allSelected) {
+            setSelectedLeads(prev => prev.filter(id => !currentPageIds.includes(id)))
         } else {
-            setSelectedLeads(filteredLeads.map(l => l.id))
+            setSelectedLeads(prev => [...new Set([...prev, ...currentPageIds])])
         }
     }
 
@@ -413,7 +460,7 @@ function AdminContent() {
                     const { error } = await supabase.from('leads').delete().eq('id', leadId)
                     if (error) throw error
                     showToast('Lead eliminado correctamente', 'success')
-                    fetchData()
+                    fetchLeadsPage()
                 } catch (error: any) {
                     showToast('Error al eliminar lead: ' + error.message, 'error')
                 } finally {
@@ -438,7 +485,7 @@ function AdminContent() {
                     if (error) throw error
                     showToast(`${leadIds.length} leads eliminados`, 'success')
                     setSelectedLeads([])
-                    fetchData()
+                    fetchLeadsPage()
                 } catch (error: any) {
                     showToast('Error en borrado masivo: ' + error.message, 'error')
                 } finally {
@@ -917,29 +964,29 @@ function AdminContent() {
                             <label className="text-xs font-bold text-gray-500 uppercase ml-1">País</label>
                             <select
                                 value={filters.country}
-                                onChange={(e) => setFilters({ ...filters, country: e.target.value })}
+                                onChange={(e) => updateFilter({ country: e.target.value })}
                                 className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                             >
                                 <option value="">Todos los países</option>
-                                {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                                {availableCountries.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1.5 flex-1 min-w-[200px]">
                             <label className="text-xs font-bold text-gray-500 uppercase ml-1">Categoría</label>
                             <select
                                 value={filters.categories}
-                                onChange={(e) => setFilters({ ...filters, categories: e.target.value })}
+                                onChange={(e) => updateFilter({ categories: e.target.value })}
                                 className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                             >
                                 <option value="">Todas las categorías</option>
-                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1.5 flex-1 min-w-[200px]">
                             <label className="text-xs font-bold text-gray-500 uppercase ml-1">Responsable</label>
                             <select
                                 value={filters.owner}
-                                onChange={(e) => setFilters({ ...filters, owner: e.target.value })}
+                                onChange={(e) => updateFilter({ owner: e.target.value })}
                                 className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                             >
                                 <option value="all">Todos</option>
@@ -994,7 +1041,7 @@ function AdminContent() {
                                     <th className="px-6 py-4 w-10">
                                         <input
                                             type="checkbox"
-                                            checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
+                                            checked={leads.length > 0 && leads.every((l: any) => selectedLeads.includes(l.id))}
                                             onChange={toggleSelectAll}
                                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                         />
@@ -1006,7 +1053,7 @@ function AdminContent() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {filteredLeads.map(lead => (
+                                {leads.map((lead: any) => (
                                     <tr key={lead.id} className={clsx(
                                         "hover:bg-gray-50/50 transition-colors",
                                         selectedLeads.includes(lead.id) && "bg-indigo-50/30"
@@ -1051,6 +1098,52 @@ function AdminContent() {
                                 ))}
                             </tbody>
                         </table>
+
+                        {/* Pagination */}
+                        {totalLeadsCount > LEADS_PER_PAGE && (
+                            <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
+                                <div className="text-sm text-gray-500">
+                                    Mostrando <span className="font-bold text-gray-700">{((currentPage - 1) * LEADS_PER_PAGE) + 1}-{Math.min(currentPage * LEADS_PER_PAGE, totalLeadsCount)}</span> de <span className="font-bold text-gray-700">{totalLeadsCount.toLocaleString('es-ES')}</span> leads
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                    <button
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1}
+                                        className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-gray-600"
+                                        title="Primera página"
+                                    >
+                                        <ChevronsLeft size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-gray-600"
+                                        title="Página anterior"
+                                    >
+                                        <ChevronLeft size={18} />
+                                    </button>
+                                    <div className="px-4 py-1.5 text-sm font-bold text-gray-700">
+                                        {currentPage} / {totalPages}
+                                    </div>
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-gray-600"
+                                        title="Página siguiente"
+                                    >
+                                        <ChevronRight size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages}
+                                        className="p-2 rounded-lg hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-gray-600"
+                                        title="Última página"
+                                    >
+                                        <ChevronsRight size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

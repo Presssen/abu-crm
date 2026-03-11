@@ -131,8 +131,10 @@ export default function LeadsPage() {
                 query = query.eq('status', statusFilter)
             }
 
-            if (planFilter !== 'all') {
-                query = query.eq('plan', planFilter)
+            if (planFilter === 'Shopify Plus') {
+                query = query.eq('plan', 'Shopify Plus')
+            } else if (planFilter === 'Shopify Standard') {
+                query = query.or('plan.is.null,plan.eq.,plan.eq.Shopify Standard')
             }
 
             if (shopifyStatusFilter !== 'all') {
@@ -473,16 +475,14 @@ export default function LeadsPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="space-y-1">
-                                                    {lead.plan && (
-                                                        <span className={clsx(
-                                                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold",
-                                                            lead.plan === 'Shopify Plus'
-                                                                ? "bg-purple-50 text-purple-700 border border-purple-100"
-                                                                : "bg-gray-50 text-gray-600 border border-gray-100"
-                                                        )}>
-                                                            {lead.plan}
-                                                        </span>
-                                                    )}
+                                                    <span className={clsx(
+                                                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold",
+                                                        (lead.plan || 'Shopify Standard') === 'Shopify Plus'
+                                                            ? "bg-purple-50 text-purple-700 border border-purple-100"
+                                                            : "bg-gray-50 text-gray-600 border border-gray-100"
+                                                    )}>
+                                                        {lead.plan || 'Shopify Standard'}
+                                                    </span>
                                                     {lead.shopify_status && (
                                                         <span className={clsx(
                                                             "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium",

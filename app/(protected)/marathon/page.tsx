@@ -158,7 +158,7 @@ export default function MarathonPage() {
                 city: leads[currentIndex].city || '',
                 country: leads[currentIndex].country || '',
                 categories: leads[currentIndex].categories || '',
-                plan: leads[currentIndex].plan || '',
+                plan: leads[currentIndex].plan || 'Shopify Standard',
                 shopify_status: leads[currentIndex].shopify_status || '',
                 status: leads[currentIndex].status || '',
                 notes: leads[currentIndex].notes || ''
@@ -235,8 +235,10 @@ export default function MarathonPage() {
                 .eq('status', 'new')
 
             // Apply Plan Filter
-            if (planFilter !== 'all') {
-                query = query.eq('plan', planFilter)
+            if (planFilter === 'Shopify Plus') {
+                query = query.eq('plan', 'Shopify Plus')
+            } else if (planFilter === 'Shopify Standard') {
+                query = query.or('plan.is.null,plan.eq.,plan.eq.Shopify Standard')
             }
 
             // Apply Password Protected Exclusion
@@ -1516,16 +1518,14 @@ export default function MarathonPage() {
                                             <Tag size={12} className="mr-1.5 text-gray-400" />
                                             {currentLead.categories || 'Sin sector'}
                                         </div>
-                                        {currentLead.plan && (
-                                            <div className={clsx(
-                                                "flex items-center text-xs font-bold px-2 py-1 rounded border",
-                                                currentLead.plan === 'Shopify Plus'
-                                                    ? "bg-purple-50 text-purple-700 border-purple-200"
-                                                    : "bg-blue-50 text-blue-700 border-blue-200"
-                                            )}>
-                                                {currentLead.plan}
-                                            </div>
-                                        )}
+                                        <div className={clsx(
+                                            "flex items-center text-xs font-bold px-2 py-1 rounded border",
+                                            (currentLead.plan || 'Shopify Standard') === 'Shopify Plus'
+                                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                                : "bg-blue-50 text-blue-700 border-blue-200"
+                                        )}>
+                                            {currentLead.plan || 'Shopify Standard'}
+                                        </div>
                                         {currentLead.shopify_status && (
                                             <div className={clsx(
                                                 "flex items-center text-xs font-bold px-2 py-1 rounded border",

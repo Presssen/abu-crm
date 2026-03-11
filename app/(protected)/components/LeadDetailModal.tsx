@@ -118,7 +118,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     country: leadData.country || '',
                     categories: leadData.categories || '',
                     status: leadData.status || 'new',
-                    plan: leadData.plan || '',
+                    plan: leadData.plan || 'Shopify Standard',
                     shopify_status: leadData.shopify_status || ''
                 })
             }
@@ -789,7 +789,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                         </select>
                                                     ) : (
                                                         <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200">
-                                                            {lead.plan || 'No especificado'}
+                                                            {lead.plan || 'Shopify Standard'}
                                                         </span>
                                                     )}
                                                 </div>
