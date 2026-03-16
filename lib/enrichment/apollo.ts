@@ -445,7 +445,7 @@ export async function revealPerson(
             console.log(`[Apollo] Using provided Apollo ID: ${personId}`)
         }
 
-        // STEP 2: Reveal via bulk_match with the person ID (this reliably returns email)
+        // STEP 2: Reveal via bulk_match with the person ID (requests email + phone)
         const matchRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
             method: 'POST',
             headers: {
@@ -453,7 +453,8 @@ export async function revealPerson(
                 'X-Api-Key': apiKey
             },
             body: JSON.stringify({
-                details: [{ id: personId }]
+                details: [{ id: personId }],
+                reveal_phone_number: true,
             })
         })
 
@@ -486,20 +487,22 @@ export async function revealPerson(
         const hasValidWebhook = webhookBaseUrl && webhookBaseUrl.startsWith('https://')
 
         if (wantsPhone && !phone) {
-            // Try people/match with reveal_phone_number (works with or without webhook)
+            // Try people/match with reveal_phone_number in the body (NOT as URL param)
             console.log(`[Apollo] Trying phone reveal via people/match`)
             
             const phoneMatchParams: any = {
                 first_name: firstName,
                 organization_domain: cleanDomain,
+                reveal_phone_number: true,
             }
             if (lastName) phoneMatchParams.last_name = lastName
             if (organizationName) phoneMatchParams.organization_name = organizationName
             if (personLinkedin) phoneMatchParams.linkedin_url = personLinkedin
+            if (personId) phoneMatchParams.id = personId
 
-            let phoneUrl = `${APOLLO_API_BASE}/people/match?reveal_phone_number=true`
+            let phoneUrl = `${APOLLO_API_BASE}/people/match`
             if (hasValidWebhook) {
-                phoneUrl += `&webhook_url=${encodeURIComponent(webhookBaseUrl)}`
+                phoneUrl += `?webhook_url=${encodeURIComponent(webhookBaseUrl)}`
             }
             
             try {
@@ -527,6 +530,8 @@ export async function revealPerson(
                     if (pp?.first_name && pp?.last_name) {
                         personName = [pp.first_name, pp.last_name].filter(Boolean).join(' ')
                     }
+                } else {
+                    console.warn('[Apollo] people/match failed:', phoneRes.status, await phoneRes.text().catch(() => ''))
                 }
             } catch (phoneErr) {
                 console.warn('[Apollo] Phone reveal via match failed:', phoneErr)
@@ -546,7 +551,8 @@ export async function revealPerson(
                                 'X-Api-Key': apiKey
                             },
                             body: JSON.stringify({
-                                details: [{ id: personId }]
+                                details: [{ id: personId }],
+                                reveal_phone_number: true,
                             })
                         })
                         if (pollRes.ok) {
