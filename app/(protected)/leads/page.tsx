@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/auth/client'
 import {
     Plus,
@@ -15,6 +15,7 @@ import {
     Zap,
     ChevronLeft,
     ChevronRight,
+    Loader2,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import CreateLeadModal from '../components/CreateLeadModal'
@@ -71,6 +72,9 @@ export default function LeadsPage() {
     const [leads, setLeads] = useState<Lead[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
+    const [isSearching, setIsSearching] = useState(false)
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [statusFilter, setStatusFilter] = useState('all')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -120,6 +124,24 @@ export default function LeadsPage() {
         setIsScrolled(e.currentTarget.scrollTop > 10)
     }
 
+    // Debounce search input: waits 400ms after last keystroke before triggering API call
+    const handleSearchChange = useCallback((value: string) => {
+        setSearch(value)
+        setIsSearching(true)
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+        searchTimerRef.current = setTimeout(() => {
+            setDebouncedSearch(value)
+            setIsSearching(false)
+        }, 400)
+    }, [])
+
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+        }
+    }, [])
+
     const buildApiUrl = (extraParams?: Record<string, string>) => {
         const params = new URLSearchParams()
         params.set('page', String(page))
@@ -128,7 +150,7 @@ export default function LeadsPage() {
         if (shopifyStatusFilter !== 'all') params.set('shopifyStatus', shopifyStatusFilter)
         if (countryFilter !== 'all') params.set('country', countryFilter)
         if (cityFilter !== 'all') params.set('city', cityFilter)
-        if (search) params.set('search', search)
+        if (debouncedSearch) params.set('search', debouncedSearch)
         if (viewMode !== 'all') params.set('viewMode', viewMode)
         if (excludePasswordProtected) params.set('excludePassword', 'true')
         if (extraParams) {
@@ -179,9 +201,14 @@ export default function LeadsPage() {
         fetchLeads(true) // First load includes profiles
     }, [])
 
+    // Reset to page 1 whenever a new search term is debounced
+    useEffect(() => {
+        setPage(1)
+    }, [debouncedSearch])
+
     useEffect(() => {
         fetchLeads()
-    }, [page, statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter, viewMode, excludePasswordProtected])
+    }, [page, statusFilter, debouncedSearch, planFilter, shopifyStatusFilter, countryFilter, cityFilter, viewMode, excludePasswordProtected])
 
     const reassignLead = async (leadId: string, newOwnerId: string | null) => {
         try {
@@ -247,13 +274,17 @@ export default function LeadsPage() {
                 )}>
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            {isSearching ? (
+                                <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-500 animate-spin" />
+                            ) : (
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            )}
                             <input
                                 type="text"
                                 placeholder="Buscar por empresa, contacto, email o domain..."
                                 className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm"
                                 value={search}
-                                onChange={(e) => setSearch(e.target.value)}
+                                onChange={(e) => handleSearchChange(e.target.value)}
                             />
                         </div>
                         <div className="flex items-center gap-2">

@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         // Build leads query
         let query = supabase
             .from('leads')
-            .select('*', { count: 'exact' })
+            .select('id, company_name, contact_name, email, phone, status, source, owner_id, created_at, domain, categories, city, plan, platform, platform_rank, shopify_status, country, tags', { count: 'exact' })
             .order('created_at', { ascending: false })
 
         // Non-admin: only own leads, no won/lost
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
             query = query.eq('city', cityFilter)
         }
 
-        if (search) {
+        if (search && search.length >= 2) {
             query = query.or(`company_name.ilike.%${search}%,contact_name.ilike.%${search}%,email.ilike.%${search}%,domain.ilike.%${search}%`)
         }
 
