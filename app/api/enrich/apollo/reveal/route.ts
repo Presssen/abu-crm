@@ -44,11 +44,24 @@ export async function POST(request: NextRequest) {
         }
 
         // Determine webhook URL for phone reveal
-        // Use the request origin to build the webhook URL
-        const headersList = await headers()
-        const host = headersList.get('host') || 'localhost:3000'
-        const proto = headersList.get('x-forwarded-proto') || 'http'
-        const webhookUrl = `${proto}://${host}/api/enrich/apollo/webhook`
+        // Priority: APP_URL env var > VERCEL_URL env var > request headers
+        let webhookUrl: string
+        const appUrl = process.env.APP_URL
+        const vercelUrl = process.env.VERCEL_URL
+        if (appUrl) {
+            // APP_URL should include protocol, e.g. https://myapp.vercel.app
+            const baseUrl = appUrl.replace(/\/$/, '')
+            webhookUrl = `${baseUrl}/api/enrich/apollo/webhook`
+        } else if (vercelUrl) {
+            // VERCEL_URL doesn't include protocol, always HTTPS in production
+            webhookUrl = `https://${vercelUrl}/api/enrich/apollo/webhook`
+        } else {
+            const headersList = await headers()
+            const host = headersList.get('host') || 'localhost:3000'
+            const proto = headersList.get('x-forwarded-proto') || 'http'
+            webhookUrl = `${proto}://${host}/api/enrich/apollo/webhook`
+        }
+        console.log('[Apollo Reveal] Webhook URL:', webhookUrl)
 
         const result = await revealPerson(
             firstName,

@@ -390,110 +390,131 @@ export async function revealPerson(
             .replace(/\/.*$/, '')
             .trim()
 
-        console.log(`[Apollo] Revealing contact: ${firstName} ${lastName} @ ${cleanDomain} (org: ${organizationName}, type: ${revealType})`)
+        const fullName = [firstName, lastName].filter(Boolean).join(' ')
+        console.log(`[Apollo] Revealing contact: ${fullName} @ ${cleanDomain} (org: ${organizationName}, type: ${revealType})`)
 
-        // Build match params — both org name and domain are critical
-        const matchParams: any = {
-            first_name: firstName,
-            organization_domain: cleanDomain,
-        }
-        if (lastName) {
-            matchParams.last_name = lastName
-        }
-        if (organizationName) {
-            matchParams.organization_name = organizationName
-        }
-        if (linkedinUrl) {
-            matchParams.linkedin_url = linkedinUrl
-        }
+        // STEP 1: Search for the person to get their Apollo ID
+        // people/match is unreliable for name-based lookups — use api_search instead
+        const searchName = organizationName || cleanDomain?.replace(/\.[^.]+$/, '') || ''
+        
+        const searchRes = await fetch(`${APOLLO_API_BASE}/mixed_people/api_search`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'X-Api-Key': apiKey
+            },
+            body: JSON.stringify({
+                q_person_name: fullName,
+                q_organization_name: searchName,
+                per_page: 10,
+                page: 1,
+            })
+        })
 
-        // Build URL with query params for reveal
-        let url = `${APOLLO_API_BASE}/people/match`
-        const queryParams: string[] = []
-
-        const wantsPhone = revealType === 'phone' || revealType === 'both'
-
-        if (wantsPhone) {
-            queryParams.push('reveal_phone_number=true')
-            // Add webhook as fallback if available
-            const hasValidWebhook = webhookBaseUrl && webhookBaseUrl.startsWith('https://')
-            if (hasValidWebhook) {
-                queryParams.push(`webhook_url=${encodeURIComponent(webhookBaseUrl)}`)
-            }
+        if (!searchRes.ok) {
+            console.error('[Apollo] api_search failed:', searchRes.status)
+            return { success: false, error: `Error buscando en Apollo (${searchRes.status})` }
         }
 
-        if (queryParams.length > 0) {
-            url += '?' + queryParams.join('&')
+        const searchData = await searchRes.json()
+        const foundPeople = searchData.people || []
+
+        console.log(`[Apollo] api_search found ${searchData.total_entries || 0} total, ${foundPeople.length} returned`)
+
+        if (foundPeople.length === 0) {
+            return { success: false, error: 'No se encontró el contacto en Apollo.' }
         }
 
-        const response = await fetch(url, {
+        // Find the best match by first name
+        const bestMatch = foundPeople.find((p: any) =>
+            p.first_name?.toLowerCase() === firstName.toLowerCase()
+        ) || foundPeople[0]
+
+        const personId = bestMatch.id
+        if (!personId) {
+            return { success: false, error: 'No se pudo identificar al contacto en Apollo.' }
+        }
+
+        console.log(`[Apollo] Best match: ${bestMatch.first_name} (ID: ${personId}), has_email: ${bestMatch.has_email}, has_phone: ${bestMatch.has_direct_phone}`)
+
+        // STEP 2: Reveal via bulk_match with the person ID (this reliably returns email)
+        const matchRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Api-Key': apiKey
             },
-            body: JSON.stringify(matchParams)
+            body: JSON.stringify({
+                details: [{ id: personId }]
+            })
         })
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            console.error('[Apollo] Reveal error:', response.status, errorData)
-            return {
-                success: false,
-                error: errorData.error || `Error al desbloquear contacto (${response.status})`
+        let email: string | null = null
+        let phone: string | null = null
+        let personName = fullName
+        let personTitle = bestMatch.title || ''
+        let personLinkedin: string | undefined
+
+        if (matchRes.ok) {
+            const matchData = await matchRes.json()
+            const m = matchData.matches?.[0]
+            console.log(`[Apollo] bulk_match credits consumed: ${matchData.credits_consumed || 0}`)
+
+            if (m) {
+                email = m.email && !m.email.includes('email_not_unlocked') ? m.email : null
+                phone = m.phone_numbers?.[0]?.sanitized_number || null
+                personName = [m.first_name, m.last_name].filter(Boolean).join(' ') || m.name || fullName
+                personTitle = m.title || personTitle
+                personLinkedin = m.linkedin_url || undefined
             }
+        } else {
+            console.warn('[Apollo] bulk_match failed:', matchRes.status)
         }
 
-        const data = await response.json()
-        const p = data.person
+        console.log(`[Apollo] After bulk_match: email=${email}, phone=${phone}`)
 
-        if (!p) {
-            return {
-                success: false,
-                error: 'No se encontró el contacto en Apollo.'
-            }
-        }
+        // STEP 3: If phone is still missing and requested, try people/match with reveal_phone_number
+        const wantsPhone = revealType === 'phone' || revealType === 'both'
+        const hasValidWebhook = webhookBaseUrl && webhookBaseUrl.startsWith('https://')
 
-        let email = p.email && !p.email.includes('email_not_unlocked') ? p.email : null
-        let phone = p.phone_numbers?.[0]?.sanitized_number || null
-
-        console.log(`[Apollo] Initial reveal: email=${email}, phone=${phone}, personId=${p.id}`)
-
-        // If phone was requested but not in the initial response, poll the person directly
-        // Apollo may need a moment to process the phone lookup
-        if (wantsPhone && !phone && p.id) {
-            console.log(`[Apollo] Phone not in initial response, polling person ${p.id}...`)
+        if (wantsPhone && !phone && hasValidWebhook) {
+            console.log(`[Apollo] Trying phone reveal via people/match with webhook: ${webhookBaseUrl}`)
             
-            // Wait and retry up to 3 times with increasing delays
-            const delays = [2000, 3000, 4000]
-            for (const delay of delays) {
-                await new Promise(resolve => setTimeout(resolve, delay))
-                
-                try {
-                    const personRes = await fetch(`${APOLLO_API_BASE}/people/${p.id}`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Api-Key': apiKey
-                        }
-                    })
+            const phoneMatchParams: any = {
+                first_name: firstName,
+                organization_domain: cleanDomain,
+            }
+            if (lastName) phoneMatchParams.last_name = lastName
+            if (organizationName) phoneMatchParams.organization_name = organizationName
+            if (personLinkedin) phoneMatchParams.linkedin_url = personLinkedin
 
-                    if (personRes.ok) {
-                        const personData = await personRes.json()
-                        const pp = personData.person
-                        if (pp?.phone_numbers?.[0]?.sanitized_number) {
-                            phone = pp.phone_numbers[0].sanitized_number
-                            console.log(`[Apollo] Phone found on retry: ${phone}`)
-                            // Also pick up email if we didn't have it yet
-                            if (!email && pp.email && !pp.email.includes('email_not_unlocked')) {
-                                email = pp.email
-                            }
-                            break
-                        }
+            const phoneUrl = `${APOLLO_API_BASE}/people/match?reveal_phone_number=true&webhook_url=${encodeURIComponent(webhookBaseUrl)}`
+            
+            try {
+                const phoneRes = await fetch(phoneUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Api-Key': apiKey
+                    },
+                    body: JSON.stringify(phoneMatchParams)
+                })
+
+                if (phoneRes.ok) {
+                    const phoneData = await phoneRes.json()
+                    const pp = phoneData.person
+                    if (pp?.phone_numbers?.[0]?.sanitized_number) {
+                        phone = pp.phone_numbers[0].sanitized_number
+                        console.log(`[Apollo] Phone found in match response: ${phone}`)
                     }
-                } catch (retryErr) {
-                    console.warn('[Apollo] Retry fetch error:', retryErr)
+                    // Also pick up email if we didn't get it from bulk_match
+                    if (!email && pp?.email && !pp.email.includes('email_not_unlocked')) {
+                        email = pp.email
+                    }
                 }
+            } catch (phoneErr) {
+                console.warn('[Apollo] Phone reveal via match failed:', phoneErr)
             }
         }
 
@@ -502,16 +523,15 @@ export async function revealPerson(
         return {
             success: true,
             person: {
-                id: p.id || '',
-                name: p.name || [p.first_name, p.last_name].filter(Boolean).join(' ') || '',
-                title: p.title || '',
+                id: personId,
+                name: personName,
+                title: personTitle,
                 email,
                 phone,
-                linkedin_url: p.linkedin_url || undefined,
+                linkedin_url: personLinkedin,
             },
-            // Only set phoneRequested if we still don't have it after retries
-            phoneRequested: false,
-            phoneUnavailable: wantsPhone && !phone,
+            phoneRequested: wantsPhone && !!hasValidWebhook && !phone,
+            phoneUnavailable: wantsPhone && !hasValidWebhook && !phone,
         }
     } catch (error: any) {
         console.error('[Apollo] Reveal error:', error)

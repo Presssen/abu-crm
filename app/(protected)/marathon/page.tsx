@@ -538,8 +538,10 @@ export default function MarathonPage() {
                     }
 
                     showSuccess(type === 'email' ? '✅ Email desbloqueado' : '✅ Teléfono desbloqueado')
+                } else if (data.phoneRequested) {
+                    showSuccess('📞 Teléfono solicitado a Apollo. Refresca en unos segundos para verlo.')
                 } else if (data.phoneUnavailable) {
-                    showError('Apollo no tiene un teléfono disponible para este contacto')
+                    showError('Apollo no pudo solicitar el teléfono. Inténtalo de nuevo más tarde.')
                 } else {
                     showError(`Apollo no tiene ${type === 'email' ? 'email' : 'teléfono'} para este contacto`)
                 }
@@ -835,7 +837,7 @@ export default function MarathonPage() {
                                                 if (revealed.length > 0) {
                                                     showSuccess(`✅ ${revealed.join(' y ')} desbloqueado para ${contactToReveal.name}`)
                                                 } else if (data.phoneRequested) {
-                                                    showSuccess('📞 Teléfono solicitado — llegará en unos segundos')
+                                                    showSuccess('📞 Teléfono solicitado a Apollo. Refresca en unos segundos para verlo.')
                                                 } else {
                                                     showError('Apollo no tiene datos de contacto para esta persona')
                                                 }
