@@ -922,7 +922,7 @@ export default function MarathonPage() {
                                 <input
                                     type="text"
                                     value={editForm.company_name}
-                                    onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, company_name: e.target.value }))}
                                     className="w-full text-base font-bold bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                                     placeholder="Nombre de empresa"
                                 />
@@ -934,7 +934,7 @@ export default function MarathonPage() {
                                     <input
                                         type="text"
                                         value={editForm.contact_name}
-                                        onChange={(e) => setEditForm({ ...editForm, contact_name: e.target.value })}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, contact_name: e.target.value }))}
                                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                         placeholder="Nombre"
                                     />
@@ -944,7 +944,7 @@ export default function MarathonPage() {
                                     <input
                                         type="text"
                                         value={editForm.contact_role}
-                                        onChange={(e) => setEditForm({ ...editForm, contact_role: e.target.value })}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, contact_role: e.target.value }))}
                                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                         placeholder="CEO, Manager..."
                                     />
@@ -962,10 +962,12 @@ export default function MarathonPage() {
                                                 <button
                                                     onClick={() => {
                                                         if (idx === 0) return
-                                                        const newEmails = [...editForm.emails]
-                                                        const item = newEmails.splice(idx, 1)[0]
-                                                        newEmails.unshift(item)
-                                                        setEditForm({ ...editForm, emails: newEmails })
+                                                        setEditForm(prev => {
+                                                            const newEmails = [...prev.emails]
+                                                            const item = newEmails.splice(idx, 1)[0]
+                                                            newEmails.unshift(item)
+                                                            return { ...prev, emails: newEmails }
+                                                        })
                                                     }}
                                                     className={clsx(
                                                         "p-1 rounded-lg shrink-0",
@@ -979,9 +981,12 @@ export default function MarathonPage() {
                                                 type="email"
                                                 value={email}
                                                 onChange={(e) => {
-                                                    const newEmails = [...editForm.emails]
-                                                    newEmails[idx] = e.target.value
-                                                    setEditForm({ ...editForm, emails: newEmails })
+                                                    const val = e.target.value
+                                                    setEditForm(prev => {
+                                                        const newEmails = [...prev.emails]
+                                                        newEmails[idx] = val
+                                                        return { ...prev, emails: newEmails }
+                                                    })
                                                 }}
                                                 className="flex-1 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
                                                 placeholder="email@empresa.com"
@@ -989,8 +994,10 @@ export default function MarathonPage() {
                                             {editForm.emails.length > 1 && (
                                                 <button
                                                     onClick={() => {
-                                                        const newEmails = editForm.emails.filter((_: string, i: number) => i !== idx)
-                                                        setEditForm({ ...editForm, emails: newEmails.length ? newEmails : [''] })
+                                                        setEditForm(prev => {
+                                                            const newEmails = prev.emails.filter((_: string, i: number) => i !== idx)
+                                                            return { ...prev, emails: newEmails.length ? newEmails : [''] }
+                                                        })
                                                     }}
                                                     className="p-2 text-gray-400 active:text-rose-500 rounded-lg"
                                                 >
@@ -1000,7 +1007,7 @@ export default function MarathonPage() {
                                         </div>
                                     ))}
                                     <button
-                                        onClick={() => setEditForm({ ...editForm, emails: [...editForm.emails, ''] })}
+                                        onClick={() => setEditForm(prev => ({ ...prev, emails: [...prev.emails, ''] }))}
                                         className="text-[11px] font-bold text-indigo-600 flex items-center gap-1 py-1"
                                     >
                                         <Plus size={14} /> Añadir Email
@@ -1019,10 +1026,12 @@ export default function MarathonPage() {
                                                 <button
                                                     onClick={() => {
                                                         if (idx === 0) return
-                                                        const newPhones = [...editForm.phones]
-                                                        const item = newPhones.splice(idx, 1)[0]
-                                                        newPhones.unshift(item)
-                                                        setEditForm({ ...editForm, phones: newPhones })
+                                                        setEditForm(prev => {
+                                                            const newPhones = [...prev.phones]
+                                                            const item = newPhones.splice(idx, 1)[0]
+                                                            newPhones.unshift(item)
+                                                            return { ...prev, phones: newPhones }
+                                                        })
                                                     }}
                                                     className={clsx(
                                                         "p-1 rounded-lg shrink-0",
@@ -1036,9 +1045,12 @@ export default function MarathonPage() {
                                                 type="tel"
                                                 value={phone}
                                                 onChange={(e) => {
-                                                    const newPhones = [...editForm.phones]
-                                                    newPhones[idx] = e.target.value
-                                                    setEditForm({ ...editForm, phones: newPhones })
+                                                    const val = e.target.value
+                                                    setEditForm(prev => {
+                                                        const newPhones = [...prev.phones]
+                                                        newPhones[idx] = val
+                                                        return { ...prev, phones: newPhones }
+                                                    })
                                                 }}
                                                 className="flex-1 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
                                                 placeholder="+34..."
@@ -1046,8 +1058,10 @@ export default function MarathonPage() {
                                             {editForm.phones.length > 1 && (
                                                 <button
                                                     onClick={() => {
-                                                        const newPhones = editForm.phones.filter((_: string, i: number) => i !== idx)
-                                                        setEditForm({ ...editForm, phones: newPhones.length ? newPhones : [''] })
+                                                        setEditForm(prev => {
+                                                            const newPhones = prev.phones.filter((_: string, i: number) => i !== idx)
+                                                            return { ...prev, phones: newPhones.length ? newPhones : [''] }
+                                                        })
                                                     }}
                                                     className="p-2 text-gray-400 active:text-rose-500 rounded-lg"
                                                 >
@@ -1057,7 +1071,7 @@ export default function MarathonPage() {
                                         </div>
                                     ))}
                                     <button
-                                        onClick={() => setEditForm({ ...editForm, phones: [...editForm.phones, ''] })}
+                                        onClick={() => setEditForm(prev => ({ ...prev, phones: [...prev.phones, ''] }))}
                                         className="text-[11px] font-bold text-indigo-600 flex items-center gap-1 py-1"
                                     >
                                         <Plus size={14} /> Añadir Teléfono
@@ -1071,7 +1085,7 @@ export default function MarathonPage() {
                                     <input
                                         type="text"
                                         value={editForm.domain}
-                                        onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, domain: e.target.value }))}
                                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                         placeholder="www.empresa.com"
                                     />
@@ -1080,7 +1094,7 @@ export default function MarathonPage() {
                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Estado</label>
                                     <select
                                         value={editForm.status}
-                                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value }))}
                                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                     >
                                         <option value="new">Nuevo</option>
@@ -1099,7 +1113,7 @@ export default function MarathonPage() {
                                     <input
                                         type="text"
                                         value={editForm.city}
-                                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, city: e.target.value }))}
                                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                         placeholder="Madrid"
                                     />
@@ -1109,7 +1123,7 @@ export default function MarathonPage() {
                                     <input
                                         type="text"
                                         value={editForm.country}
-                                        onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, country: e.target.value }))}
                                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                         placeholder="España"
                                     />
@@ -1121,7 +1135,7 @@ export default function MarathonPage() {
                                 <input
                                     type="text"
                                     value={editForm.categories}
-                                    onChange={(e) => setEditForm({ ...editForm, categories: e.target.value })}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, categories: e.target.value }))}
                                     className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                     placeholder="Tecnología, Retail..."
                                 />
@@ -1132,7 +1146,7 @@ export default function MarathonPage() {
                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Plan Shopify</label>
                                     <select
                                         value={editForm.plan}
-                                        onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, plan: e.target.value }))}
                                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                     >
                                         <option value="">Sin especificar</option>
@@ -1144,7 +1158,7 @@ export default function MarathonPage() {
                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Estado Tienda</label>
                                     <select
                                         value={editForm.shopify_status}
-                                        onChange={(e) => setEditForm({ ...editForm, shopify_status: e.target.value })}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, shopify_status: e.target.value }))}
                                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
                                     >
                                         <option value="">Sin especificar</option>
@@ -1158,7 +1172,7 @@ export default function MarathonPage() {
                                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Notas</label>
                                 <textarea
                                     value={editForm.notes}
-                                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
                                     className="w-full h-28 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                                     placeholder="Notas sobre este lead..."
                                 />
