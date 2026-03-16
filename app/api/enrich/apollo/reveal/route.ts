@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { firstName, lastName, domain, organizationName, linkedinUrl, revealType = 'both' } = body
+        const { firstName, lastName, domain, organizationName, linkedinUrl, revealType = 'both', apolloId } = body
 
         if (!firstName || !domain) {
             return NextResponse.json(
@@ -71,7 +71,8 @@ export async function POST(request: NextRequest) {
             organizationName,
             linkedinUrl,
             revealType,
-            webhookUrl
+            webhookUrl,
+            apolloId
         )
 
         return NextResponse.json(result)

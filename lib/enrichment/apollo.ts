@@ -381,7 +381,8 @@ export async function revealPerson(
     organizationName?: string,
     linkedinUrl?: string,
     revealType: 'email' | 'phone' | 'both' = 'both',
-    webhookBaseUrl?: string
+    webhookBaseUrl?: string,
+    apolloId?: string
 ): Promise<{ success: boolean; person?: EnrichedContact; phoneRequested?: boolean; phoneUnavailable?: boolean; error?: string }> {
     try {
         const cleanDomain = domain
@@ -391,52 +392,58 @@ export async function revealPerson(
             .trim()
 
         const fullName = [firstName, lastName].filter(Boolean).join(' ')
-        console.log(`[Apollo] Revealing contact: ${fullName} @ ${cleanDomain} (org: ${organizationName}, type: ${revealType})`)
+        console.log(`[Apollo] Revealing contact: ${fullName} @ ${cleanDomain} (org: ${organizationName}, type: ${revealType}, apolloId: ${apolloId || 'none'})`)
 
-        // STEP 1: Search for the person to get their Apollo ID
-        // people/match is unreliable for name-based lookups — use api_search instead
-        const searchName = organizationName || cleanDomain?.replace(/\.[^.]+$/, '') || ''
-        
-        const searchRes = await fetch(`${APOLLO_API_BASE}/mixed_people/api_search`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache',
-                'X-Api-Key': apiKey
-            },
-            body: JSON.stringify({
-                q_person_name: fullName,
-                q_organization_name: searchName,
-                per_page: 10,
-                page: 1,
-            })
-        })
+        let personId = apolloId || null
+        let bestMatchTitle = ''
 
-        if (!searchRes.ok) {
-            console.error('[Apollo] api_search failed:', searchRes.status)
-            return { success: false, error: `Error buscando en Apollo (${searchRes.status})` }
-        }
-
-        const searchData = await searchRes.json()
-        const foundPeople = searchData.people || []
-
-        console.log(`[Apollo] api_search found ${searchData.total_entries || 0} total, ${foundPeople.length} returned`)
-
-        if (foundPeople.length === 0) {
-            return { success: false, error: 'No se encontró el contacto en Apollo.' }
-        }
-
-        // Find the best match by first name
-        const bestMatch = foundPeople.find((p: any) =>
-            p.first_name?.toLowerCase() === firstName.toLowerCase()
-        ) || foundPeople[0]
-
-        const personId = bestMatch.id
+        // STEP 1: If we don't have an Apollo ID, search for the person
         if (!personId) {
-            return { success: false, error: 'No se pudo identificar al contacto en Apollo.' }
-        }
+            const searchRes = await fetch(`${APOLLO_API_BASE}/mixed_people/api_search`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache',
+                    'X-Api-Key': apiKey
+                },
+                body: JSON.stringify({
+                    q_person_name: fullName,
+                    q_organization_domains: cleanDomain ? `\n${cleanDomain}` : undefined,
+                    q_organization_name: organizationName || undefined,
+                    per_page: 10,
+                    page: 1,
+                })
+            })
 
-        console.log(`[Apollo] Best match: ${bestMatch.first_name} (ID: ${personId}), has_email: ${bestMatch.has_email}, has_phone: ${bestMatch.has_direct_phone}`)
+            if (!searchRes.ok) {
+                console.error('[Apollo] api_search failed:', searchRes.status)
+                return { success: false, error: `Error buscando en Apollo (${searchRes.status})` }
+            }
+
+            const searchData = await searchRes.json()
+            const foundPeople = searchData.people || []
+
+            console.log(`[Apollo] api_search found ${searchData.total_entries || 0} total, ${foundPeople.length} returned`)
+
+            if (foundPeople.length === 0) {
+                return { success: false, error: 'No se encontró el contacto en Apollo.' }
+            }
+
+            const bestMatch = foundPeople.find((p: any) =>
+                p.first_name?.toLowerCase() === firstName.toLowerCase()
+            ) || foundPeople[0]
+
+            personId = bestMatch.id
+            bestMatchTitle = bestMatch.title || ''
+
+            if (!personId) {
+                return { success: false, error: 'No se pudo identificar al contacto en Apollo.' }
+            }
+
+            console.log(`[Apollo] Best match: ${bestMatch.first_name} (ID: ${personId}), has_email: ${bestMatch.has_email}, has_phone: ${bestMatch.has_direct_phone}`)
+        } else {
+            console.log(`[Apollo] Using provided Apollo ID: ${personId}`)
+        }
 
         // STEP 2: Reveal via bulk_match with the person ID (this reliably returns email)
         const matchRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
@@ -453,7 +460,7 @@ export async function revealPerson(
         let email: string | null = null
         let phone: string | null = null
         let personName = fullName
-        let personTitle = bestMatch.title || ''
+        let personTitle = bestMatchTitle
         let personLinkedin: string | undefined
 
         if (matchRes.ok) {

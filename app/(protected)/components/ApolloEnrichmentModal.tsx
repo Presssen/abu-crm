@@ -157,6 +157,7 @@ export default function ApolloEnrichmentModal({
                     organizationName: companyName,
                     linkedinUrl: person.linkedin_url,
                     revealType: type,
+                    apolloId: person.id,
                 })
             })
 
