@@ -440,6 +440,7 @@ export default function PipelinePage() {
                     isOpen={!!selectedLeadId}
                     onClose={() => setSelectedLeadId(null)}
                     leadId={selectedLeadId}
+                    onUpdate={() => fetchLeads()}
                 />
             )}
 
