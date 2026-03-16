@@ -183,26 +183,14 @@ export default function ApolloEnrichmentModal({
                 const emailRevealed = (type === 'email' || type === 'both') && data.person.email
                 const phoneRevealed = (type === 'phone' || type === 'both') && data.person.phone
 
-                // If phone was requested but will arrive via webhook
-                if (data.phoneRequested && !phoneRevealed) {
+                if (data.phoneUnavailable && !phoneRevealed) {
                     if (type === 'phone') {
-                        setError('📞 Teléfono solicitado. Apollo lo buscará y lo recibiremos en unos segundos.')
+                        setError('Apollo no tiene un teléfono disponible para este contacto.')
                     } else if (type === 'both') {
                         if (emailRevealed) {
-                            setError('✅ Email desbloqueado. 📞 Teléfono solicitado — llegará en unos segundos.')
+                            setError('✅ Email desbloqueado. Apollo no tiene teléfono para este contacto.')
                         } else {
-                            setError('📞 Datos solicitados. Apollo los buscará y los recibiremos en unos segundos.')
-                        }
-                    }
-                } else if (data.phoneUnavailable) {
-                    // Phone requires HTTPS webhook (won't work on localhost)
-                    if (type === 'phone') {
-                        setError('📞 El desbloqueo de teléfono requiere que la app esté desplegada en producción (HTTPS).')
-                    } else if (type === 'both') {
-                        if (emailRevealed) {
-                            setError('✅ Email desbloqueado. 📞 El teléfono requiere despliegue en producción (HTTPS).')
-                        } else {
-                            setError('📞 El desbloqueo de teléfono requiere despliegue en producción (HTTPS).')
+                            setError('Apollo no tiene datos de contacto disponibles para esta persona.')
                         }
                     }
                 } else if (!emailRevealed && (type === 'email' || type === 'both')) {
