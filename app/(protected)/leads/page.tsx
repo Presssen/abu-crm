@@ -99,6 +99,8 @@ export default function LeadsPage() {
     const [shopifyStatusFilter, setShopifyStatusFilter] = useState('all')
     const [countryFilter, setCountryFilter] = useState('all')
     const [cityFilter, setCityFilter] = useState('all')
+    const [availableCountries, setAvailableCountries] = useState<string[]>([])
+    const [availableCities, setAvailableCities] = useState<string[]>([])
     const [showFilters, setShowFilters] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
@@ -149,6 +151,8 @@ export default function LeadsPage() {
             if (data.isAdmin !== undefined) setIsAdmin(data.isAdmin)
             if (data.profile) setProfile(data.profile)
             if (data.profiles) setProfiles(data.profiles)
+            if (data.countries) setAvailableCountries(data.countries)
+            if (data.cities) setAvailableCities(data.cities)
         } catch (error) {
             console.error('Error fetching leads:', error)
         } finally {
@@ -350,7 +354,7 @@ export default function LeadsPage() {
                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                                 >
                                     <option value="all">Todos</option>
-                                    {Array.from(new Set(leads.map(l => l.country).filter(Boolean))).map(country => (
+                                    {availableCountries.map(country => (
                                         <option key={country} value={country}>{country}</option>
                                     ))}
                                 </select>
@@ -363,7 +367,7 @@ export default function LeadsPage() {
                                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                                 >
                                     <option value="all">Todas</option>
-                                    {Array.from(new Set(leads.map(l => l.city).filter(Boolean))).map(city => (
+                                    {availableCities.map(city => (
                                         <option key={city} value={city}>{city}</option>
                                     ))}
                                 </select>

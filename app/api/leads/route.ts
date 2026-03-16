@@ -85,14 +85,23 @@ export async function GET(request: NextRequest) {
         const hasMore = leads ? leads.length > PAGE_SIZE : false
         const trimmedLeads = hasMore ? leads!.slice(0, PAGE_SIZE) : (leads || [])
 
-        // Optionally include profiles list (only on first load)
+        // Optionally include profiles list + filter options (only on first load)
         let profilesList = null
+        let countries: string[] = []
+        let cities: string[] = []
         if (includeProfiles) {
-            const { data: profilesData } = await supabase
-                .from('profiles')
-                .select('id, email, first_name, last_name')
-                .order('email')
-            profilesList = profilesData
+            const [profilesRes, countriesRes, citiesRes] = await Promise.all([
+                supabase.from('profiles').select('id, email, first_name, last_name').order('email'),
+                supabase.from('leads').select('country').not('country', 'is', null),
+                supabase.from('leads').select('city').not('city', 'is', null)
+            ])
+            profilesList = profilesRes.data
+            if (countriesRes.data) {
+                countries = Array.from(new Set(countriesRes.data.map((r: any) => r.country).filter(Boolean))).sort() as string[]
+            }
+            if (citiesRes.data) {
+                cities = Array.from(new Set(citiesRes.data.map((r: any) => r.city).filter(Boolean))).sort() as string[]
+            }
         }
 
         return NextResponse.json({
@@ -101,7 +110,7 @@ export async function GET(request: NextRequest) {
             totalCount: count,
             isAdmin,
             profile,
-            ...(profilesList !== null && { profiles: profilesList })
+            ...(profilesList !== null && { profiles: profilesList, countries, cities })
         })
 
     } catch (error: any) {
