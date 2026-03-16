@@ -95,9 +95,11 @@ export default function MarathonPage() {
 
     // Filters state
     const [planFilter, setPlanFilter] = useState<string>('all')
+    const [countryFilter, setCountryFilter] = useState<string>('all')
     const [excludePasswordProtected, setExcludePasswordProtected] = useState<boolean>(true)
     const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
     const [isAdmin, setIsAdmin] = useState(false)
+    const [availableCountries, setAvailableCountries] = useState<string[]>([])
 
     // Activity state
     const [emailHistory, setEmailHistory] = useState<any[]>([])
@@ -149,9 +151,11 @@ export default function MarathonPage() {
     // Load filters from localStorage
     useEffect(() => {
         const savedPlan = localStorage.getItem('marathon_plan_filter')
+        const savedCountry = localStorage.getItem('marathon_country_filter')
         const savedExclude = localStorage.getItem('marathon_exclude_password')
         const savedViewMode = localStorage.getItem('marathon_view_mode')
         if (savedPlan) setPlanFilter(savedPlan)
+        if (savedCountry) setCountryFilter(savedCountry)
         if (savedExclude !== null) setExcludePasswordProtected(savedExclude === 'true')
         if (savedViewMode === 'mine' || savedViewMode === 'all') setViewMode(savedViewMode)
     }, [])
@@ -159,14 +163,27 @@ export default function MarathonPage() {
     // Save filters to localStorage
     useEffect(() => {
         localStorage.setItem('marathon_plan_filter', planFilter)
+        localStorage.setItem('marathon_country_filter', countryFilter)
         localStorage.setItem('marathon_exclude_password', String(excludePasswordProtected))
         localStorage.setItem('marathon_view_mode', viewMode)
-    }, [planFilter, excludePasswordProtected, viewMode])
+    }, [planFilter, countryFilter, excludePasswordProtected, viewMode])
+
+    // Fetch available countries on mount
+    useEffect(() => {
+        const fetchCountries = async () => {
+            const { data } = await supabase.from('leads').select('country').not('country', 'is', null)
+            if (data) {
+                const unique = Array.from(new Set(data.map((r: any) => r.country).filter(Boolean))).sort()
+                setAvailableCountries(unique as string[])
+            }
+        }
+        fetchCountries()
+    }, [])
 
     useEffect(() => {
         fetchLeads()
         fetchUserGoal()
-    }, [planFilter, excludePasswordProtected, viewMode])
+    }, [planFilter, countryFilter, excludePasswordProtected, viewMode])
 
     useEffect(() => {
         if (leads[currentIndex]) {
@@ -262,6 +279,11 @@ export default function MarathonPage() {
                 query = query.eq('plan', 'Shopify Plus')
             } else if (planFilter === 'Shopify Standard') {
                 query = query.or('plan.is.null,plan.eq.,plan.eq.Shopify Standard')
+            }
+
+            // Apply Country Filter
+            if (countryFilter !== 'all') {
+                query = query.eq('country', countryFilter)
             }
 
             // Apply Password Protected Exclusion
@@ -675,6 +697,21 @@ export default function MarathonPage() {
                                 <option value="all">Todos</option>
                                 <option value="Shopify Plus">Shopify Plus</option>
                                 <option value="Shopify Standard">Shopify Standard</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-600 block mb-2">País:</label>
+                            <select
+                                value={countryFilter}
+                                onChange={(e) => {
+                                    setCountryFilter(e.target.value)
+                                    setCurrentIndex(0)
+                                }}
+                                className="w-full text-sm font-medium bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="all">Todos los países</option>
+                                {availableCountries.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
 
@@ -1267,9 +1304,9 @@ export default function MarathonPage() {
             </div>
 
             {/* Filter Bar */}
-            <div className="bg-white px-6 py-2 border-b border-gray-100 flex items-center space-x-4">
+            <div className="bg-white px-6 py-2 border-b border-gray-100 flex items-center space-x-4 flex-wrap gap-y-1">
                 <div className="flex items-center space-x-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Plan Shopify:</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Plan:</label>
                     <select
                         value={planFilter}
                         onChange={(e) => {
@@ -1281,6 +1318,21 @@ export default function MarathonPage() {
                         <option value="all">Todos</option>
                         <option value="Shopify Plus">Shopify Plus</option>
                         <option value="Shopify Standard">Shopify Standard</option>
+                    </select>
+                </div>
+                <div className="h-4 w-px bg-gray-200" />
+                <div className="flex items-center space-x-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">País:</label>
+                    <select
+                        value={countryFilter}
+                        onChange={(e) => {
+                            setCountryFilter(e.target.value)
+                            setCurrentIndex(0)
+                        }}
+                        className="text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                        <option value="all">Todos</option>
+                        {availableCountries.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
                 <div className="h-4 w-px bg-gray-200" />
@@ -1316,7 +1368,7 @@ export default function MarathonPage() {
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest group-hover:text-gray-700 transition-colors">
-                        Excluir Tiendas con Contraseña
+                        Excluir Contraseña
                     </span>
                 </label>
             </div>

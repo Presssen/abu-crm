@@ -118,71 +118,37 @@ export default function LeadsPage() {
         setIsScrolled(e.currentTarget.scrollTop > 10)
     }
 
-    const fetchLeads = async () => {
+    const buildApiUrl = (extraParams?: Record<string, string>) => {
+        const params = new URLSearchParams()
+        params.set('page', String(page))
+        if (statusFilter !== 'all') params.set('status', statusFilter)
+        if (planFilter !== 'all') params.set('plan', planFilter)
+        if (shopifyStatusFilter !== 'all') params.set('shopifyStatus', shopifyStatusFilter)
+        if (countryFilter !== 'all') params.set('country', countryFilter)
+        if (cityFilter !== 'all') params.set('city', cityFilter)
+        if (search) params.set('search', search)
+        if (viewMode !== 'all') params.set('viewMode', viewMode)
+        if (excludePasswordProtected) params.set('excludePassword', 'true')
+        if (extraParams) {
+            Object.entries(extraParams).forEach(([k, v]) => params.set(k, v))
+        }
+        return `/api/leads?${params.toString()}`
+    }
+
+    const fetchLeads = async (includeProfiles = false) => {
         setLoading(true)
         try {
-            let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
+            const url = buildApiUrl(includeProfiles ? { includeProfiles: 'true' } : undefined)
+            const res = await fetch(url)
+            if (!res.ok) throw new Error('Failed to fetch leads')
+            const data = await res.json()
 
-            // Non-admin: only own leads, no won/lost
-            if (!isAdmin) {
-                query = query.not('status', 'in', '("won","lost")')
-                const { data: { user } } = await supabase.auth.getUser()
-                if (user) {
-                    query = query.eq('owner_id', user.id)
-                }
-            } else if (viewMode === 'mine') {
-                // Admin chose to see only their leads
-                const { data: { user } } = await supabase.auth.getUser()
-                if (user) {
-                    query = query.eq('owner_id', user.id)
-                }
-            }
+            setLeads(data.leads || [])
+            setHasMore(data.hasMore)
 
-            if (statusFilter !== 'all') {
-                query = query.eq('status', statusFilter)
-            }
-
-            if (planFilter === 'Shopify Plus') {
-                query = query.eq('plan', 'Shopify Plus')
-            } else if (planFilter === 'Shopify Standard') {
-                query = query.or('plan.is.null,plan.eq.,plan.eq.Shopify Standard')
-            }
-
-            if (shopifyStatusFilter !== 'all') {
-                query = query.eq('shopify_status', shopifyStatusFilter)
-            }
-
-            if (excludePasswordProtected) {
-                query = query.neq('shopify_status', 'Password Protected')
-            }
-
-            if (countryFilter !== 'all') {
-                query = query.eq('country', countryFilter)
-            }
-
-            if (cityFilter !== 'all') {
-                query = query.eq('city', cityFilter)
-            }
-
-            if (search) {
-                query = query.or(`company_name.ilike.%${search}%,contact_name.ilike.%${search}%,email.ilike.%${search}%,domain.ilike.%${search}%`)
-            }
-
-            const from = (page - 1) * PAGE_SIZE
-            const to = from + PAGE_SIZE - 1
-
-            // Get one more to check if there are more pages
-            const { data, error } = await query.range(from, to + 1)
-
-            if (error) throw error
-
-            if (data && data.length > PAGE_SIZE) {
-                setHasMore(true)
-                setLeads(data.slice(0, PAGE_SIZE))
-            } else {
-                setHasMore(false)
-                setLeads(data || [])
-            }
+            if (data.isAdmin !== undefined) setIsAdmin(data.isAdmin)
+            if (data.profile) setProfile(data.profile)
+            if (data.profiles) setProfiles(data.profiles)
         } catch (error) {
             console.error('Error fetching leads:', error)
         } finally {
@@ -206,31 +172,12 @@ export default function LeadsPage() {
 
     useEffect(() => {
         setPage(1)
-        fetchLeads()
-    }, [statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter, viewMode, isAdmin, excludePasswordProtected])
-
-    useEffect(() => {
-        fetchLeads()
-    }, [page])
-
-    useEffect(() => {
-        checkAdminStatus()
-        fetchProfiles()
+        fetchLeads(true) // First load includes profiles
     }, [])
 
-    const checkAdminStatus = async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-            setProfile(data)
-            setIsAdmin(data?.role === 'admin')
-        }
-    }
-
-    const fetchProfiles = async () => {
-        const { data } = await supabase.from('profiles').select('id, email, first_name, last_name').order('email')
-        setProfiles(data || [])
-    }
+    useEffect(() => {
+        fetchLeads()
+    }, [page, statusFilter, search, planFilter, shopifyStatusFilter, countryFilter, cityFilter, viewMode, excludePasswordProtected])
 
     const reassignLead = async (leadId: string, newOwnerId: string | null) => {
         try {
