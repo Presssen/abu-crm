@@ -117,7 +117,8 @@ function AdminContent() {
         country: '',
         categories: '',
         status: '',
-        owner: 'all' // all, assigned, unassigned
+        owner: 'all', // all, assigned, unassigned
+        shopify_status: '' // '', 'Password Protected', 'Active'
     })
 
     const updateFilter = (newFilter: Partial<typeof filters>) => {
@@ -253,6 +254,7 @@ function AdminContent() {
             if (filters.status) query = query.eq('status', filters.status)
             if (filters.owner === 'assigned') query = query.not('owner_id', 'is', null)
             if (filters.owner === 'unassigned') query = query.is('owner_id', null)
+            if (filters.shopify_status) query = query.eq('shopify_status', filters.shopify_status)
 
             query = query.order('created_at', { ascending: false }).range(from, to)
 
@@ -494,6 +496,47 @@ function AdminContent() {
             }
         })
         return
+    }
+
+    const bulkDeleteByFilter = async () => {
+        // Check if any filter is active
+        const hasActiveFilter = filters.country || filters.categories || filters.status || (filters.owner !== 'all') || filters.shopify_status
+        if (!hasActiveFilter) {
+            showToast('Debes aplicar al menos un filtro antes de eliminar', 'error')
+            return
+        }
+
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Eliminar TODOS los leads filtrados',
+            message: `¿Estás seguro de que deseas eliminar TODOS los ${totalLeadsCount} leads que coinciden con los filtros actuales? Esta acción no se puede deshacer.`,
+            type: 'danger',
+            onConfirm: async () => {
+                setSaving(true)
+                try {
+                    let query = supabase.from('leads').delete()
+
+                    if (filters.country) query = query.eq('country', filters.country)
+                    if (filters.categories) query = query.eq('categories', filters.categories)
+                    if (filters.status) query = query.eq('status', filters.status)
+                    if (filters.owner === 'assigned') query = query.not('owner_id', 'is', null)
+                    if (filters.owner === 'unassigned') query = query.is('owner_id', null)
+                    if (filters.shopify_status) query = query.eq('shopify_status', filters.shopify_status)
+
+                    const { error } = await query
+                    if (error) throw error
+
+                    showToast(`Se han eliminado los leads filtrados correctamente`, 'success')
+                    setSelectedLeads([])
+                    setCurrentPage(1)
+                    fetchLeadsPage()
+                } catch (error: any) {
+                    showToast('Error al eliminar leads: ' + error.message, 'error')
+                } finally {
+                    setSaving(false)
+                }
+            }
+        })
     }
 
     const deleteImportBatch = async (batchId: string) => {
@@ -959,41 +1002,80 @@ function AdminContent() {
             {activeTab === 'leads' && (
                 <div className="space-y-6">
                     {/* Filters */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-wrap gap-4 items-end">
-                        <div className="space-y-1.5 flex-1 min-w-[200px]">
-                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">País</label>
-                            <select
-                                value={filters.country}
-                                onChange={(e) => updateFilter({ country: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                            >
-                                <option value="">Todos los países</option>
-                                {availableCountries.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+                        <div className="flex flex-wrap gap-4 items-end">
+                            <div className="space-y-1.5 flex-1 min-w-[180px]">
+                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">País</label>
+                                <select
+                                    value={filters.country}
+                                    onChange={(e) => updateFilter({ country: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                    <option value="">Todos los países</option>
+                                    {availableCountries.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1.5 flex-1 min-w-[180px]">
+                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Categoría</label>
+                                <select
+                                    value={filters.categories}
+                                    onChange={(e) => updateFilter({ categories: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                    <option value="">Todas las categorías</option>
+                                    {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1.5 flex-1 min-w-[180px]">
+                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Responsable</label>
+                                <select
+                                    value={filters.owner}
+                                    onChange={(e) => updateFilter({ owner: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                    <option value="all">Todos</option>
+                                    <option value="assigned">Asignados</option>
+                                    <option value="unassigned">Sin asignar</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1.5 flex-1 min-w-[180px]">
+                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Estado Shopify</label>
+                                <select
+                                    value={filters.shopify_status}
+                                    onChange={(e) => updateFilter({ shopify_status: e.target.value })}
+                                    className={clsx(
+                                        "w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none",
+                                        filters.shopify_status === 'Password Protected'
+                                            ? "bg-amber-50 border-amber-300 text-amber-800 font-semibold"
+                                            : "bg-gray-50 border-gray-200"
+                                    )}
+                                >
+                                    <option value="">Todos</option>
+                                    <option value="Password Protected">🔒 Password Protected</option>
+                                    <option value="Active">✅ Active</option>
+                                </select>
+                            </div>
                         </div>
-                        <div className="space-y-1.5 flex-1 min-w-[200px]">
-                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Categoría</label>
-                            <select
-                                value={filters.categories}
-                                onChange={(e) => updateFilter({ categories: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                            >
-                                <option value="">Todas las categorías</option>
-                                {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                        </div>
-                        <div className="space-y-1.5 flex-1 min-w-[200px]">
-                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Responsable</label>
-                            <select
-                                value={filters.owner}
-                                onChange={(e) => updateFilter({ owner: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                            >
-                                <option value="all">Todos</option>
-                                <option value="assigned">Asignados</option>
-                                <option value="unassigned">Sin asignar</option>
-                            </select>
-                        </div>
+
+                        {/* Bulk delete by filter */}
+                        {(filters.shopify_status || filters.country || filters.categories || filters.status || filters.owner !== 'all') && totalLeadsCount > 0 && (
+                            <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-2xl px-5 py-3">
+                                <div className="flex items-center space-x-3">
+                                    <Trash2 size={18} className="text-rose-500" />
+                                    <span className="text-sm font-medium text-rose-800">
+                                        <span className="font-bold">{totalLeadsCount}</span> leads coinciden con los filtros actuales
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={bulkDeleteByFilter}
+                                    disabled={saving}
+                                    className="px-5 py-2 bg-rose-600 text-white text-sm font-bold rounded-xl hover:bg-rose-700 transition-all disabled:opacity-50 shadow-sm shadow-rose-200 flex items-center"
+                                >
+                                    <Trash2 size={16} className="mr-2" />
+                                    Eliminar todos los filtrados
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Bulk Actions */}

@@ -27,15 +27,12 @@ export async function GET(request: NextRequest) {
         const pageNum = parseInt(searchParams.get('page') || '1', 10)
         const excludePassword = searchParams.get('excludePassword') === 'true'
 
-        // Single stage pagination request
-        if (stageId) {
-            const start = (pageNum - 1) * LEADS_PER_PAGE
-            const end = start + LEADS_PER_PAGE - 1
-
+        // Helper to build a query for a given stage
+        const buildStageQuery = (stage: string, start: number, end: number) => {
             let query = supabase
                 .from('leads')
                 .select('id, company_name, contact_name, email, phone, status, won_by, won_at, shopify_status')
-                .eq('status', stageId)
+                .eq('status', stage)
                 .order('created_at', { ascending: false })
                 .range(start, end)
 
@@ -47,7 +44,15 @@ export async function GET(request: NextRequest) {
                 query = query.neq('shopify_status', 'Password Protected')
             }
 
-            const { data, error } = await query
+            return query
+        }
+
+        // Single stage pagination request
+        if (stageId) {
+            const start = (pageNum - 1) * LEADS_PER_PAGE
+            const end = start + LEADS_PER_PAGE - 1
+
+            const { data, error } = await buildStageQuery(stageId, start, end)
             if (error) throw error
 
             return NextResponse.json({
@@ -58,46 +63,23 @@ export async function GET(request: NextRequest) {
             })
         }
 
-        // Initial load: single query fetching enough leads for all stages
-        // Instead of 6 parallel RLS-filtered queries, fetch one larger batch
-        // sorted by status, then slice client-side
-        const maxTotal = LEADS_PER_PAGE * STAGES.length  // 150 max
-
-        let query = supabase
-            .from('leads')
-            .select('id, company_name, contact_name, email, phone, status, won_by, won_at, shopify_status')
-            .in('status', STAGES)
-            .order('created_at', { ascending: false })
-            .limit(maxTotal)
-
-        if (!isAdmin) {
-            query = query.eq('owner_id', user.id)
-        }
-
-        if (excludePassword) {
-            query = query.neq('shopify_status', 'Password Protected')
-        }
-
-        const { data, error } = await query
-        if (error) throw error
-
-        // Group by stage and take first LEADS_PER_PAGE per stage
-        const grouped: Record<string, any[]> = {}
+        // Initial load: fetch each stage SEQUENTIALLY to avoid overwhelming
+        // the database (6 parallel RLS queries caused timeouts from client)
+        // Server-side sequential is fast because no network round-trip per query
+        const stages = []
         for (const stage of STAGES) {
-            grouped[stage] = []
-        }
-        for (const lead of (data || [])) {
-            const key = (lead.status || '').toLowerCase().trim()
-            if (grouped[key] && grouped[key].length < LEADS_PER_PAGE) {
-                grouped[key].push(lead)
+            const { data, error } = await buildStageQuery(stage, 0, LEADS_PER_PAGE - 1)
+            if (error) {
+                console.error(`Error fetching stage ${stage}:`, error)
+                stages.push({ stageId: stage, leads: [], hasMore: false })
+            } else {
+                stages.push({
+                    stageId: stage,
+                    leads: data || [],
+                    hasMore: data ? data.length === LEADS_PER_PAGE : false
+                })
             }
         }
-
-        const stages = STAGES.map(stageId => ({
-            stageId,
-            leads: grouped[stageId] || [],
-            hasMore: grouped[stageId] ? grouped[stageId].length === LEADS_PER_PAGE : false
-        }))
 
         return NextResponse.json({
             stages,
