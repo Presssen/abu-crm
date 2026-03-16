@@ -31,7 +31,6 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import ApolloEnrichmentModal from '../components/ApolloEnrichmentModal'
 // enrichLead no longer used — enrichment now goes through Apollo API
 import SendEmailModal from '../components/SendEmailModal'
@@ -62,10 +61,13 @@ interface Lead {
 
 export default function MarathonPage() {
     const supabase = createClient()
-    const searchParams = useSearchParams()
     const [leads, setLeads] = useState<Lead[]>([])
     const [currentIndex, setCurrentIndexState] = useState(0)
-    const [restoredLeadId] = useState(() => searchParams.get('leadId') || null)
+    const [restoredLeadId] = useState(() => {
+        if (typeof window === 'undefined') return null
+        const params = new URLSearchParams(window.location.search)
+        return params.get('leadId') || null
+    })
 
     // Wrapper to update both state and URL with the lead ID
     const setCurrentIndex = useCallback((valueOrUpdater: number | ((prev: number) => number)) => {
