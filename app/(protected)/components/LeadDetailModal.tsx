@@ -369,7 +369,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                     <input
                                                         className="text-2xl font-bold text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1 w-full focus:border-gray-900 outline-none"
                                                         value={editForm.company_name}
-                                                        onChange={e => setEditForm({ ...editForm, company_name: e.target.value })}
+                                                        onChange={e => setEditForm(prev => ({ ...prev, company_name: e.target.value }))}
                                                     />
                                                 ) : (
                                                     <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{lead.company_name}</h3>
@@ -381,13 +381,13 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                             <input
                                                                 className="flex-1 text-gray-600 font-semibold bg-white border border-gray-200 rounded-lg px-2 py-0.5 text-sm focus:border-gray-900 outline-none"
                                                                 value={editForm.contact_name}
-                                                                onChange={e => setEditForm({ ...editForm, contact_name: e.target.value })}
+                                                                onChange={e => setEditForm(prev => ({ ...prev, contact_name: e.target.value }))}
                                                                 placeholder="Nombre"
                                                             />
                                                             <input
                                                                 className="flex-1 text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-2 py-0.5 focus:border-gray-900 outline-none uppercase font-bold"
                                                                 value={editForm.contact_role}
-                                                                onChange={e => setEditForm({ ...editForm, contact_role: e.target.value })}
+                                                                onChange={e => setEditForm(prev => ({ ...prev, contact_role: e.target.value }))}
                                                                 placeholder="Cargo (e.g. CEO)"
                                                             />
                                                         </div>
@@ -408,7 +408,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                             {isEditing ? (
                                                 <select
                                                     value={editForm.status}
-                                                    onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                                                    onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value }))}
                                                     className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold focus:border-gray-900 outline-none"
                                                 >
                                                     {Object.entries(statusLabels).map(([val, label]) => (
@@ -441,19 +441,24 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                                 className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:border-gray-900 outline-none"
                                                                 value={email}
                                                                 onChange={e => {
-                                                                    const newEmails = [...editForm.emails]
-                                                                    newEmails[idx] = e.target.value
-                                                                    setEditForm({ ...editForm, emails: newEmails })
+                                                                    const val = e.target.value
+                                                                    setEditForm(prev => {
+                                                                        const newEmails = [...prev.emails]
+                                                                        newEmails[idx] = val
+                                                                        return { ...prev, emails: newEmails }
+                                                                    })
                                                                 }}
                                                                 placeholder="email@empresa.com"
                                                             />
                                                             <div className="flex items-center gap-1">
                                                                 <button
                                                                     onClick={() => {
-                                                                        const newEmails = [...editForm.emails]
-                                                                        const item = newEmails.splice(idx, 1)[0]
-                                                                        newEmails.unshift(item)
-                                                                        setEditForm({ ...editForm, emails: newEmails })
+                                                                        setEditForm(prev => {
+                                                                            const newEmails = [...prev.emails]
+                                                                            const item = newEmails.splice(idx, 1)[0]
+                                                                            newEmails.unshift(item)
+                                                                            return { ...prev, emails: newEmails }
+                                                                        })
                                                                     }}
                                                                     disabled={idx === 0}
                                                                     className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 hover:text-amber-500 disabled:opacity-30"
@@ -463,8 +468,10 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                                 </button>
                                                                 <button
                                                                     onClick={() => {
-                                                                        const newEmails = editForm.emails.filter((_, i) => i !== idx)
-                                                                        setEditForm({ ...editForm, emails: newEmails.length ? newEmails : [''] })
+                                                                        setEditForm(prev => {
+                                                                            const newEmails = prev.emails.filter((_, i) => i !== idx)
+                                                                            return { ...prev, emails: newEmails.length ? newEmails : [''] }
+                                                                        })
                                                                     }}
                                                                     className="p-1.5 hover:bg-rose-50 rounded-md text-gray-400 hover:text-rose-500"
                                                                 >
@@ -474,7 +481,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                         </div>
                                                     ))}
                                                     <button
-                                                        onClick={() => setEditForm({ ...editForm, emails: [...editForm.emails, ''] })}
+                                                        onClick={() => setEditForm(prev => ({ ...prev, emails: [...prev.emails, ''] }))}
                                                         className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
                                                     >
                                                         <Plus size={12} /> Añadir Email
@@ -492,19 +499,24 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                                 className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:border-gray-900 outline-none"
                                                                 value={phone}
                                                                 onChange={e => {
-                                                                    const newPhones = [...editForm.phones]
-                                                                    newPhones[idx] = e.target.value
-                                                                    setEditForm({ ...editForm, phones: newPhones })
+                                                                    const val = e.target.value
+                                                                    setEditForm(prev => {
+                                                                        const newPhones = [...prev.phones]
+                                                                        newPhones[idx] = val
+                                                                        return { ...prev, phones: newPhones }
+                                                                    })
                                                                 }}
                                                                 placeholder="+34..."
                                                             />
                                                             <div className="flex items-center gap-1">
                                                                 <button
                                                                     onClick={() => {
-                                                                        const newPhones = [...editForm.phones]
-                                                                        const item = newPhones.splice(idx, 1)[0]
-                                                                        newPhones.unshift(item)
-                                                                        setEditForm({ ...editForm, phones: newPhones })
+                                                                        setEditForm(prev => {
+                                                                            const newPhones = [...prev.phones]
+                                                                            const item = newPhones.splice(idx, 1)[0]
+                                                                            newPhones.unshift(item)
+                                                                            return { ...prev, phones: newPhones }
+                                                                        })
                                                                     }}
                                                                     disabled={idx === 0}
                                                                     className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 hover:text-amber-500 disabled:opacity-30"
@@ -514,8 +526,10 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                                 </button>
                                                                 <button
                                                                     onClick={() => {
-                                                                        const newPhones = editForm.phones.filter((_, i) => i !== idx)
-                                                                        setEditForm({ ...editForm, phones: newPhones.length ? newPhones : [''] })
+                                                                        setEditForm(prev => {
+                                                                            const newPhones = prev.phones.filter((_, i) => i !== idx)
+                                                                            return { ...prev, phones: newPhones.length ? newPhones : [''] }
+                                                                        })
                                                                     }}
                                                                     className="p-1.5 hover:bg-rose-50 rounded-md text-gray-400 hover:text-rose-500"
                                                                 >
@@ -525,7 +539,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                         </div>
                                                     ))}
                                                     <button
-                                                        onClick={() => setEditForm({ ...editForm, phones: [...editForm.phones, ''] })}
+                                                        onClick={() => setEditForm(prev => ({ ...prev, phones: [...prev.phones, ''] }))}
                                                         className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
                                                     >
                                                         <Plus size={12} /> Añadir Teléfono
@@ -691,13 +705,13 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                     <input
                                                         className="flex-1 text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1 focus:border-gray-900 outline-none"
                                                         value={editForm.city}
-                                                        onChange={e => setEditForm({ ...editForm, city: e.target.value })}
+                                                        onChange={e => setEditForm(prev => ({ ...prev, city: e.target.value }))}
                                                         placeholder="Ciudad"
                                                     />
                                                     <input
                                                         className="flex-1 text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1 focus:border-gray-900 outline-none"
                                                         value={editForm.country}
-                                                        onChange={e => setEditForm({ ...editForm, country: e.target.value })}
+                                                        onChange={e => setEditForm(prev => ({ ...prev, country: e.target.value }))}
                                                         placeholder="País"
                                                     />
                                                 </div>
@@ -716,7 +730,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                 <input
                                                     className="w-full text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1 focus:border-gray-900 outline-none"
                                                     value={editForm.categories}
-                                                    onChange={e => setEditForm({ ...editForm, categories: e.target.value })}
+                                                    onChange={e => setEditForm(prev => ({ ...prev, categories: e.target.value }))}
                                                     placeholder="Sector"
                                                 />
                                             ) : (
@@ -738,7 +752,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                 <input
                                                     className="w-full text-base font-bold text-white bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 outline-none focus:border-white/50"
                                                     value={editForm.domain}
-                                                    onChange={e => setEditForm({ ...editForm, domain: e.target.value })}
+                                                    onChange={e => setEditForm(prev => ({ ...prev, domain: e.target.value }))}
                                                     placeholder="www.empresa.com"
                                                 />
                                             ) : (
@@ -780,7 +794,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                     {isEditing ? (
                                                         <select
                                                             value={editForm.plan}
-                                                            onChange={e => setEditForm({ ...editForm, plan: e.target.value })}
+                                                            onChange={e => setEditForm(prev => ({ ...prev, plan: e.target.value }))}
                                                             className="w-full text-sm font-bold bg-white border border-purple-200 rounded-lg px-3 py-1.5 outline-none focus:border-purple-400"
                                                         >
                                                             <option value="">Sin especificar</option>
@@ -802,7 +816,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                     {isEditing ? (
                                                         <input
                                                             value={editForm.shopify_status}
-                                                            onChange={e => setEditForm({ ...editForm, shopify_status: e.target.value })}
+                                                            onChange={e => setEditForm(prev => ({ ...prev, shopify_status: e.target.value }))}
                                                             className="w-full text-sm font-bold bg-white border border-purple-200 rounded-lg px-3 py-1.5 outline-none focus:border-purple-400"
                                                             placeholder="Active, Password Protected, etc."
                                                         />
