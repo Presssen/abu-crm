@@ -479,6 +479,11 @@ export default function MarathonPage() {
             const lastName = nameParts.slice(1).join(' ') || ''
             const domain = currentLead.domain?.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '') || ''
 
+            if (!firstName || !domain) {
+                showError('Falta nombre o dominio para desbloquear')
+                return
+            }
+
             const response = await fetch('/api/enrich/apollo/reveal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -492,6 +497,11 @@ export default function MarathonPage() {
             })
 
             const data = await response.json()
+
+            if (!response.ok) {
+                showError(data.error || `Error al desbloquear (${response.status})`)
+                return
+            }
 
             if (data.success && data.person) {
                 const updates: any = {}
@@ -526,8 +536,12 @@ export default function MarathonPage() {
                             await supabase.from('leads').update(leadUpdates).eq('id', currentLead.id)
                         }
                     }
+
+                    showSuccess(type === 'email' ? '✅ Email desbloqueado' : '✅ Teléfono desbloqueado')
                 } else if (data.phoneUnavailable) {
                     showError('El desbloqueo de teléfono requiere HTTPS (producción)')
+                } else if (data.phoneRequested) {
+                    showSuccess('📞 Teléfono solicitado — llegará en unos segundos vía webhook')
                 } else {
                     showError(`Apollo no tiene ${type === 'email' ? 'email' : 'teléfono'} para este contacto`)
                 }

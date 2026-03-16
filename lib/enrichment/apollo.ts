@@ -395,8 +395,10 @@ export async function revealPerson(
         // Build match params — both org name and domain are critical
         const matchParams: any = {
             first_name: firstName,
-            last_name: lastName,
             organization_domain: cleanDomain,
+        }
+        if (lastName) {
+            matchParams.last_name = lastName
         }
         if (organizationName) {
             matchParams.organization_name = organizationName

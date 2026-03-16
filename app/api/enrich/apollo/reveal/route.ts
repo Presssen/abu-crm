@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const { firstName, lastName, domain, organizationName, linkedinUrl, revealType = 'both' } = body
 
-        if (!firstName || !lastName || !domain) {
+        if (!firstName || !domain) {
             return NextResponse.json(
-                { error: 'firstName, lastName, and domain are required' },
+                { error: 'firstName and domain are required' },
                 { status: 400 }
             )
         }
