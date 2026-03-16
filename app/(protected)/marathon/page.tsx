@@ -546,6 +546,7 @@ export default function MarathonPage() {
                     domain,
                     organizationName: currentLead.company_name,
                     revealType: type,
+                    apolloId: contact.apollo_id || undefined,
                 })
             })
 
@@ -564,8 +565,8 @@ export default function MarathonPage() {
                 if (type === 'phone' && data.person.phone) {
                     updates.phone = data.person.phone
                 }
-                // Also update name if it was obfuscated
-                if (data.person.name && contact.name.includes('***')) {
+                // Always update name if reveal returns a better one
+                if (data.person.name && data.person.name !== contact.name) {
                     updates.name = data.person.name
                 }
 
@@ -591,10 +592,8 @@ export default function MarathonPage() {
                     }
 
                     showSuccess(type === 'email' ? '✅ Email desbloqueado' : '✅ Teléfono desbloqueado')
-                } else if (data.phoneRequested) {
-                    showSuccess('📞 Teléfono solicitado a Apollo. Refresca en unos segundos para verlo.')
                 } else if (data.phoneUnavailable) {
-                    showError('Apollo no pudo solicitar el teléfono. Inténtalo de nuevo más tarde.')
+                    showError('Apollo no tiene teléfono disponible para esta persona.')
                 } else {
                     showError(`Apollo no tiene ${type === 'email' ? 'email' : 'teléfono'} para este contacto`)
                 }
@@ -850,6 +849,7 @@ export default function MarathonPage() {
                                                     domain,
                                                     organizationName: currentLead.company_name,
                                                     revealType: 'both',
+                                                    apolloId: contactToReveal.apollo_id || undefined,
                                                 })
                                             })
 
@@ -864,7 +864,8 @@ export default function MarathonPage() {
                                                 const updates: any = {}
                                                 if (data.person.email) updates.email = data.person.email
                                                 if (data.person.phone) updates.phone = data.person.phone
-                                                if (data.person.name && contactToReveal.name.includes('***')) {
+                                                // Always update name from reveal
+                                                if (data.person.name && data.person.name !== contactToReveal.name) {
                                                     updates.name = data.person.name
                                                 }
 
@@ -904,8 +905,8 @@ export default function MarathonPage() {
                                                 if (data.person.phone) revealed.push('teléfono')
                                                 if (revealed.length > 0) {
                                                     showSuccess(`✅ ${revealed.join(' y ')} desbloqueado para ${contactToReveal.name}`)
-                                                } else if (data.phoneRequested) {
-                                                    showSuccess('📞 Teléfono solicitado a Apollo. Refresca en unos segundos para verlo.')
+                                                } else if (data.phoneUnavailable) {
+                                                    showError('Apollo no tiene datos de contacto disponibles para esta persona.')
                                                 } else {
                                                     showError('Apollo no tiene datos de contacto para esta persona')
                                                 }

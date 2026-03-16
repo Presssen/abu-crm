@@ -168,7 +168,8 @@ export default function ApolloEnrichmentModal({
                     if (p.id === person.id) {
                         const updated = { ...p }
                         if (data.person.title) updated.title = data.person.title
-                        if (data.person.name && !p.name.includes('***')) updated.name = data.person.name
+                        // Always update name from reveal (it returns the full, unmasked name)
+                        if (data.person.name) updated.name = data.person.name
                         if ((type === 'email' || type === 'both') && data.person.email) {
                             updated.email = data.person.email
                         }
@@ -176,6 +177,8 @@ export default function ApolloEnrichmentModal({
                             updated.phone = data.person.phone
                         }
                         if (data.person.linkedin_url) updated.linkedin_url = data.person.linkedin_url
+                        // Update the ID if Apollo returned a resolved one
+                        if (data.person.id) updated.id = data.person.id
                         return updated
                     }
                     return p
@@ -186,20 +189,20 @@ export default function ApolloEnrichmentModal({
 
                 if (data.phoneRequested && !phoneRevealed) {
                     if (type === 'phone') {
-                        setError('📞 Teléfono solicitado a Apollo. Refresca en unos segundos para verlo.')
+                        setError('Apollo no tiene teléfono disponible para esta persona.')
                     } else if (type === 'both') {
                         if (emailRevealed) {
-                            setError('✅ Email desbloqueado. 📞 Teléfono solicitado — refresca en unos segundos.')
+                            setError('✅ Email desbloqueado. Apollo no tiene teléfono disponible.')
                         } else {
-                            setError('📞 Datos solicitados a Apollo. Refresca en unos segundos para verlos.')
+                            setError('Apollo no tiene datos de contacto disponibles para esta persona.')
                         }
                     }
                 } else if (data.phoneUnavailable && !phoneRevealed) {
                     if (type === 'phone') {
-                        setError('Apollo no pudo solicitar el teléfono. Inténtalo de nuevo más tarde.')
+                        setError('Apollo no tiene teléfono disponible para esta persona.')
                     } else if (type === 'both') {
                         if (emailRevealed) {
-                            setError('✅ Email desbloqueado. No se pudo solicitar el teléfono.')
+                            setError('✅ Email desbloqueado. No se encontró teléfono.')
                         } else {
                             setError('Apollo no tiene datos de contacto disponibles para esta persona.')
                         }
@@ -262,6 +265,7 @@ export default function ApolloEnrichmentModal({
                 email: p.email || null,
                 phone: p.phone || null,
                 is_primary: p.id === primaryId,
+                apollo_id: p.id || null,
             }))
 
             if (contactInserts.length > 0) {
