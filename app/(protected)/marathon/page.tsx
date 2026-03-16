@@ -592,10 +592,38 @@ export default function MarathonPage() {
                     }
 
                     showSuccess(type === 'email' ? '✅ Email desbloqueado' : '✅ Teléfono desbloqueado')
-                } else if (data.phoneRequested) {
-                    showSuccess('📞 Teléfono solicitado. Aparecerá automáticamente en unos segundos.')
-                } else if (data.phoneUnavailable) {
-                    showError('El teléfono se entrega de forma asíncrona. Prueba en producción (HTTPS).')
+                } else if (data.phoneRequested || data.phoneUnavailable) {
+                    // Phone was requested via Apollo webhook — poll database until it arrives
+                    showSuccess('📞 Teléfono solicitado a Apollo. Buscando...')
+                    
+                    // Poll the database for the phone (webhook will deliver it async)
+                    let phoneFound = false
+                    for (let pollAttempt = 1; pollAttempt <= 10; pollAttempt++) {
+                        await new Promise(resolve => setTimeout(resolve, 3000))
+                        
+                        const { data: freshContact } = await supabase
+                            .from('lead_contacts')
+                            .select('phone, name')
+                            .eq('id', contact.id)
+                            .single()
+                        
+                        if (freshContact?.phone) {
+                            // Phone arrived via webhook!
+                            setContacts(prev => prev.map(c =>
+                                c.id === contact.id ? { ...c, phone: freshContact.phone, name: freshContact.name || c.name } : c
+                            ))
+                            if (contact.is_primary && currentLead) {
+                                await supabase.from('leads').update({ phone: freshContact.phone }).eq('id', currentLead.id)
+                            }
+                            showSuccess(`✅ Teléfono desbloqueado: ${freshContact.phone}`)
+                            phoneFound = true
+                            break
+                        }
+                    }
+                    
+                    if (!phoneFound) {
+                        showError('⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
+                    }
                 } else {
                     showError(`Apollo no tiene ${type === 'email' ? 'email' : 'teléfono'} para este contacto`)
                 }
@@ -907,10 +935,32 @@ export default function MarathonPage() {
                                                 if (data.person.phone) revealed.push('teléfono')
                                                 if (revealed.length > 0) {
                                                     showSuccess(`✅ ${revealed.join(' y ')} desbloqueado para ${contactToReveal.name}`)
-                                                } else if (data.phoneRequested) {
-                                                    showSuccess('📞 Teléfono solicitado. Aparecerá automáticamente en unos segundos.')
-                                                } else if (data.phoneUnavailable) {
-                                                    showError('El teléfono requiere HTTPS (producción) para recibirse.')
+                                                } else if (data.phoneRequested || data.phoneUnavailable) {
+                                                    // Phone requested via webhook — poll DB
+                                                    showSuccess('📞 Teléfono solicitado a Apollo. Buscando...')
+                                                    let phoneFound = false
+                                                    for (let pollAttempt = 1; pollAttempt <= 10; pollAttempt++) {
+                                                        await new Promise(resolve => setTimeout(resolve, 3000))
+                                                        const { data: freshContact } = await supabase
+                                                            .from('lead_contacts')
+                                                            .select('phone, name')
+                                                            .eq('id', contactToReveal.id)
+                                                            .single()
+                                                        if (freshContact?.phone) {
+                                                            setContacts(prev => prev.map(c =>
+                                                                c.id === contactToReveal.id ? { ...c, phone: freshContact.phone, name: freshContact.name || c.name } : c
+                                                            ))
+                                                            if (contactToReveal.is_primary && currentLead) {
+                                                                await supabase.from('leads').update({ phone: freshContact.phone }).eq('id', currentLead.id)
+                                                            }
+                                                            showSuccess(`✅ Teléfono desbloqueado: ${freshContact.phone}`)
+                                                            phoneFound = true
+                                                            break
+                                                        }
+                                                    }
+                                                    if (!phoneFound) {
+                                                        showError('⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
+                                                    }
                                                 } else {
                                                     showError('Apollo no tiene datos de contacto para esta persona')
                                                 }

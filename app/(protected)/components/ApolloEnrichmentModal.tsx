@@ -187,24 +187,40 @@ export default function ApolloEnrichmentModal({
                 const emailRevealed = (type === 'email' || type === 'both') && data.person.email
                 const phoneRevealed = (type === 'phone' || type === 'both') && data.person.phone
 
-                if (data.phoneRequested && !phoneRevealed) {
-                    if (type === 'phone') {
-                        setError('📞 Teléfono solicitado. Aparecerá automáticamente en unos segundos.')
-                    } else if (type === 'both') {
-                        if (emailRevealed) {
-                            setError('✅ Email desbloqueado. 📞 Teléfono solicitado — aparecerá en unos segundos.')
-                        } else {
-                            setError('📞 Datos solicitados. Aparecerán automáticamente en unos segundos.')
+                if ((data.phoneRequested || data.phoneUnavailable) && !phoneRevealed) {
+                    // Phone requested via Apollo webhook — poll database for arrival
+                    const supabase = createClient()
+                    setError('📞 Teléfono solicitado a Apollo. Buscando...')
+                    
+                    let phoneFound = false
+                    for (let pollAttempt = 1; pollAttempt <= 10; pollAttempt++) {
+                        await new Promise(resolve => setTimeout(resolve, 3000))
+                        
+                        // Check if webhook has delivered the phone to lead_contacts
+                        const { data: freshContact } = await supabase
+                            .from('lead_contacts')
+                            .select('phone, name')
+                            .eq('apollo_id', person.id)
+                            .not('phone', 'is', null)
+                            .limit(1)
+                            .single()
+                        
+                        if (freshContact?.phone) {
+                            setPeople(prev => prev.map(p =>
+                                p.id === person.id ? { ...p, phone: freshContact.phone } : p
+                            ))
+                            setError(null)
+                            phoneFound = true
+                            onSuccess() // Refresh parent page
+                            break
                         }
                     }
-                } else if (data.phoneUnavailable && !phoneRevealed) {
-                    if (type === 'phone') {
-                        setError('El teléfono se entrega de forma asíncrona. Prueba en la app en producción (HTTPS).')
-                    } else if (type === 'both') {
+                    
+                    if (!phoneFound) {
                         if (emailRevealed) {
-                            setError('✅ Email desbloqueado. El teléfono requiere HTTPS (producción).')
+                            setError('✅ Email desbloqueado. ⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
                         } else {
-                            setError('El teléfono requiere entorno HTTPS (producción) para recibirse.')
+                            setError('⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
                         }
                     }
                 } else if (!emailRevealed && (type === 'email' || type === 'both')) {
