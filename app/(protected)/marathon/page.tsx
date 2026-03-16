@@ -763,49 +763,86 @@ export default function MarathonPage() {
                                         setShowRevealConfirm(false)
                                         setRevealingContact(true)
                                         try {
-                                            // First search for the person via Apollo free search
-                                            const searchRes = await fetch('/api/enrich/apollo/search', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({
-                                                    domain: currentLead.domain?.replace(/^https?:\/\//, ''),
-                                                    name: contactToReveal.name,
-                                                    leadId: currentLead.id
-                                                })
-                                            })
-                                            const searchData = await searchRes.json()
+                                            const nameParts = (contactToReveal.name || '').split(' ')
+                                            const firstName = nameParts[0] || ''
+                                            const lastName = nameParts.slice(1).join(' ') || ''
+                                            const domain = currentLead.domain?.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '') || ''
 
-                                            if (!searchData.people?.length) {
-                                                showError('No se encontró a ' + contactToReveal.name + ' en Apollo')
+                                            if (!firstName || !domain) {
+                                                showError('Falta nombre o dominio para desbloquear')
                                                 return
                                             }
 
-                                            // Find the best match
-                                            const match = searchData.people.find((p: any) =>
-                                                p.name?.toLowerCase().includes(contactToReveal.name.toLowerCase().split(' ')[0])
-                                            ) || searchData.people[0]
-
-                                            // Now enrich with credits
-                                            const enrichRes = await fetch('/api/enrich/apollo/enrich', {
+                                            const response = await fetch('/api/enrich/apollo/reveal', {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({
-                                                    contactIds: [match.id],
-                                                    leadId: currentLead.id
+                                                    firstName,
+                                                    lastName,
+                                                    domain,
+                                                    organizationName: currentLead.company_name,
+                                                    revealType: 'both',
                                                 })
                                             })
-                                            const enrichData = await enrichRes.json()
 
-                                            if (enrichData.error) {
-                                                showError(enrichData.error)
-                                            } else {
-                                                showSuccess(`Datos de ${contactToReveal.name} desvelados`)
-                                                // Refresh contacts
+                                            const data = await response.json()
+
+                                            if (!response.ok) {
+                                                showError(data.error || `Error al desbloquear (${response.status})`)
+                                                return
+                                            }
+
+                                            if (data.success && data.person) {
+                                                const updates: any = {}
+                                                if (data.person.email) updates.email = data.person.email
+                                                if (data.person.phone) updates.phone = data.person.phone
+                                                if (data.person.name && contactToReveal.name.includes('***')) {
+                                                    updates.name = data.person.name
+                                                }
+
+                                                // Find matching lead_contact to update
+                                                const matchingContact = contacts.find((c: any) =>
+                                                    c.name === contactToReveal.name ||
+                                                    c.name?.toLowerCase().includes(firstName.toLowerCase())
+                                                )
+
+                                                if (matchingContact && Object.keys(updates).length > 0) {
+                                                    await supabase
+                                                        .from('lead_contacts')
+                                                        .update(updates)
+                                                        .eq('id', matchingContact.id)
+
+                                                    // Also update lead if primary
+                                                    if (matchingContact.is_primary) {
+                                                        const leadUpdates: any = {}
+                                                        if (updates.email) leadUpdates.email = updates.email
+                                                        if (updates.phone) leadUpdates.phone = updates.phone
+                                                        if (updates.name) leadUpdates.contact_name = updates.name
+                                                        if (Object.keys(leadUpdates).length > 0) {
+                                                            await supabase.from('leads').update(leadUpdates).eq('id', currentLead.id)
+                                                        }
+                                                    }
+                                                }
+
+                                                // Refresh contacts from DB
                                                 const { data: freshContacts } = await supabase
                                                     .from('lead_contacts')
                                                     .select('*')
                                                     .eq('lead_id', currentLead.id)
                                                 if (freshContacts) setContacts(freshContacts)
+
+                                                const revealed = []
+                                                if (data.person.email) revealed.push('email')
+                                                if (data.person.phone) revealed.push('teléfono')
+                                                if (revealed.length > 0) {
+                                                    showSuccess(`✅ ${revealed.join(' y ')} desbloqueado para ${contactToReveal.name}`)
+                                                } else if (data.phoneRequested) {
+                                                    showSuccess('📞 Teléfono solicitado — llegará en unos segundos')
+                                                } else {
+                                                    showError('Apollo no tiene datos de contacto para esta persona')
+                                                }
+                                            } else {
+                                                showError(data.error || 'No se encontró el contacto en Apollo')
                                             }
                                         } catch (err: any) {
                                             showError('Error: ' + (err.message || 'desconocido'))
