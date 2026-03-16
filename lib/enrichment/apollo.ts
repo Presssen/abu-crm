@@ -468,6 +468,8 @@ export async function revealPerson(
             const matchData = await matchRes.json()
             const m = matchData.matches?.[0]
             console.log(`[Apollo] bulk_match credits consumed: ${matchData.credits_consumed || 0}`)
+            console.log(`[Apollo] bulk_match raw phone_numbers:`, JSON.stringify(m?.phone_numbers || []))
+            console.log(`[Apollo] bulk_match raw email:`, m?.email)
 
             if (m) {
                 email = m.email && !m.email.includes('email_not_unlocked') ? m.email : null
@@ -477,7 +479,8 @@ export async function revealPerson(
                 personLinkedin = m.linkedin_url || undefined
             }
         } else {
-            console.warn('[Apollo] bulk_match failed:', matchRes.status)
+            const errText = await matchRes.text().catch(() => '')
+            console.warn('[Apollo] bulk_match failed:', matchRes.status, errText)
         }
 
         console.log(`[Apollo] After bulk_match: email=${email}, phone=${phone}`)
@@ -487,22 +490,26 @@ export async function revealPerson(
         const hasValidWebhook = webhookBaseUrl && webhookBaseUrl.startsWith('https://')
 
         if (wantsPhone && !phone) {
-            // Try people/match with reveal_phone_number in the body (NOT as URL param)
-            console.log(`[Apollo] Trying phone reveal via people/match`)
+            // Apollo phone reveal is async — try multiple approaches
+            console.log(`[Apollo] Trying phone reveal via people/match (email=${email}, domain=${cleanDomain}, personId=${personId})`)
             
+            // Approach 1: people/match with reveal_phone_number as query param + body
             const phoneMatchParams: any = {
-                first_name: firstName,
-                organization_domain: cleanDomain,
                 reveal_phone_number: true,
+                organization_domain: cleanDomain,
+                reveal_personal_emails: true,
             }
+            if (email) phoneMatchParams.email = email
+            if (firstName) phoneMatchParams.first_name = firstName
             if (lastName) phoneMatchParams.last_name = lastName
             if (organizationName) phoneMatchParams.organization_name = organizationName
             if (personLinkedin) phoneMatchParams.linkedin_url = personLinkedin
             if (personId) phoneMatchParams.id = personId
 
-            let phoneUrl = `${APOLLO_API_BASE}/people/match`
+            // Try with reveal_phone_number as BOTH query param and body param
+            let phoneUrl = `${APOLLO_API_BASE}/people/match?reveal_phone_number=true`
             if (hasValidWebhook) {
-                phoneUrl += `?webhook_url=${encodeURIComponent(webhookBaseUrl)}`
+                phoneUrl += `&webhook_url=${encodeURIComponent(webhookBaseUrl)}`
             }
             
             try {
@@ -518,58 +525,89 @@ export async function revealPerson(
                 if (phoneRes.ok) {
                     const phoneData = await phoneRes.json()
                     const pp = phoneData.person
+                    console.log(`[Apollo] people/match raw response keys:`, pp ? Object.keys(pp).join(',') : 'null')
+                    console.log(`[Apollo] people/match raw phone_numbers:`, JSON.stringify(pp?.phone_numbers || []))
+                    console.log(`[Apollo] people/match raw sanitized_phone:`, pp?.sanitized_phone)
+                    console.log(`[Apollo] people/match raw phone:`, pp?.phone)
+                    console.log(`[Apollo] people/match raw direct_phone:`, pp?.direct_phone)
+                    console.log(`[Apollo] people/match raw mobile_phone:`, pp?.mobile_phone)
+                    
+                    // Try multiple phone fields
                     if (pp?.phone_numbers?.[0]?.sanitized_number) {
                         phone = pp.phone_numbers[0].sanitized_number
+                    } else if (pp?.sanitized_phone) {
+                        phone = pp.sanitized_phone
+                    } else if (pp?.phone) {
+                        phone = pp.phone
+                    } else if (pp?.direct_phone) {
+                        phone = pp.direct_phone
+                    } else if (pp?.mobile_phone) {
+                        phone = pp.mobile_phone
+                    }
+                    
+                    if (phone) {
                         console.log(`[Apollo] Phone found in match response: ${phone}`)
                     }
-                    // Also pick up email if we didn't get it from bulk_match
+                    
                     if (!email && pp?.email && !pp.email.includes('email_not_unlocked')) {
                         email = pp.email
                     }
-                    // Update name if we got a better one
                     if (pp?.first_name && pp?.last_name) {
                         personName = [pp.first_name, pp.last_name].filter(Boolean).join(' ')
                     }
                 } else {
-                    console.warn('[Apollo] people/match failed:', phoneRes.status, await phoneRes.text().catch(() => ''))
+                    const errText = await phoneRes.text().catch(() => '')
+                    console.warn('[Apollo] people/match failed:', phoneRes.status, errText)
                 }
             } catch (phoneErr) {
                 console.warn('[Apollo] Phone reveal via match failed:', phoneErr)
             }
 
-            // STEP 4: Polling — if phone still missing, retry bulk_match up to 3 times with 3s delay
+            // STEP 4: If phone still missing, poll with people/match using the person ID
+            // This gives Apollo time to process the phone reveal request
             if (!phone && personId) {
-                console.log(`[Apollo] Phone not yet available, starting polling...`)
-                for (let attempt = 1; attempt <= 3; attempt++) {
-                    await new Promise(resolve => setTimeout(resolve, 3000))
-                    console.log(`[Apollo] Polling attempt ${attempt}/3 for phone...`)
+                console.log(`[Apollo] Phone not yet available, starting polling with people/match...`)
+                for (let attempt = 1; attempt <= 4; attempt++) {
+                    const delayMs = attempt <= 2 ? 4000 : 6000
+                    await new Promise(resolve => setTimeout(resolve, delayMs))
+                    console.log(`[Apollo] Polling attempt ${attempt}/4 for phone (delay=${delayMs}ms)...`)
                     try {
-                        const pollRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
+                        // Use people/match with just the ID to get already-revealed data
+                        const pollRes = await fetch(`${APOLLO_API_BASE}/people/match?reveal_phone_number=true`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-Api-Key': apiKey
                             },
                             body: JSON.stringify({
-                                details: [{ id: personId }],
+                                id: personId,
                                 reveal_phone_number: true,
                             })
                         })
                         if (pollRes.ok) {
                             const pollData = await pollRes.json()
-                            const pm = pollData.matches?.[0]
-                            if (pm?.phone_numbers?.[0]?.sanitized_number) {
-                                phone = pm.phone_numbers[0].sanitized_number
+                            const pm = pollData.person
+                            console.log(`[Apollo] Poll ${attempt} phone_numbers:`, JSON.stringify(pm?.phone_numbers || []))
+                            
+                            const foundPhone = pm?.phone_numbers?.[0]?.sanitized_number 
+                                || pm?.sanitized_phone 
+                                || pm?.phone 
+                                || pm?.direct_phone 
+                                || pm?.mobile_phone
+                            
+                            if (foundPhone) {
+                                phone = foundPhone
                                 console.log(`[Apollo] Phone found on polling attempt ${attempt}: ${phone}`)
-                                // Also update name/email if better data
-                                if (!email && pm.email && !pm.email.includes('email_not_unlocked')) {
+                                if (!email && pm?.email && !pm.email.includes('email_not_unlocked')) {
                                     email = pm.email
                                 }
-                                if (pm.first_name && pm.last_name) {
+                                if (pm?.first_name && pm?.last_name) {
                                     personName = [pm.first_name, pm.last_name].filter(Boolean).join(' ')
                                 }
                                 break
                             }
+                        } else {
+                            console.warn(`[Apollo] Poll ${attempt} failed:`, pollRes.status)
                         }
                     } catch (pollErr) {
                         console.warn(`[Apollo] Polling attempt ${attempt} failed:`, pollErr)
@@ -590,8 +628,8 @@ export async function revealPerson(
                 phone,
                 linkedin_url: personLinkedin,
             },
-            phoneRequested: false, // We now poll synchronously, no need for async message
-            phoneUnavailable: wantsPhone && !phone,
+            phoneRequested: !!(wantsPhone && !phone && hasValidWebhook), // Phone requested via webhook, will arrive async
+            phoneUnavailable: !!(wantsPhone && !phone && !hasValidWebhook), // Can't deliver phone without HTTPS webhook
         }
     } catch (error: any) {
         console.error('[Apollo] Reveal error:', error)

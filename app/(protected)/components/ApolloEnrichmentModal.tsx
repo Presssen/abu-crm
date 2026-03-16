@@ -189,22 +189,22 @@ export default function ApolloEnrichmentModal({
 
                 if (data.phoneRequested && !phoneRevealed) {
                     if (type === 'phone') {
-                        setError('Apollo no tiene teléfono disponible para esta persona.')
+                        setError('📞 Teléfono solicitado. Aparecerá automáticamente en unos segundos.')
                     } else if (type === 'both') {
                         if (emailRevealed) {
-                            setError('✅ Email desbloqueado. Apollo no tiene teléfono disponible.')
+                            setError('✅ Email desbloqueado. 📞 Teléfono solicitado — aparecerá en unos segundos.')
                         } else {
-                            setError('Apollo no tiene datos de contacto disponibles para esta persona.')
+                            setError('📞 Datos solicitados. Aparecerán automáticamente en unos segundos.')
                         }
                     }
                 } else if (data.phoneUnavailable && !phoneRevealed) {
                     if (type === 'phone') {
-                        setError('Apollo no tiene teléfono disponible para esta persona.')
+                        setError('El teléfono se entrega de forma asíncrona. Prueba en la app en producción (HTTPS).')
                     } else if (type === 'both') {
                         if (emailRevealed) {
-                            setError('✅ Email desbloqueado. No se encontró teléfono.')
+                            setError('✅ Email desbloqueado. El teléfono requiere HTTPS (producción).')
                         } else {
-                            setError('Apollo no tiene datos de contacto disponibles para esta persona.')
+                            setError('El teléfono requiere entorno HTTPS (producción) para recibirse.')
                         }
                     }
                 } else if (!emailRevealed && (type === 'email' || type === 'both')) {

@@ -37,13 +37,46 @@ export async function POST(request: NextRequest) {
         }
 
         const supabase = createAdminClient(supabaseUrl, supabaseServiceKey)
-
-        // Find the contact by name match and update phone
         const personName = [person.first_name, person.last_name].filter(Boolean).join(' ') || person.name
-        if (personName) {
-            const { data: contacts, error } = await supabase
+
+        // Strategy 1: Find contact by apollo_id (most reliable)
+        let updated = false
+        if (person.id) {
+            const { data: contacts } = await supabase
                 .from('lead_contacts')
-                .select('id, lead_id')
+                .select('id, lead_id, is_primary')
+                .eq('apollo_id', person.id)
+                .limit(5)
+
+            if (contacts && contacts.length > 0) {
+                for (const contact of contacts) {
+                    const updates: any = { phone }
+                    if (personName) updates.name = personName
+                    
+                    await supabase
+                        .from('lead_contacts')
+                        .update(updates)
+                        .eq('id', contact.id)
+                    console.log(`[Apollo Webhook] Updated contact ${contact.id} (by apollo_id) with phone ${phone}`)
+
+                    if (contact.is_primary) {
+                        const leadUpdates: any = { phone }
+                        if (personName) leadUpdates.contact_name = personName
+                        await supabase
+                            .from('leads')
+                            .update(leadUpdates)
+                            .eq('id', contact.lead_id)
+                    }
+                }
+                updated = true
+            }
+        }
+
+        // Strategy 2: Fall back to name matching if apollo_id didn't match
+        if (!updated && personName) {
+            const { data: contacts } = await supabase
+                .from('lead_contacts')
+                .select('id, lead_id, is_primary')
                 .ilike('name', personName)
                 .is('phone', null)
                 .limit(5)
@@ -54,20 +87,13 @@ export async function POST(request: NextRequest) {
                         .from('lead_contacts')
                         .update({ phone })
                         .eq('id', contact.id)
-                    console.log(`[Apollo Webhook] Updated contact ${contact.id} with phone ${phone}`)
+                    console.log(`[Apollo Webhook] Updated contact ${contact.id} (by name) with phone ${phone}`)
 
-                    // Also update lead if this was the primary contact
-                    const { data: primaryCheck } = await supabase
-                        .from('lead_contacts')
-                        .select('is_primary, lead_id')
-                        .eq('id', contact.id)
-                        .single()
-
-                    if (primaryCheck?.is_primary) {
+                    if (contact.is_primary) {
                         await supabase
                             .from('leads')
                             .update({ phone })
-                            .eq('id', primaryCheck.lead_id)
+                            .eq('id', contact.lead_id)
                     }
                 }
             }
