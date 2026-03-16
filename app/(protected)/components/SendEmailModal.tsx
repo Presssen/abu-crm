@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/auth/client'
-import { X, Send, User, Mail, ChevronDown, Sparkles, Layout, Variable, Eye } from 'lucide-react'
+import { X, Send, User, Mail, ChevronDown, Sparkles, Layout, Variable, Eye, Plus, UserPlus } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useNotification } from './ui/NotificationProvider'
 
@@ -32,9 +32,11 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
     const [formData, setFormData] = useState({
         lead_id: initialLeadId || '',
         to_email: initialTo || '',
+        cc_emails: [] as string[],
         subject: initialSubject || '',
         body: ''
     })
+    const [leadContacts, setLeadContacts] = useState<{email: string, name: string}[]>([])
 
     useEffect(() => {
         if (isOpen) {
@@ -50,7 +52,9 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                 ...prev,
                 lead_id: initialLeadId || prev.lead_id,
                 to_email: initialTo || prev.to_email,
-                subject: initialSubject || prev.subject
+                cc_emails: [],
+                subject: initialSubject || prev.subject,
+                body: ''
             }))
         }
     }, [isOpen, initialLeadId, initialTo, initialSubject])
@@ -64,6 +68,13 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                 return [...prev, data]
             })
         }
+        // Fetch lead contacts for CC suggestions
+        const { data: contacts } = await supabase
+            .from('lead_contacts')
+            .select('email, name')
+            .eq('lead_id', id)
+            .not('email', 'is', null)
+        setLeadContacts((contacts || []).filter(c => c.email && !c.email.includes('email_not_unlocked')))
     }
 
     const fetchTemplates = async () => {
@@ -116,6 +127,7 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                 body: JSON.stringify({
                     lead_id: formData.lead_id,
                     to: formData.to_email,
+                    cc: formData.cc_emails.length > 0 ? formData.cc_emails.join(', ') : undefined,
                     subject: finalSubject,
                     body: finalBody,
                     threadId: initialThreadId
@@ -203,6 +215,21 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
     // If we're searching for email options from a lead that's passed as prop but not in 'leads' yet
     const availableEmails = selectedLead?.email ? selectedLead.email.split(':').map((e: string) => e.trim()).filter(Boolean) : []
 
+    // All CC-able emails: lead emails (excluding current To) + lead_contacts emails
+    const ccSuggestions = [
+        ...availableEmails.filter((e: string) => e !== formData.to_email),
+        ...leadContacts.map(c => c.email).filter(e => e !== formData.to_email && !availableEmails.includes(e))
+    ].filter(e => !formData.cc_emails.includes(e))
+
+    const toggleCc = (email: string) => {
+        setFormData(prev => ({
+            ...prev,
+            cc_emails: prev.cc_emails.includes(email)
+                ? prev.cc_emails.filter(e => e !== email)
+                : [...prev.cc_emails, email]
+        }))
+    }
+
     return (
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all animate-in fade-in duration-300">
             <div className="bg-white rounded-[32px] shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-100">
@@ -269,7 +296,7 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                                     <select
                                         required
                                         value={formData.to_email}
-                                        onChange={(e) => setFormData({ ...formData, to_email: e.target.value })}
+                                        onChange={(e) => setFormData({ ...formData, to_email: e.target.value, cc_emails: formData.cc_emails.filter(cc => cc !== e.target.value) })}
                                         className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-sm font-bold text-indigo-600"
                                     >
                                         {availableEmails.map((email: string, idx: number) => (
@@ -287,6 +314,53 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                                     />
                                 )}
                             </div>
+                        </div>
+
+                        {/* CC Field */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center">
+                                <UserPlus size={12} className="mr-1" />
+                                CC (Copia)
+                            </label>
+                            {/* Selected CC chips */}
+                            {formData.cc_emails.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {formData.cc_emails.map((email, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-100"
+                                        >
+                                            {email}
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleCc(email)}
+                                                className="p-0.5 hover:bg-indigo-200 rounded-full transition-colors"
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                            {/* Suggestions */}
+                            {ccSuggestions.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {ccSuggestions.map((email, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => toggleCc(email)}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-50 text-gray-500 text-xs font-medium rounded-lg border border-gray-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all"
+                                        >
+                                            <Plus size={10} />
+                                            {email}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            {ccSuggestions.length === 0 && formData.cc_emails.length === 0 && (
+                                <p className="text-[11px] text-gray-400 italic">No hay emails adicionales disponibles</p>
+                            )}
                         </div>
 
                         <div className="space-y-1.5">
@@ -350,6 +424,9 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                             <div className="border-b border-gray-100 pb-4 mb-6 space-y-1">
                                 <div className="text-xs font-bold text-gray-400">Asunto: <span className="text-gray-900">{formData.subject || '(Sin asunto)'}</span></div>
                                 <div className="text-xs font-bold text-gray-400">Para: <span className="text-indigo-600">{formData.to_email || '(Sin destinatario)'}</span></div>
+                                {formData.cc_emails.length > 0 && (
+                                    <div className="text-xs font-bold text-gray-400">CC: <span className="text-gray-600">{formData.cc_emails.join(', ')}</span></div>
+                                )}
                             </div>
                             <div className="flex-1 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap font-medium">
                                 {getPreviewContent(formData.body) || <span className="text-gray-300 italic">Escribe tu mensaje para ver la vista previa...</span>}

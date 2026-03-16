@@ -14,7 +14,7 @@ import {
 import { clsx } from 'clsx'
 import CreateLeadModal from '../components/CreateLeadModal'
 import LeadDetailModal from '../components/LeadDetailModal'
-import { syncInactiveLeads } from '@/lib/leads/sync'
+
 
 const STAGES = [
     { id: 'new', label: 'Nuevos', color: 'bg-blue-500' },
@@ -98,7 +98,7 @@ export default function PipelinePage() {
 
                 let query = supabase
                     .from('leads')
-                    .select('*, lead_contacts(email, phone, is_primary)')
+                    .select('id, company_name, contact_name, email, phone, status, won_by, won_at, shopify_status, lead_contacts(email, phone, is_primary)')
                     .eq('status', stageId)
                     .order('created_at', { ascending: false })
                     .range(start, end)
@@ -133,7 +133,7 @@ export default function PipelinePage() {
             const stagePromises = STAGES.map(async (stage) => {
                 let query = supabase
                     .from('leads')
-                    .select('*, lead_contacts(email, phone, is_primary)')
+                    .select('id, company_name, contact_name, email, phone, status, won_by, won_at, shopify_status, lead_contacts(email, phone, is_primary)')
                     .eq('status', stage.id)
                     .order('created_at', { ascending: false })
                     .range(0, LEADS_PER_PAGE - 1)
@@ -173,10 +173,7 @@ export default function PipelinePage() {
             })
             setStagePagination(newPagination)
 
-            // Sync inactive leads in background without blocking
-            syncInactiveLeads(supabase).catch(err =>
-                console.error('Background sync failed:', err)
-            )
+
         } catch (error) {
             console.error('Error fetching leads:', error)
         } finally {

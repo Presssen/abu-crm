@@ -5,7 +5,7 @@ import { callGmailApi } from '@/lib/gmail'
 export async function POST(request: Request) {
     try {
         const bodyData = await request.json()
-        const { to, subject, body, lead_id, threadId, parentMessageId } = bodyData
+        const { to, cc, subject, body, lead_id, threadId, parentMessageId } = bodyData
 
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
 
             const headers = [
                 `To: ${to}`,
+                ...(cc ? [`Cc: ${cc}`] : []),
                 `Subject: ${finalSubject}`,
                 `Content-Type: text/html; charset=utf-8`,
             ]

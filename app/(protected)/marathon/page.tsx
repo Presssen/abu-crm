@@ -565,6 +565,34 @@ export default function MarathonPage() {
         }
     }
 
+    const setFavorite = async (type: 'email' | 'phone', idx: number) => {
+        if (!currentLead || idx === 0) return
+        const list = type === 'email'
+            ? currentLead.email.split(':').map(e => e.trim()).filter(Boolean)
+            : currentLead.phone.split(':').map(p => p.trim()).filter(Boolean)
+        if (idx >= list.length) return
+
+        // Move selected item to first position
+        const item = list.splice(idx, 1)[0]
+        list.unshift(item)
+        const newValue = list.join(' : ')
+
+        // Save to DB
+        const field = type === 'email' ? 'email' : 'phone'
+        const { error } = await supabase
+            .from('leads')
+            .update({ [field]: newValue })
+            .eq('id', currentLead.id)
+
+        if (!error) {
+            // Update local state
+            const updatedLeads = [...leads]
+            updatedLeads[currentIndex] = { ...currentLead, [field]: newValue }
+            setLeads(updatedLeads)
+            showSuccess(type === 'email' ? 'Email favorito actualizado' : 'Teléfono favorito actualizado')
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -848,6 +876,23 @@ export default function MarathonPage() {
                                 <div className="space-y-2">
                                     {editForm.emails.map((email: string, idx: number) => (
                                         <div key={idx} className="flex items-center gap-2">
+                                            {editForm.emails.length > 1 && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (idx === 0) return
+                                                        const newEmails = [...editForm.emails]
+                                                        const item = newEmails.splice(idx, 1)[0]
+                                                        newEmails.unshift(item)
+                                                        setEditForm({ ...editForm, emails: newEmails })
+                                                    }}
+                                                    className={clsx(
+                                                        "p-1 rounded-lg shrink-0",
+                                                        idx === 0 ? "text-amber-500" : "text-gray-300 active:text-amber-400"
+                                                    )}
+                                                >
+                                                    <Star size={14} className={idx === 0 ? "fill-amber-500" : ""} />
+                                                </button>
+                                            )}
                                             <input
                                                 type="email"
                                                 value={email}
@@ -888,6 +933,23 @@ export default function MarathonPage() {
                                 <div className="space-y-2">
                                     {editForm.phones.map((phone: string, idx: number) => (
                                         <div key={idx} className="flex items-center gap-2">
+                                            {editForm.phones.length > 1 && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (idx === 0) return
+                                                        const newPhones = [...editForm.phones]
+                                                        const item = newPhones.splice(idx, 1)[0]
+                                                        newPhones.unshift(item)
+                                                        setEditForm({ ...editForm, phones: newPhones })
+                                                    }}
+                                                    className={clsx(
+                                                        "p-1 rounded-lg shrink-0",
+                                                        idx === 0 ? "text-amber-500" : "text-gray-300 active:text-amber-400"
+                                                    )}
+                                                >
+                                                    <Star size={14} className={idx === 0 ? "fill-amber-500" : ""} />
+                                                </button>
+                                            )}
                                             <input
                                                 type="tel"
                                                 value={phone}
@@ -1561,10 +1623,26 @@ export default function MarathonPage() {
                                 <div className="space-y-2">
                                     {phones.length > 0 ? phones.map((phone, idx) => (
                                         <div key={idx} className="group flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:border-emerald-200 hover:shadow-sm transition-all">
-                                            <span className="text-sm font-bold text-gray-900 font-mono tracking-tight">{phone}</span>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {phones.length > 1 && (
+                                                    <button
+                                                        onClick={() => setFavorite('phone', idx)}
+                                                        className={clsx(
+                                                            "p-0.5 rounded transition-all shrink-0",
+                                                            idx === 0
+                                                                ? "text-amber-500"
+                                                                : "text-gray-300 hover:text-amber-400"
+                                                        )}
+                                                        title={idx === 0 ? 'Teléfono favorito' : 'Marcar como favorito'}
+                                                    >
+                                                        <Star size={14} className={idx === 0 ? "fill-amber-500" : ""} />
+                                                    </button>
+                                                )}
+                                                <span className="text-sm font-bold text-gray-900 font-mono tracking-tight truncate">{phone}</span>
+                                            </div>
                                             <a
                                                 href={`tel:${phone}`}
-                                                className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
+                                                className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors shrink-0"
                                             >
                                                 <Phone size={14} />
                                             </a>
@@ -1593,13 +1671,29 @@ export default function MarathonPage() {
                                 <div className="space-y-2">
                                     {emails.length > 0 ? emails.map((email, idx) => (
                                         <div key={idx} className="group flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:border-blue-200 hover:shadow-sm transition-all">
-                                            <span className="text-sm font-medium text-gray-700 font-mono tracking-tight truncate mr-2 max-w-[180px]">{email}</span>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {emails.length > 1 && (
+                                                    <button
+                                                        onClick={() => setFavorite('email', idx)}
+                                                        className={clsx(
+                                                            "p-0.5 rounded transition-all shrink-0",
+                                                            idx === 0
+                                                                ? "text-amber-500"
+                                                                : "text-gray-300 hover:text-amber-400"
+                                                        )}
+                                                        title={idx === 0 ? 'Email favorito' : 'Marcar como favorito'}
+                                                    >
+                                                        <Star size={14} className={idx === 0 ? "fill-amber-500" : ""} />
+                                                    </button>
+                                                )}
+                                                <span className="text-sm font-medium text-gray-700 font-mono tracking-tight truncate max-w-[180px]">{email}</span>
+                                            </div>
                                             <button
                                                 onClick={() => {
                                                     setEmailInitialTo(email)
                                                     setIsEmailModalOpen(true)
                                                 }}
-                                                className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                                                className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors shrink-0"
                                             >
                                                 <Mail size={14} />
                                             </button>
