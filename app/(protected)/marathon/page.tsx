@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/auth/client'
 import {
     Phone,
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import ApolloEnrichmentModal from '../components/ApolloEnrichmentModal'
 // enrichLead no longer used — enrichment now goes through Apollo API
 import SendEmailModal from '../components/SendEmailModal'
@@ -61,8 +62,28 @@ interface Lead {
 
 export default function MarathonPage() {
     const supabase = createClient()
+    const searchParams = useSearchParams()
     const [leads, setLeads] = useState<Lead[]>([])
-    const [currentIndex, setCurrentIndex] = useState(0)
+    const [currentIndex, setCurrentIndexState] = useState(0)
+    const [restoredLeadId] = useState(() => searchParams.get('leadId') || null)
+
+    // Wrapper to update both state and URL with the lead ID
+    const setCurrentIndex = useCallback((valueOrUpdater: number | ((prev: number) => number)) => {
+        setCurrentIndexState(prev => {
+            const newIndex = typeof valueOrUpdater === 'function' ? valueOrUpdater(prev) : valueOrUpdater
+            return newIndex
+        })
+    }, [])
+
+    // Sync URL whenever currentIndex or leads change
+    useEffect(() => {
+        const lead = leads[currentIndex]
+        if (lead) {
+            const url = new URL(window.location.href)
+            url.searchParams.set('leadId', lead.id)
+            window.history.replaceState({}, '', url.toString())
+        }
+    }, [currentIndex, leads])
     const [loading, setLoading] = useState(true)
     const [dailyGoal, setDailyGoal] = useState(20)
 
@@ -261,6 +282,14 @@ export default function MarathonPage() {
             // Randomize client-side for "surprise" effect or keep DB order
             const shuffled = (data || []).sort(() => Math.random() - 0.5)
             setLeads(shuffled)
+
+            // Restore position by lead ID if available
+            if (restoredLeadId) {
+                const idx = shuffled.findIndex((l: Lead) => l.id === restoredLeadId)
+                if (idx >= 0) {
+                    setCurrentIndexState(idx)
+                }
+            }
         } catch (error) {
             console.error('Error fetching marathon leads:', error)
         } finally {
