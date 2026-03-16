@@ -539,9 +539,7 @@ export default function MarathonPage() {
 
                     showSuccess(type === 'email' ? '✅ Email desbloqueado' : '✅ Teléfono desbloqueado')
                 } else if (data.phoneUnavailable) {
-                    showError('El desbloqueo de teléfono requiere HTTPS (producción)')
-                } else if (data.phoneRequested) {
-                    showSuccess('📞 Teléfono solicitado — llegará en unos segundos vía webhook')
+                    showError('Apollo no tiene un teléfono disponible para este contacto')
                 } else {
                     showError(`Apollo no tiene ${type === 'email' ? 'email' : 'teléfono'} para este contacto`)
                 }

@@ -412,12 +412,14 @@ export async function revealPerson(
         const queryParams: string[] = []
 
         const wantsPhone = revealType === 'phone' || revealType === 'both'
-        // Apollo requires an HTTPS webhook URL for phone reveal (won't work on localhost)
-        const hasValidWebhook = webhookBaseUrl && webhookBaseUrl.startsWith('https://')
 
-        if (wantsPhone && hasValidWebhook) {
+        if (wantsPhone) {
             queryParams.push('reveal_phone_number=true')
-            queryParams.push(`webhook_url=${encodeURIComponent(webhookBaseUrl)}`)
+            // Add webhook as fallback if available
+            const hasValidWebhook = webhookBaseUrl && webhookBaseUrl.startsWith('https://')
+            if (hasValidWebhook) {
+                queryParams.push(`webhook_url=${encodeURIComponent(webhookBaseUrl)}`)
+            }
         }
 
         if (queryParams.length > 0) {
@@ -452,10 +454,50 @@ export async function revealPerson(
             }
         }
 
-        const email = p.email && !p.email.includes('email_not_unlocked') ? p.email : null
-        const phone = p.phone_numbers?.[0]?.sanitized_number || null
+        let email = p.email && !p.email.includes('email_not_unlocked') ? p.email : null
+        let phone = p.phone_numbers?.[0]?.sanitized_number || null
 
-        console.log(`[Apollo] Revealed: email=${email}, phone=${phone}, title=${p.title}, phoneRequested=${wantsPhone && !phone}`)
+        console.log(`[Apollo] Initial reveal: email=${email}, phone=${phone}, personId=${p.id}`)
+
+        // If phone was requested but not in the initial response, poll the person directly
+        // Apollo may need a moment to process the phone lookup
+        if (wantsPhone && !phone && p.id) {
+            console.log(`[Apollo] Phone not in initial response, polling person ${p.id}...`)
+            
+            // Wait and retry up to 3 times with increasing delays
+            const delays = [2000, 3000, 4000]
+            for (const delay of delays) {
+                await new Promise(resolve => setTimeout(resolve, delay))
+                
+                try {
+                    const personRes = await fetch(`${APOLLO_API_BASE}/people/${p.id}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Api-Key': apiKey
+                        }
+                    })
+
+                    if (personRes.ok) {
+                        const personData = await personRes.json()
+                        const pp = personData.person
+                        if (pp?.phone_numbers?.[0]?.sanitized_number) {
+                            phone = pp.phone_numbers[0].sanitized_number
+                            console.log(`[Apollo] Phone found on retry: ${phone}`)
+                            // Also pick up email if we didn't have it yet
+                            if (!email && pp.email && !pp.email.includes('email_not_unlocked')) {
+                                email = pp.email
+                            }
+                            break
+                        }
+                    }
+                } catch (retryErr) {
+                    console.warn('[Apollo] Retry fetch error:', retryErr)
+                }
+            }
+        }
+
+        console.log(`[Apollo] Final result: email=${email}, phone=${phone}`)
 
         return {
             success: true,
@@ -467,10 +509,9 @@ export async function revealPerson(
                 phone,
                 linkedin_url: p.linkedin_url || undefined,
             },
-            // Phone was requested and will arrive via webhook (only if HTTPS webhook was used)
-            phoneRequested: wantsPhone && !!hasValidWebhook && !phone,
-            // Phone was requested but webhook isn't available (localhost/HTTP)
-            phoneUnavailable: wantsPhone && !hasValidWebhook && !phone,
+            // Only set phoneRequested if we still don't have it after retries
+            phoneRequested: false,
+            phoneUnavailable: wantsPhone && !phone,
         }
     } catch (error: any) {
         console.error('[Apollo] Reveal error:', error)
