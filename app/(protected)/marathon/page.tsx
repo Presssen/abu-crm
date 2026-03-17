@@ -2008,21 +2008,19 @@ export default function MarathonPage() {
                                                 </div>
                                                 <div className="space-y-1.5 pt-2 border-t border-gray-100">
                                                     {contact.email && !contact.email.includes('email_not_unlocked') ? (
-                                                        <div className="flex items-center justify-between group">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEmailInitialTo(contact.email)
+                                                                setIsEmailModalOpen(true)
+                                                            }}
+                                                            className="flex items-center justify-between w-full group p-1.5 -m-1.5 rounded-lg hover:bg-blue-50 transition-all"
+                                                        >
                                                             <div className="flex items-center gap-2 min-w-0">
-                                                                <Mail size={10} className="text-gray-400 shrink-0" />
-                                                                <span className="text-[11px] text-gray-600 font-medium truncate">{contact.email}</span>
+                                                                <Mail size={10} className="text-gray-400 group-hover:text-blue-500 shrink-0" />
+                                                                <span className="text-[11px] text-gray-600 group-hover:text-blue-600 font-medium truncate">{contact.email}</span>
                                                             </div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setEmailInitialTo(contact.email)
-                                                                    setIsEmailModalOpen(true)
-                                                                }}
-                                                                className="opacity-0 group-hover:opacity-100 p-1 bg-gray-900 text-white rounded-md hover:bg-black transition-all"
-                                                            >
-                                                                <Mail size={8} />
-                                                            </button>
-                                                        </div>
+                                                            <Mail size={10} className="text-blue-500 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+                                                        </button>
                                                     ) : (
                                                         <button
                                                             onClick={() => revealContactData(contact, 'email')}
