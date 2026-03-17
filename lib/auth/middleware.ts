@@ -37,8 +37,14 @@ export async function updateSession(request: NextRequest) {
 
     const path = request.nextUrl.pathname
 
-    // Public routes (including /blocked)
-    if (['/login', '/signup', '/forgot-password', '/auth/callback', '/pending-approval', '/blocked', '/chat-widget'].includes(path)) {
+    // Public routes (including /blocked and API webhooks)
+    const publicPaths = ['/login', '/signup', '/forgot-password', '/auth/callback', '/pending-approval', '/blocked', '/chat-widget']
+    const isPublicPath = publicPaths.includes(path)
+    
+    // Allow external webhooks and API callbacks without authentication
+    const isWebhookPath = path.startsWith('/api/enrich/apollo/webhook') || path.startsWith('/api/webhook')
+    
+    if (isPublicPath || isWebhookPath) {
         if (user) {
             // Check status if logged in and trying to access public/pending/blocked pages
             const { data: profile } = await supabase

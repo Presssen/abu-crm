@@ -531,60 +531,72 @@ export async function revealPerson(
             console.warn('[Apollo] Cannot reveal phone: no valid HTTPS webhook URL available')
         }
 
-        // STEP 4: If phone still missing after reveal request, poll bulk_match
-        // bulk_match returns phone in person.contact sub-object once Apollo processes the reveal
-        // This is DIFFERENT from GET /people/{id} which does NOT return phones
-        if (wantsPhone && !phone && personId) {
-            console.log(`[Apollo] Polling bulk_match for phone (up to 5 attempts, every 2s)...`)
+        // STEP 4: If phone was requested via webhook, poll DB for webhook delivery
+        // Apollo delivers phone data asynchronously via webhook to our endpoint.
+        // The webhook handler saves it to apollo_webhook_results table.
+        // We poll that table here for up to ~12 seconds before giving up.
+        let phoneRequested = false
+        if (wantsPhone && !phone && personId && hasValidWebhook) {
+            phoneRequested = true
+            console.log(`[Apollo] Phone requested via webhook. Polling apollo_webhook_results for up to 12s...`)
             
-            for (let attempt = 1; attempt <= 5; attempt++) {
-                await new Promise(resolve => setTimeout(resolve, 2000))
+            // Import supabase admin to check webhook results
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+            const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+            
+            if (supabaseUrl && supabaseKey) {
+                const { createClient } = await import('@supabase/supabase-js')
+                const adminDb = createClient(supabaseUrl, supabaseKey)
                 
-                try {
-                    const pollRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Api-Key': apiKey
-                        },
-                        body: JSON.stringify({
-                            details: [{ id: personId }],
-                        })
-                    })
+                for (let attempt = 1; attempt <= 6; attempt++) {
+                    await new Promise(resolve => setTimeout(resolve, 2000))
                     
-                    if (pollRes.ok) {
-                        const pollData = await pollRes.json()
-                        const pm = pollData.matches?.[0]
+                    try {
+                        // Check apollo_webhook_results for this person's phone
+                        const { data: webhookResult } = await adminDb
+                            .from('apollo_webhook_results')
+                            .select('phone, email')
+                            .eq('apollo_id', personId)
+                            .not('phone', 'is', null)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .single()
                         
-                        const foundPhone = pm?.phone_numbers?.[0]?.sanitized_number
-                            || pm?.contact?.phone_numbers?.[0]?.sanitized_number
-                            || pm?.contact?.sanitized_phone
-                            || pm?.sanitized_phone
-                            || null
-                        
-                        if (foundPhone) {
-                            phone = foundPhone
-                            console.log(`[Apollo] ✅ Phone found on poll attempt ${attempt}: ${phone}`)
-                            
-                            if (!email && pm?.email && !pm.email.includes('email_not_unlocked')) {
-                                email = pm.email
+                        if (webhookResult?.phone) {
+                            phone = webhookResult.phone
+                            if (!email && webhookResult.email) {
+                                email = webhookResult.email
                             }
+                            console.log(`[Apollo] ✅ Phone found in webhook_results on attempt ${attempt}: ${phone}`)
+                            phoneRequested = false // Phone was found!
                             break
                         }
                         
-                        console.log(`[Apollo] Poll ${attempt}/5: phone not yet available`)
+                        // Also check if webhook updated lead_contacts directly
+                        const { data: contactResult } = await adminDb
+                            .from('lead_contacts')
+                            .select('phone')
+                            .eq('apollo_id', personId)
+                            .not('phone', 'is', null)
+                            .limit(1)
+                            .single()
+                        
+                        if (contactResult?.phone) {
+                            phone = contactResult.phone
+                            console.log(`[Apollo] ✅ Phone found in lead_contacts on attempt ${attempt}: ${phone}`)
+                            phoneRequested = false
+                            break
+                        }
+                        
+                        console.log(`[Apollo] Poll ${attempt}/6: phone not yet in DB`)
+                    } catch (pollErr) {
+                        console.log(`[Apollo] Poll ${attempt}/6: no result yet`)
                     }
-                } catch (pollErr) {
-                    console.warn(`[Apollo] Poll ${attempt} error:`, pollErr)
                 }
-            }
-            
-            if (!phone) {
-                console.log(`[Apollo] Phone not available after polling`)
             }
         }
 
-        console.log(`[Apollo] Final result: email=${email}, phone=${phone}`)
+        console.log(`[Apollo] Final result: email=${email}, phone=${phone}, phoneRequested=${phoneRequested}`)
 
         return {
             success: true,
@@ -596,8 +608,8 @@ export async function revealPerson(
                 phone,
                 linkedin_url: personLinkedin,
             },
-            phoneRequested: false, // We handle everything server-side now
-            phoneUnavailable: !!(wantsPhone && !phone),
+            phoneRequested, // true = phone should arrive via webhook, client should poll DB
+            phoneUnavailable: !!(wantsPhone && !phone && !phoneRequested),
         }
     } catch (error: any) {
         console.error('[Apollo] Reveal error:', error)
