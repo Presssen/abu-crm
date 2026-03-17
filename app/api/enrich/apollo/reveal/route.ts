@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
             organizationName,
             linkedinUrl,
             revealType,
-            webhookUrl,
+            webhookUrl,  // Full webhook URL — revealPerson passes it directly to Apollo
             apolloId
         )
 

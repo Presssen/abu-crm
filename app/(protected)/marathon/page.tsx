@@ -559,15 +559,20 @@ export default function MarathonPage() {
 
             if (data.success && data.person) {
                 const updates: any = {}
-                if (type === 'email' && data.person.email) {
+                // Save ALL returned data regardless of requested type
+                if (data.person.email) {
                     updates.email = data.person.email
                 }
-                if (type === 'phone' && data.person.phone) {
+                if (data.person.phone) {
                     updates.phone = data.person.phone
                 }
                 // Always update name if reveal returns a better one
                 if (data.person.name && data.person.name !== contact.name) {
                     updates.name = data.person.name
+                }
+                // Save apollo_id for reliable webhook matching
+                if (data.person.id && !contact.apollo_id) {
+                    updates.apollo_id = data.person.id
                 }
 
                 if (Object.keys(updates).length > 0) {
@@ -591,7 +596,10 @@ export default function MarathonPage() {
                         }
                     }
 
-                    showSuccess(type === 'email' ? '✅ Email desbloqueado' : '✅ Teléfono desbloqueado')
+                    const revealed = []
+                    if (updates.email) revealed.push('email')
+                    if (updates.phone) revealed.push('teléfono')
+                    showSuccess(`✅ ${revealed.join(' y ')} desbloqueado`)
                 } else if (data.phoneRequested || data.phoneUnavailable) {
                     // Phone was requested via Apollo webhook — poll database until it arrives
                     showSuccess('📞 Teléfono solicitado a Apollo. Buscando...')
@@ -892,11 +900,16 @@ export default function MarathonPage() {
 
                                             if (data.success && data.person) {
                                                 const updates: any = {}
+                                                // Save ALL returned data regardless of requested type
                                                 if (data.person.email) updates.email = data.person.email
                                                 if (data.person.phone) updates.phone = data.person.phone
                                                 // Always update name from reveal
                                                 if (data.person.name && data.person.name !== contactToReveal.name) {
                                                     updates.name = data.person.name
+                                                }
+                                                // Save apollo_id for reliable webhook matching
+                                                if (data.person.id) {
+                                                    updates.apollo_id = data.person.id
                                                 }
 
                                                 // Find matching lead_contact to update

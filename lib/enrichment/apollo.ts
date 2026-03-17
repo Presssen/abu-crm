@@ -381,7 +381,7 @@ export async function revealPerson(
     organizationName?: string,
     linkedinUrl?: string,
     revealType: 'email' | 'phone' | 'both' = 'both',
-    webhookBaseUrl?: string,
+    webhookUrl?: string,
     apolloId?: string
 ): Promise<{ success: boolean; person?: EnrichedContact; phoneRequested?: boolean; phoneUnavailable?: boolean; error?: string }> {
     try {
@@ -392,7 +392,8 @@ export async function revealPerson(
             .trim()
 
         const fullName = [firstName, lastName].filter(Boolean).join(' ')
-        console.log(`[Apollo] Revealing contact: ${fullName} @ ${cleanDomain} (org: ${organizationName}, type: ${revealType}, apolloId: ${apolloId || 'none'})`)
+        const hasValidWebhook = webhookUrl && webhookUrl.startsWith('https://')
+        console.log(`[Apollo] Revealing contact: ${fullName} @ ${cleanDomain} (org: ${organizationName}, type: ${revealType}, apolloId: ${apolloId || 'none'}, webhook: ${hasValidWebhook ? 'yes' : 'no'})`)
 
         let personId = apolloId || null
         let bestMatchTitle = ''
@@ -446,16 +447,21 @@ export async function revealPerson(
         }
 
         // STEP 2: Reveal via bulk_match with the person ID (requests email + phone)
+        const bulkMatchBody: any = {
+            details: [{ id: personId }],
+            reveal_phone_number: true,
+            reveal_personal_emails: true,
+        }
+        if (hasValidWebhook) {
+            bulkMatchBody.webhook_url = webhookUrl
+        }
         const matchRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Api-Key': apiKey
             },
-            body: JSON.stringify({
-                details: [{ id: personId }],
-                reveal_phone_number: true,
-            })
+            body: JSON.stringify(bulkMatchBody)
         })
 
         let email: string | null = null
@@ -487,7 +493,6 @@ export async function revealPerson(
 
         // STEP 3: If phone is still missing and requested, try people/match with reveal_phone_number
         const wantsPhone = revealType === 'phone' || revealType === 'both'
-        const hasValidWebhook = webhookBaseUrl && webhookBaseUrl.startsWith('https://')
 
         if (wantsPhone && !phone) {
             // Apollo phone reveal is async — try multiple approaches
@@ -509,7 +514,8 @@ export async function revealPerson(
             // Try with reveal_phone_number as BOTH query param and body param
             let phoneUrl = `${APOLLO_API_BASE}/people/match?reveal_phone_number=true`
             if (hasValidWebhook) {
-                phoneUrl += `&webhook_url=${encodeURIComponent(webhookBaseUrl)}`
+                phoneUrl += `&webhook_url=${encodeURIComponent(webhookUrl!)}`
+                phoneMatchParams.webhook_url = webhookUrl
             }
             
             try {
