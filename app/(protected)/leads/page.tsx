@@ -124,6 +124,37 @@ export default function LeadsPage() {
         setIsScrolled(e.currentTarget.scrollTop > 10)
     }
 
+    // Sync selectedLeadId with URL
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        const leadId = params.get('leadId')
+        if (leadId) {
+            setSelectedLeadId(leadId)
+        }
+
+        const handlePopState = () => {
+            const currentParams = new URLSearchParams(window.location.search)
+            setSelectedLeadId(currentParams.get('leadId'))
+        }
+        window.addEventListener('popstate', handlePopState)
+        return () => window.removeEventListener('popstate', handlePopState)
+    }, [])
+
+    const openLead = (id: string) => {
+        setSelectedLeadId(id)
+        const params = new URLSearchParams(window.location.search)
+        params.set('leadId', id)
+        window.history.pushState(null, '', `?${params.toString()}`)
+    }
+
+    const closeLead = () => {
+        setSelectedLeadId(null)
+        const params = new URLSearchParams(window.location.search)
+        params.delete('leadId')
+        const newUrl = window.location.pathname + (params.toString() ? `?${params.toString()}` : '')
+        window.history.pushState(null, '', newUrl)
+    }
+
     // Debounce search input: waits 400ms after last keystroke before triggering API call
     const handleSearchChange = useCallback((value: string) => {
         setSearch(value)
@@ -452,7 +483,7 @@ export default function LeadsPage() {
                                     leads.map((lead) => (
                                         <tr
                                             key={lead.id}
-                                            onClick={() => setSelectedLeadId(lead.id)}
+                                            onClick={() => openLead(lead.id)}
                                             className="hover:bg-gray-50 transition-colors cursor-pointer"
                                         >
                                             <td className="px-6 py-4">
@@ -757,7 +788,7 @@ export default function LeadsPage() {
                 {selectedLeadId && (
                     <LeadDetailModal
                         isOpen={!!selectedLeadId}
-                        onClose={() => setSelectedLeadId(null)}
+                        onClose={closeLead}
                         leadId={selectedLeadId}
                     />
                 )}

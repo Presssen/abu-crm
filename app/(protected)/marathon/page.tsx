@@ -596,12 +596,53 @@ export default function MarathonPage() {
                         }
                     }
 
-                    const revealed = []
-                    if (updates.email) revealed.push('email')
-                    if (updates.phone) revealed.push('teléfono')
-                    showSuccess(`✅ ${revealed.join(' y ')} desbloqueado`)
+                    // Show appropriate message based on what was requested vs what was returned
+                    const phoneWasRequested = type === 'phone'
+                    const phoneStillMissing = phoneWasRequested && !updates.phone
+                    
+                    if (phoneStillMissing && (data.phoneRequested || data.phoneUnavailable)) {
+                        // User asked for phone, email may have been saved but phone is async
+                        if (updates.email) {
+                            showSuccess('✅ Email desbloqueado. 📞 Teléfono solicitado, buscando...')
+                        } else {
+                            showSuccess('📞 Teléfono solicitado a Apollo. Buscando...')
+                        }
+                        
+                        // Poll the database for the phone (webhook will deliver it async)
+                        let phoneFound = false
+                        for (let pollAttempt = 1; pollAttempt <= 10; pollAttempt++) {
+                            await new Promise(resolve => setTimeout(resolve, 3000))
+                            
+                            const { data: freshContact } = await supabase
+                                .from('lead_contacts')
+                                .select('phone, name')
+                                .eq('id', contact.id)
+                                .single()
+                            
+                            if (freshContact?.phone) {
+                                setContacts(prev => prev.map(c =>
+                                    c.id === contact.id ? { ...c, phone: freshContact.phone, name: freshContact.name || c.name } : c
+                                ))
+                                if (contact.is_primary && currentLead) {
+                                    await supabase.from('leads').update({ phone: freshContact.phone }).eq('id', currentLead.id)
+                                }
+                                showSuccess(`✅ Teléfono desbloqueado: ${freshContact.phone}`)
+                                phoneFound = true
+                                break
+                            }
+                        }
+                        
+                        if (!phoneFound) {
+                            showError('⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
+                        }
+                    } else {
+                        const revealed = []
+                        if (updates.email) revealed.push('email')
+                        if (updates.phone) revealed.push('teléfono')
+                        showSuccess(`✅ ${revealed.join(' y ')} desbloqueado`)
+                    }
                 } else if (data.phoneRequested || data.phoneUnavailable) {
-                    // Phone was requested via Apollo webhook — poll database until it arrives
+                    // No data was saved at all, but phone was requested via webhook
                     showSuccess('📞 Teléfono solicitado a Apollo. Buscando...')
                     
                     // Poll the database for the phone (webhook will deliver it async)

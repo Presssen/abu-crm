@@ -147,6 +147,25 @@ export async function POST(request: NextRequest) {
                     }
                 }
             }
+
+            // Always insert into the cache table to fix race conditions where lead_contacts is not created yet
+            // The frontend ApolloEnrichmentModal will poll this table
+            if (person.id) {
+                const { error: insertError } = await supabase
+                    .from('apollo_webhook_results')
+                    .insert({
+                        apollo_id: person.id,
+                        phone: phone,
+                        email: email,
+                        payload: person,
+                    })
+                
+                if (insertError) {
+                    console.error(`[Apollo Webhook] Error inserting cache for ${person.id}:`, insertError)
+                } else {
+                    console.log(`[Apollo Webhook] Saved result in cache table for ${person.id}`)
+                }
+            }
         }
 
         return NextResponse.json({ ok: true })

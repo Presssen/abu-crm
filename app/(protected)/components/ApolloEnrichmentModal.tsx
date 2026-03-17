@@ -141,6 +141,7 @@ export default function ApolloEnrichmentModal({
         setRevealingId(person.id)
         setRevealType(type)
         setError(null)
+        const supabase = createClient()
 
         try {
             const nameParts = person.name.split(' ')
@@ -170,10 +171,10 @@ export default function ApolloEnrichmentModal({
                         if (data.person.title) updated.title = data.person.title
                         // Always update name from reveal (it returns the full, unmasked name)
                         if (data.person.name) updated.name = data.person.name
-                        if ((type === 'email' || type === 'both') && data.person.email) {
+                        if (data.person.email) {
                             updated.email = data.person.email
                         }
-                        if ((type === 'phone' || type === 'both') && data.person.phone) {
+                        if (data.person.phone) {
                             updated.phone = data.person.phone
                         }
                         if (data.person.linkedin_url) updated.linkedin_url = data.person.linkedin_url
@@ -187,42 +188,53 @@ export default function ApolloEnrichmentModal({
                 const emailRevealed = (type === 'email' || type === 'both') && data.person.email
                 const phoneRevealed = (type === 'phone' || type === 'both') && data.person.phone
 
-                if ((data.phoneRequested || data.phoneUnavailable) && !phoneRevealed) {
-                    // Phone requested via Apollo webhook — poll database for arrival
-                    const supabase = createClient()
-                    setError('📞 Teléfono solicitado a Apollo. Buscando...')
+                if (data.phoneRequested && !phoneRevealed) {
+                    // Phone requested via Apollo webhook — poll cache table for arrival
+                    setError('📞 Teléfono solicitado a Apollo. Esperando respuesta...')
                     
                     let phoneFound = false
-                    for (let pollAttempt = 1; pollAttempt <= 10; pollAttempt++) {
-                        await new Promise(resolve => setTimeout(resolve, 3000))
+                    for (let pollAttempt = 1; pollAttempt <= 12; pollAttempt++) {
+                        await new Promise(resolve => setTimeout(resolve, 2500))
                         
-                        // Check if webhook has delivered the phone to lead_contacts
-                        const { data: freshContact } = await supabase
-                            .from('lead_contacts')
-                            .select('phone, name')
-                            .eq('apollo_id', person.id)
-                            .not('phone', 'is', null)
-                            .limit(1)
-                            .single()
-                        
-                        if (freshContact?.phone) {
-                            setPeople(prev => prev.map(p =>
-                                p.id === person.id ? { ...p, phone: freshContact.phone } : p
-                            ))
-                            setError(null)
-                            phoneFound = true
-                            onSuccess() // Refresh parent page
-                            break
+                        try {
+                            // Check the apollo_webhook_results cache table
+                            const { data: cacheResult } = await supabase
+                                .from('apollo_webhook_results')
+                                .select('phone, email')
+                                .eq('apollo_id', data.person.id)
+                                .not('phone', 'is', null)
+                                .order('created_at', { ascending: false })
+                                .limit(1)
+                                .maybeSingle()
+                            
+                            if (cacheResult?.phone) {
+                                setPeople(prev => prev.map(p => {
+                                    if (p.id === person.id) {
+                                        const updatedP = { ...p, phone: cacheResult.phone }
+                                        if (cacheResult.email) updatedP.email = cacheResult.email
+                                        return updatedP
+                                    }
+                                    return p
+                                }))
+                                setError(null)
+                                phoneFound = true
+                                break
+                            }
+                        } catch (pollErr) {
+                            // Table might not exist yet — ignore and keep polling
+                            console.warn('Poll error (table may not exist yet):', pollErr)
                         }
                     }
                     
                     if (!phoneFound) {
                         if (emailRevealed) {
-                            setError('✅ Email desbloqueado. ⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
+                            setError('✅ Email desbloqueado. ⏱️ El teléfono aún no ha llegado. Asegúrate de haber aplicado la migración y desplegado en producción.')
                         } else {
-                            setError('⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
+                            setError('⏱️ El teléfono aún no ha llegado. El webhook de Apollo lo enviará a producción. Asegúrate de haber aplicado la migración SQL.')
                         }
                     }
+                } else if (data.phoneUnavailable && !phoneRevealed) {
+                    setError('No se puede desbloquear el teléfono. Verifica que APP_URL esté configurado con HTTPS.')
                 } else if (!emailRevealed && (type === 'email' || type === 'both')) {
                     setError('Apollo no tiene un email disponible para este contacto.')
                 } else if (!phoneRevealed && (type === 'phone')) {
