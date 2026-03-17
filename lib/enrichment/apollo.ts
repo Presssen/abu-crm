@@ -477,14 +477,24 @@ export async function revealPerson(
             const m = matchData.matches?.[0]
             console.log(`[Apollo] bulk_match credits consumed: ${matchData.credits_consumed || 0}`)
             console.log(`[Apollo] bulk_match raw phone_numbers:`, JSON.stringify(m?.phone_numbers || []))
+            console.log(`[Apollo] bulk_match contact phone_numbers:`, JSON.stringify(m?.contact?.phone_numbers || []))
             console.log(`[Apollo] bulk_match raw email:`, m?.email)
 
             if (m) {
                 email = m.email && !m.email.includes('email_not_unlocked') ? m.email : null
-                phone = m.phone_numbers?.[0]?.sanitized_number || null
+                // Check phone in multiple locations: top-level, contact sub-object, sanitized_phone
+                phone = m.phone_numbers?.[0]?.sanitized_number
+                    || m.contact?.phone_numbers?.[0]?.sanitized_number
+                    || m.contact?.sanitized_phone
+                    || m.sanitized_phone
+                    || null
                 personName = [m.first_name, m.last_name].filter(Boolean).join(' ') || m.name || fullName
                 personTitle = m.title || personTitle
                 personLinkedin = m.linkedin_url || undefined
+                
+                if (phone) {
+                    console.log(`[Apollo] Phone found in bulk_match response: ${phone}`)
+                }
             }
         } else {
             const errText = await matchRes.text().catch(() => '')
@@ -530,13 +540,19 @@ export async function revealPerson(
                     const pp = phoneData.person
                     console.log(`[Apollo] people/match response keys:`, pp ? Object.keys(pp).join(',') : 'null')
                     console.log(`[Apollo] people/match phone_numbers:`, JSON.stringify(pp?.phone_numbers || []))
+                    console.log(`[Apollo] people/match contact.phone_numbers:`, JSON.stringify(pp?.contact?.phone_numbers || []))
+                    console.log(`[Apollo] people/match contact.sanitized_phone:`, pp?.contact?.sanitized_phone)
                     
-                    // Check if phone was returned synchronously (rare but possible)
-                    if (pp?.phone_numbers?.[0]?.sanitized_number) {
-                        phone = pp.phone_numbers[0].sanitized_number
-                        console.log(`[Apollo] Phone found synchronously: ${phone}`)
-                    } else if (pp?.sanitized_phone) {
-                        phone = pp.sanitized_phone
+                    // Check phone in multiple locations: top-level, contact sub-object, sanitized_phone
+                    const foundPhone = pp?.phone_numbers?.[0]?.sanitized_number
+                        || pp?.contact?.phone_numbers?.[0]?.sanitized_number
+                        || pp?.contact?.sanitized_phone
+                        || pp?.sanitized_phone
+                        || null
+                    
+                    if (foundPhone) {
+                        phone = foundPhone
+                        console.log(`[Apollo] Phone found in people/match response: ${phone}`)
                     }
                     
                     if (!email && pp?.email && !pp.email.includes('email_not_unlocked')) {
