@@ -204,14 +204,29 @@ export default function LeadsPage() {
             if (data.isAdmin !== undefined) setIsAdmin(data.isAdmin)
             if (data.profile) setProfile(data.profile)
             if (data.profiles) setProfiles(data.profiles)
-            if (data.countries) setAvailableCountries(data.countries)
-            if (data.cities) setAvailableCities(data.cities)
         } catch (error) {
             console.error('Error fetching leads:', error)
         } finally {
             setLoading(false)
         }
     }
+
+    // Load filter options (countries, cities) once on mount — fast RPC endpoint
+    useEffect(() => {
+        const loadFilters = async () => {
+            try {
+                const res = await fetch('/api/leads/filters')
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.countries) setAvailableCountries(data.countries)
+                    if (data.cities) setAvailableCities(data.cities)
+                }
+            } catch (err) {
+                console.error('Error loading filters:', err)
+            }
+        }
+        loadFilters()
+    }, [])
 
     const sendToMarathon = async (leadId: string) => {
         try {

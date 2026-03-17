@@ -168,16 +168,20 @@ export default function MarathonPage() {
         localStorage.setItem('marathon_view_mode', viewMode)
     }, [planFilter, countryFilter, excludePasswordProtected, viewMode])
 
-    // Fetch available countries on mount
+    // Fetch available countries/cities on mount — fast RPC endpoint
     useEffect(() => {
-        const fetchCountries = async () => {
-            const { data } = await supabase.from('leads').select('country').not('country', 'is', null).limit(10000)
-            if (data) {
-                const unique = Array.from(new Set(data.map((r: any) => r.country).filter(Boolean))).sort()
-                setAvailableCountries(unique as string[])
+        const fetchFilters = async () => {
+            try {
+                const res = await fetch('/api/leads/filters')
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.countries) setAvailableCountries(data.countries)
+                }
+            } catch (err) {
+                console.error('Error loading filters:', err)
             }
         }
-        fetchCountries()
+        fetchFilters()
     }, [])
 
     useEffect(() => {
@@ -268,10 +272,10 @@ export default function MarathonPage() {
             const userIsAdmin = profile?.role === 'admin'
             setIsAdmin(userIsAdmin)
 
-            // Fetch leads that are 'new'
+            // Fetch leads that are 'new' — only select columns needed for Marathon
             let query = supabase
                 .from('leads')
-                .select('*')
+                .select('id, company_name, contact_name, email, phone, status, domain, city, country, plan, platform, platform_rank, shopify_status, categories, notes, tags, owner_id, created_at, source')
                 .eq('status', 'new')
 
             // Apply Plan Filter

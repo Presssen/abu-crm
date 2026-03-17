@@ -32,10 +32,10 @@ export async function GET(request: NextRequest) {
         const excludePassword = searchParams.get('excludePassword') === 'true'
         const includeProfiles = searchParams.get('includeProfiles') === 'true'
 
-        // Build leads query
+        // Build leads query — only select columns needed for the table view
         let query = supabase
             .from('leads')
-            .select('id, company_name, contact_name, email, phone, status, source, owner_id, created_at, domain, categories, city, plan, platform, platform_rank, shopify_status, country, tags', { count: 'exact' })
+            .select('id, company_name, contact_name, email, phone, status, source, owner_id, created_at, domain, categories, city, plan, platform, platform_rank, shopify_status, country, tags', { count: 'estimated' })
             .order('created_at', { ascending: false })
 
         // Non-admin: only own leads, no won/lost
@@ -85,23 +85,15 @@ export async function GET(request: NextRequest) {
         const hasMore = leads ? leads.length > PAGE_SIZE : false
         const trimmedLeads = hasMore ? leads!.slice(0, PAGE_SIZE) : (leads || [])
 
-        // Optionally include profiles list + filter options (only on first load)
+        // Optionally include profiles list (only on first load)
+        // Countries/cities now come from /api/leads/filters (separate endpoint)
         let profilesList = null
-        let countries: string[] = []
-        let cities: string[] = []
         if (includeProfiles) {
-            const [profilesRes, countriesRes, citiesRes] = await Promise.all([
-                supabase.from('profiles').select('id, email, first_name, last_name').order('email'),
-                supabase.from('leads').select('country').not('country', 'is', null).limit(10000),
-                supabase.from('leads').select('city').not('city', 'is', null).limit(10000)
-            ])
-            profilesList = profilesRes.data
-            if (countriesRes.data) {
-                countries = Array.from(new Set(countriesRes.data.map((r: any) => r.country).filter(Boolean))).sort() as string[]
-            }
-            if (citiesRes.data) {
-                cities = Array.from(new Set(citiesRes.data.map((r: any) => r.city).filter(Boolean))).sort() as string[]
-            }
+            const { data } = await supabase
+                .from('profiles')
+                .select('id, email, first_name, last_name')
+                .order('email')
+            profilesList = data
         }
 
         return NextResponse.json({
@@ -110,7 +102,7 @@ export async function GET(request: NextRequest) {
             totalCount: count,
             isAdmin,
             profile,
-            ...(profilesList !== null && { profiles: profilesList, countries, cities })
+            ...(profilesList !== null && { profiles: profilesList })
         })
 
     } catch (error: any) {
