@@ -92,8 +92,8 @@ export async function GET(request: NextRequest) {
         if (includeProfiles) {
             const [profilesRes, countriesRes, citiesRes] = await Promise.all([
                 supabase.from('profiles').select('id, email, first_name, last_name').order('email'),
-                supabase.from('leads').select('country').not('country', 'is', null),
-                supabase.from('leads').select('city').not('city', 'is', null)
+                supabase.from('leads').select('country').not('country', 'is', null).limit(10000),
+                supabase.from('leads').select('city').not('city', 'is', null).limit(10000)
             ])
             profilesList = profilesRes.data
             if (countriesRes.data) {

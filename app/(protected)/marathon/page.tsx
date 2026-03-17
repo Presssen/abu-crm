@@ -171,7 +171,7 @@ export default function MarathonPage() {
     // Fetch available countries on mount
     useEffect(() => {
         const fetchCountries = async () => {
-            const { data } = await supabase.from('leads').select('country').not('country', 'is', null)
+            const { data } = await supabase.from('leads').select('country').not('country', 'is', null).limit(10000)
             if (data) {
                 const unique = Array.from(new Set(data.map((r: any) => r.country).filter(Boolean))).sort()
                 setAvailableCountries(unique as string[])
