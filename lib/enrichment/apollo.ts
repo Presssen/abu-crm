@@ -535,10 +535,10 @@ export async function revealPerson(
         // bulk_match returns phone in person.contact sub-object once Apollo processes the reveal
         // This is DIFFERENT from GET /people/{id} which does NOT return phones
         if (wantsPhone && !phone && personId) {
-            console.log(`[Apollo] Polling bulk_match for phone (up to 8 attempts, every 3s)...`)
+            console.log(`[Apollo] Polling bulk_match for phone (up to 5 attempts, every 2s)...`)
             
-            for (let attempt = 1; attempt <= 8; attempt++) {
-                await new Promise(resolve => setTimeout(resolve, 3000))
+            for (let attempt = 1; attempt <= 5; attempt++) {
+                await new Promise(resolve => setTimeout(resolve, 2000))
                 
                 try {
                     const pollRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
@@ -572,7 +572,7 @@ export async function revealPerson(
                             break
                         }
                         
-                        console.log(`[Apollo] Poll ${attempt}/8: phone not yet available`)
+                        console.log(`[Apollo] Poll ${attempt}/5: phone not yet available`)
                     }
                 } catch (pollErr) {
                     console.warn(`[Apollo] Poll ${attempt} error:`, pollErr)

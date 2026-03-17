@@ -559,21 +559,10 @@ export default function MarathonPage() {
 
             if (data.success && data.person) {
                 const updates: any = {}
-                // Save ALL returned data regardless of requested type
-                if (data.person.email) {
-                    updates.email = data.person.email
-                }
-                if (data.person.phone) {
-                    updates.phone = data.person.phone
-                }
-                // Always update name if reveal returns a better one
-                if (data.person.name && data.person.name !== contact.name) {
-                    updates.name = data.person.name
-                }
-                // Save apollo_id for reliable webhook matching
-                if (data.person.id && !contact.apollo_id) {
-                    updates.apollo_id = data.person.id
-                }
+                if (data.person.email) updates.email = data.person.email
+                if (data.person.phone) updates.phone = data.person.phone
+                if (data.person.name && data.person.name !== contact.name) updates.name = data.person.name
+                if (data.person.id && !contact.apollo_id) updates.apollo_id = data.person.id
 
                 if (Object.keys(updates).length > 0) {
                     await supabase
@@ -585,7 +574,6 @@ export default function MarathonPage() {
                         c.id === contact.id ? { ...c, ...updates } : c
                     ))
 
-                    // Also update lead if primary
                     if (contact.is_primary) {
                         const leadUpdates: any = {}
                         if (updates.email) leadUpdates.email = updates.email
@@ -595,84 +583,16 @@ export default function MarathonPage() {
                             await supabase.from('leads').update(leadUpdates).eq('id', currentLead.id)
                         }
                     }
+                }
 
-                    // Show appropriate message based on what was requested vs what was returned
-                    const phoneWasRequested = type === 'phone'
-                    const phoneStillMissing = phoneWasRequested && !updates.phone
-                    
-                    if (phoneStillMissing && (data.phoneRequested || data.phoneUnavailable)) {
-                        // User asked for phone, email may have been saved but phone is async
-                        if (updates.email) {
-                            showSuccess('✅ Email desbloqueado. 📞 Teléfono solicitado, buscando...')
-                        } else {
-                            showSuccess('📞 Teléfono solicitado a Apollo. Buscando...')
-                        }
-                        
-                        // Poll the database for the phone (webhook will deliver it async)
-                        let phoneFound = false
-                        for (let pollAttempt = 1; pollAttempt <= 10; pollAttempt++) {
-                            await new Promise(resolve => setTimeout(resolve, 3000))
-                            
-                            const { data: freshContact } = await supabase
-                                .from('lead_contacts')
-                                .select('phone, name')
-                                .eq('id', contact.id)
-                                .single()
-                            
-                            if (freshContact?.phone) {
-                                setContacts(prev => prev.map(c =>
-                                    c.id === contact.id ? { ...c, phone: freshContact.phone, name: freshContact.name || c.name } : c
-                                ))
-                                if (contact.is_primary && currentLead) {
-                                    await supabase.from('leads').update({ phone: freshContact.phone }).eq('id', currentLead.id)
-                                }
-                                showSuccess(`✅ Teléfono desbloqueado: ${freshContact.phone}`)
-                                phoneFound = true
-                                break
-                            }
-                        }
-                        
-                        if (!phoneFound) {
-                            showError('⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
-                        }
-                    } else {
-                        const revealed = []
-                        if (updates.email) revealed.push('email')
-                        if (updates.phone) revealed.push('teléfono')
-                        showSuccess(`✅ ${revealed.join(' y ')} desbloqueado`)
-                    }
-                } else if (data.phoneRequested || data.phoneUnavailable) {
-                    // No data was saved at all, but phone was requested via webhook
-                    showSuccess('📞 Teléfono solicitado a Apollo. Buscando...')
-                    
-                    // Poll the database for the phone (webhook will deliver it async)
-                    let phoneFound = false
-                    for (let pollAttempt = 1; pollAttempt <= 10; pollAttempt++) {
-                        await new Promise(resolve => setTimeout(resolve, 3000))
-                        
-                        const { data: freshContact } = await supabase
-                            .from('lead_contacts')
-                            .select('phone, name')
-                            .eq('id', contact.id)
-                            .single()
-                        
-                        if (freshContact?.phone) {
-                            // Phone arrived via webhook!
-                            setContacts(prev => prev.map(c =>
-                                c.id === contact.id ? { ...c, phone: freshContact.phone, name: freshContact.name || c.name } : c
-                            ))
-                            if (contact.is_primary && currentLead) {
-                                await supabase.from('leads').update({ phone: freshContact.phone }).eq('id', currentLead.id)
-                            }
-                            showSuccess(`✅ Teléfono desbloqueado: ${freshContact.phone}`)
-                            phoneFound = true
-                            break
-                        }
-                    }
-                    
-                    if (!phoneFound) {
-                        showError('⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
-                    }
+                const revealed = []
+                if (updates.email) revealed.push('email')
+                if (updates.phone) revealed.push('teléfono')
+
+                if (revealed.length > 0) {
+                    showSuccess(`✅ ${revealed.join(' y ')} desbloqueado`)
+                } else if (data.phoneUnavailable) {
+                    showError('Apollo no tiene teléfono disponible para este contacto.')
                 } else {
                     showError(`Apollo no tiene ${type === 'email' ? 'email' : 'teléfono'} para este contacto`)
                 }
@@ -989,32 +909,8 @@ export default function MarathonPage() {
                                                 if (data.person.phone) revealed.push('teléfono')
                                                 if (revealed.length > 0) {
                                                     showSuccess(`✅ ${revealed.join(' y ')} desbloqueado para ${contactToReveal.name}`)
-                                                } else if (data.phoneRequested || data.phoneUnavailable) {
-                                                    // Phone requested via webhook — poll DB
-                                                    showSuccess('📞 Teléfono solicitado a Apollo. Buscando...')
-                                                    let phoneFound = false
-                                                    for (let pollAttempt = 1; pollAttempt <= 10; pollAttempt++) {
-                                                        await new Promise(resolve => setTimeout(resolve, 3000))
-                                                        const { data: freshContact } = await supabase
-                                                            .from('lead_contacts')
-                                                            .select('phone, name')
-                                                            .eq('id', contactToReveal.id)
-                                                            .single()
-                                                        if (freshContact?.phone) {
-                                                            setContacts(prev => prev.map(c =>
-                                                                c.id === contactToReveal.id ? { ...c, phone: freshContact.phone, name: freshContact.name || c.name } : c
-                                                            ))
-                                                            if (contactToReveal.is_primary && currentLead) {
-                                                                await supabase.from('leads').update({ phone: freshContact.phone }).eq('id', currentLead.id)
-                                                            }
-                                                            showSuccess(`✅ Teléfono desbloqueado: ${freshContact.phone}`)
-                                                            phoneFound = true
-                                                            break
-                                                        }
-                                                    }
-                                                    if (!phoneFound) {
-                                                        showError('⏱️ El teléfono aún no ha llegado. Refresca la página en unos segundos.')
-                                                    }
+                                                } else if (data.phoneUnavailable) {
+                                                    showError('Apollo no tiene teléfono disponible para este contacto.')
                                                 } else {
                                                     showError('Apollo no tiene datos de contacto para esta persona')
                                                 }
