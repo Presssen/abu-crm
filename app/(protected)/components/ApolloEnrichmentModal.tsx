@@ -188,53 +188,12 @@ export default function ApolloEnrichmentModal({
                 const emailRevealed = (type === 'email' || type === 'both') && data.person.email
                 const phoneRevealed = (type === 'phone' || type === 'both') && data.person.phone
 
-                if (data.phoneRequested && !phoneRevealed) {
-                    // Phone requested via Apollo webhook — poll cache table for arrival
-                    setError('📞 Teléfono solicitado a Apollo. Esperando respuesta...')
-                    
-                    let phoneFound = false
-                    for (let pollAttempt = 1; pollAttempt <= 12; pollAttempt++) {
-                        await new Promise(resolve => setTimeout(resolve, 2500))
-                        
-                        try {
-                            // Check the apollo_webhook_results cache table
-                            const { data: cacheResult } = await supabase
-                                .from('apollo_webhook_results')
-                                .select('phone, email')
-                                .eq('apollo_id', data.person.id)
-                                .not('phone', 'is', null)
-                                .order('created_at', { ascending: false })
-                                .limit(1)
-                                .maybeSingle()
-                            
-                            if (cacheResult?.phone) {
-                                setPeople(prev => prev.map(p => {
-                                    if (p.id === person.id) {
-                                        const updatedP = { ...p, phone: cacheResult.phone }
-                                        if (cacheResult.email) updatedP.email = cacheResult.email
-                                        return updatedP
-                                    }
-                                    return p
-                                }))
-                                setError(null)
-                                phoneFound = true
-                                break
-                            }
-                        } catch (pollErr) {
-                            // Table might not exist yet — ignore and keep polling
-                            console.warn('Poll error (table may not exist yet):', pollErr)
-                        }
+                if (data.phoneUnavailable && !phoneRevealed) {
+                    if (emailRevealed) {
+                        setError('✅ Email desbloqueado. El teléfono no está disponible en Apollo para este contacto.')
+                    } else {
+                        setError('Apollo no pudo desbloquear el teléfono de este contacto. Es posible que no esté disponible.')
                     }
-                    
-                    if (!phoneFound) {
-                        if (emailRevealed) {
-                            setError('✅ Email desbloqueado. ⏱️ El teléfono aún no ha llegado. Asegúrate de haber aplicado la migración y desplegado en producción.')
-                        } else {
-                            setError('⏱️ El teléfono aún no ha llegado. El webhook de Apollo lo enviará a producción. Asegúrate de haber aplicado la migración SQL.')
-                        }
-                    }
-                } else if (data.phoneUnavailable && !phoneRevealed) {
-                    setError('No se puede desbloquear el teléfono. Verifica que APP_URL esté configurado con HTTPS.')
                 } else if (!emailRevealed && (type === 'email' || type === 'both')) {
                     setError('Apollo no tiene un email disponible para este contacto.')
                 } else if (!phoneRevealed && (type === 'phone')) {

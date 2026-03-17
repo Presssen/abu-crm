@@ -531,6 +531,59 @@ export async function revealPerson(
             console.warn('[Apollo] Cannot reveal phone: no valid HTTPS webhook URL available')
         }
 
+        // STEP 4: If phone still missing after reveal request, poll bulk_match
+        // bulk_match returns phone in person.contact sub-object once Apollo processes the reveal
+        // This is DIFFERENT from GET /people/{id} which does NOT return phones
+        if (wantsPhone && !phone && personId) {
+            console.log(`[Apollo] Polling bulk_match for phone (up to 8 attempts, every 3s)...`)
+            
+            for (let attempt = 1; attempt <= 8; attempt++) {
+                await new Promise(resolve => setTimeout(resolve, 3000))
+                
+                try {
+                    const pollRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Api-Key': apiKey
+                        },
+                        body: JSON.stringify({
+                            details: [{ id: personId }],
+                        })
+                    })
+                    
+                    if (pollRes.ok) {
+                        const pollData = await pollRes.json()
+                        const pm = pollData.matches?.[0]
+                        
+                        const foundPhone = pm?.phone_numbers?.[0]?.sanitized_number
+                            || pm?.contact?.phone_numbers?.[0]?.sanitized_number
+                            || pm?.contact?.sanitized_phone
+                            || pm?.sanitized_phone
+                            || null
+                        
+                        if (foundPhone) {
+                            phone = foundPhone
+                            console.log(`[Apollo] ✅ Phone found on poll attempt ${attempt}: ${phone}`)
+                            
+                            if (!email && pm?.email && !pm.email.includes('email_not_unlocked')) {
+                                email = pm.email
+                            }
+                            break
+                        }
+                        
+                        console.log(`[Apollo] Poll ${attempt}/8: phone not yet available`)
+                    }
+                } catch (pollErr) {
+                    console.warn(`[Apollo] Poll ${attempt} error:`, pollErr)
+                }
+            }
+            
+            if (!phone) {
+                console.log(`[Apollo] Phone not available after polling`)
+            }
+        }
+
         console.log(`[Apollo] Final result: email=${email}, phone=${phone}`)
 
         return {
@@ -543,9 +596,8 @@ export async function revealPerson(
                 phone,
                 linkedin_url: personLinkedin,
             },
-            // Apollo ONLY delivers phones via webhook — there is no synchronous endpoint
-            phoneRequested: !!(wantsPhone && !phone && hasValidWebhook),
-            phoneUnavailable: !!(wantsPhone && !phone && !hasValidWebhook),
+            phoneRequested: false, // We handle everything server-side now
+            phoneUnavailable: !!(wantsPhone && !phone),
         }
     } catch (error: any) {
         console.error('[Apollo] Reveal error:', error)

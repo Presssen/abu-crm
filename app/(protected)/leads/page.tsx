@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/auth/client'
 import {
     Plus,
@@ -155,7 +155,7 @@ export default function LeadsPage() {
         window.history.pushState(null, '', newUrl)
     }
 
-    // Debounce search input: waits 400ms after last keystroke before triggering API call
+    // Debounce search input: waits 150ms after last keystroke before triggering API call
     const handleSearchChange = useCallback((value: string) => {
         setSearch(value)
         setIsSearching(true)
@@ -163,7 +163,7 @@ export default function LeadsPage() {
         searchTimerRef.current = setTimeout(() => {
             setDebouncedSearch(value)
             setIsSearching(false)
-        }, 400)
+        }, 150)
     }, [])
 
     // Cleanup timer on unmount
@@ -240,6 +240,18 @@ export default function LeadsPage() {
     useEffect(() => {
         fetchLeads()
     }, [page, statusFilter, debouncedSearch, planFilter, shopifyStatusFilter, countryFilter, cityFilter, viewMode, excludePasswordProtected])
+
+    // Instant client-side filtering while API call is in flight
+    const filteredLeads = useMemo(() => {
+        if (!search || search === debouncedSearch) return leads
+        const s = search.toLowerCase()
+        return leads.filter(lead =>
+            lead.company_name?.toLowerCase().includes(s) ||
+            lead.contact_name?.toLowerCase().includes(s) ||
+            lead.email?.toLowerCase().includes(s) ||
+            lead.domain?.toLowerCase().includes(s)
+        )
+    }, [leads, search, debouncedSearch])
 
     const reassignLead = async (leadId: string, newOwnerId: string | null) => {
         try {
@@ -480,7 +492,7 @@ export default function LeadsPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    leads.map((lead) => (
+                                    filteredLeads.map((lead) => (
                                         <tr
                                             key={lead.id}
                                             onClick={() => openLead(lead.id)}
