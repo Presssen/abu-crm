@@ -106,10 +106,13 @@ export default function TemplatesPage() {
         }
     }
 
-    const insertVariable = (variable: string) => {
+    const [insertTarget, setInsertTarget] = useState<'subject' | 'body'>('body')
+
+    const insertVariable = (variable: string, target?: 'subject' | 'body') => {
+        const field = target || insertTarget
         setFormData(prev => ({
             ...prev,
-            body: prev.body + ` {{${variable}}}`
+            [field]: prev[field] + ` {{${variable}}}`
         }))
     }
 
@@ -227,10 +230,28 @@ export default function TemplatesPage() {
                                 <input
                                     required
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                                    placeholder="Ej: Gracias por tu tiempo"
+                                    placeholder="Ej: Propuesta para {{company_name}}"
                                     value={formData.subject}
                                     onChange={e => setFormData({ ...formData, subject: e.target.value })}
+                                    onFocus={() => setInsertTarget('subject')}
                                 />
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {[
+                                        { id: 'contact_name', label: 'Nombre' },
+                                        { id: 'company_name', label: 'Empresa' },
+                                        { id: 'categories', label: 'Categoría' },
+                                        { id: 'country', label: 'País' },
+                                    ].map(v => (
+                                        <button
+                                            key={v.id}
+                                            type="button"
+                                            onClick={() => insertVariable(v.id, 'subject')}
+                                            className="px-1.5 py-0.5 bg-gray-50 border border-gray-200 text-[9px] font-bold text-gray-400 rounded hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                                        >
+                                            {`{{${v.id}}}`}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
@@ -266,6 +287,7 @@ export default function TemplatesPage() {
                                     placeholder="Escribe el contenido aquí... Usa las etiquetas para personalizar."
                                     value={formData.body}
                                     onChange={e => setFormData({ ...formData, body: e.target.value })}
+                                    onFocus={() => setInsertTarget('body')}
                                 />
                             </div>
                             {profile?.role === 'admin' && (

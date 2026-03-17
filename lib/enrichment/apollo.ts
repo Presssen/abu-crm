@@ -410,24 +410,18 @@ export async function revealPerson(
             console.log(`[Apollo] Using provided Apollo ID: ${personId}`)
         }
 
-        // STEP 2: Reveal via bulk_match with the person ID (get email synchronously)
-        const bulkMatchBody: any = {
-            details: [{ id: personId }],
-            reveal_personal_emails: true,
-        }
-        // Only request phone in bulk_match if we have a valid webhook URL
-        // Apollo REQUIRES webhook_url when reveal_phone_number=true
-        if (hasValidWebhook) {
-            bulkMatchBody.reveal_phone_number = true
-            bulkMatchBody.webhook_url = webhookUrl
-        }
+        // STEP 2: Fast bulk_match WITHOUT reveal — check if phone is already available
+        // If phone was previously revealed, it'll be in person.contact sub-object
         const matchRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Api-Key': apiKey
             },
-            body: JSON.stringify(bulkMatchBody)
+            body: JSON.stringify({
+                details: [{ id: personId }],
+                reveal_personal_emails: true,
+            })
         })
 
         let email: string | null = null
@@ -439,10 +433,7 @@ export async function revealPerson(
         if (matchRes.ok) {
             const matchData = await matchRes.json()
             const m = matchData.matches?.[0]
-            console.log(`[Apollo] bulk_match credits consumed: ${matchData.credits_consumed || 0}`)
-            console.log(`[Apollo] bulk_match raw phone_numbers:`, JSON.stringify(m?.phone_numbers || []))
-            console.log(`[Apollo] bulk_match contact phone_numbers:`, JSON.stringify(m?.contact?.phone_numbers || []))
-            console.log(`[Apollo] bulk_match raw email:`, m?.email)
+            console.log(`[Apollo] bulk_match (fast) credits: ${matchData.credits_consumed || 0}`)
 
             if (m) {
                 email = m.email && !m.email.includes('email_not_unlocked') ? m.email : null
@@ -457,7 +448,7 @@ export async function revealPerson(
                 personLinkedin = m.linkedin_url || undefined
                 
                 if (phone) {
-                    console.log(`[Apollo] Phone found in bulk_match response: ${phone}`)
+                    console.log(`[Apollo] ✅ Phone already available (no reveal needed): ${phone}`)
                 }
             }
         } else {
@@ -465,7 +456,7 @@ export async function revealPerson(
             console.warn('[Apollo] bulk_match failed:', matchRes.status, errText)
         }
 
-        console.log(`[Apollo] After bulk_match: email=${email}, phone=${phone}`)
+        console.log(`[Apollo] After fast bulk_match: email=${email}, phone=${phone}`)
 
         // STEP 3: If phone is still missing and requested, use people/match with webhook_url
         // Apollo REQUIRES webhook_url for phone reveal — phone is ALWAYS delivered async via webhook
