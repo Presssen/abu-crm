@@ -16,6 +16,9 @@ import {
     ChevronLeft,
     ChevronRight,
     Loader2,
+    X as XIcon,
+    MapPin,
+    Globe,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import CreateLeadModal from '../components/CreateLeadModal'
@@ -26,6 +29,7 @@ import CreateMeetingModal from '../components/CreateMeetingModal'
 import CreateTaskModal from '../components/CreateTaskModal'
 import LeadDetailModal from '../components/LeadDetailModal'
 import LogCallModal from '../components/LogCallModal'
+import { useAppData } from '../components/AppDataProvider'
 
 interface Lead {
     id: string
@@ -67,14 +71,37 @@ const statusLabels: Record<string, string> = {
     lost: 'Perdido',
 }
 
+function highlightMatch(text: string, query: string) {
+    if (!query || !text) return text
+    const idx = text.toLowerCase().indexOf(query.toLowerCase())
+    if (idx === -1) return text
+    return (
+        <>
+            {text.slice(0, idx)}
+            <span className="bg-yellow-200/60 text-yellow-900 font-bold rounded-sm px-0.5">{text.slice(idx, idx + query.length)}</span>
+            {text.slice(idx + query.length)}
+        </>
+    )
+}
+
 export default function LeadsPage() {
     const supabase = createClient()
-    const [leads, setLeads] = useState<Lead[]>([])
-    const [loading, setLoading] = useState(true)
+    const { leadsData, filters: preloadedFilters, filtersLoaded } = useAppData()
+    const [leads, setLeads] = useState<Lead[]>(() => (leadsData?.leads as Lead[]) || [])
+    const [loading, setLoading] = useState(() => !leadsData)
     const [search, setSearch] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
     const [isSearching, setIsSearching] = useState(false)
     const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // Professional search state
+    const [searchResults, setSearchResults] = useState<Lead[]>([])
+    const [showSearchDropdown, setShowSearchDropdown] = useState(false)
+    const [searchHighlight, setSearchHighlight] = useState(-1)
+    const [isSearchFetching, setIsSearchFetching] = useState(false)
+    const searchInputRef = useRef<HTMLInputElement>(null)
+    const searchDropdownRef = useRef<HTMLDivElement>(null)
+    const searchAbortRef = useRef<AbortController | null>(null)
     const [statusFilter, setStatusFilter] = useState('all')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -155,15 +182,108 @@ export default function LeadsPage() {
         window.history.pushState(null, '', newUrl)
     }
 
-    // Debounce search input: waits 150ms after last keystroke before triggering API call
+    // Professional search handler
     const handleSearchChange = useCallback((value: string) => {
         setSearch(value)
+        setSearchHighlight(-1)
+
+        // Cancel previous API request
+        if (searchAbortRef.current) searchAbortRef.current.abort()
+
+        if (value.trim().length === 0) {
+            setShowSearchDropdown(false)
+            setSearchResults([])
+            setIsSearching(true)
+            if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+            searchTimerRef.current = setTimeout(() => {
+                setDebouncedSearch('')
+                setIsSearching(false)
+            }, 200)
+            return
+        }
+
+        // Show dropdown + searching indicator
+        setShowSearchDropdown(true)
         setIsSearching(true)
+
+        // Debounce the API search (300ms) + table filter
         if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-        searchTimerRef.current = setTimeout(() => {
+        searchTimerRef.current = setTimeout(async () => {
+            // Update debounced search for table filter
             setDebouncedSearch(value)
-            setIsSearching(false)
-        }, 150)
+
+            // Fast server search
+            setIsSearchFetching(true)
+            try {
+                const controller = new AbortController()
+                searchAbortRef.current = controller
+                const res = await fetch(`/api/leads/search?q=${encodeURIComponent(value)}&limit=10`, {
+                    signal: controller.signal
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    setSearchResults(data.results || [])
+                }
+            } catch (err: any) {
+                if (err.name !== 'AbortError') console.error('Search error:', err)
+            } finally {
+                setIsSearchFetching(false)
+                setIsSearching(false)
+            }
+        }, 300)
+    }, [])
+
+    // Keyboard navigation for search dropdown
+    const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (!showSearchDropdown || searchResults.length === 0) {
+            if (e.key === 'Escape') {
+                setShowSearchDropdown(false)
+                searchInputRef.current?.blur()
+            }
+            return
+        }
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault()
+                setSearchHighlight(prev => Math.min(prev + 1, searchResults.length - 1))
+                break
+            case 'ArrowUp':
+                e.preventDefault()
+                setSearchHighlight(prev => Math.max(prev - 1, -1))
+                break
+            case 'Enter':
+                e.preventDefault()
+                if (searchHighlight >= 0 && searchResults[searchHighlight]) {
+                    openLead(searchResults[searchHighlight].id)
+                    setShowSearchDropdown(false)
+                }
+                break
+            case 'Escape':
+                setShowSearchDropdown(false)
+                searchInputRef.current?.blur()
+                break
+        }
+    }, [showSearchDropdown, searchResults, searchHighlight, openLead])
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (searchDropdownRef.current && !searchDropdownRef.current.contains(e.target as Node) &&
+                searchInputRef.current && !searchInputRef.current.contains(e.target as Node)) {
+                setShowSearchDropdown(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    const clearSearch = useCallback(() => {
+        setSearch('')
+        setDebouncedSearch('')
+        setSearchResults([])
+        setShowSearchDropdown(false)
+        searchInputRef.current?.focus()
     }, [])
 
     // Cleanup timer on unmount
@@ -211,22 +331,27 @@ export default function LeadsPage() {
         }
     }
 
-    // Load filter options (countries, cities) once on mount — fast RPC endpoint
+    // Load filter options from preloaded context (or fetch if not available)
     useEffect(() => {
-        const loadFilters = async () => {
-            try {
-                const res = await fetch('/api/leads/filters')
-                if (res.ok) {
-                    const data = await res.json()
-                    if (data.countries) setAvailableCountries(data.countries)
-                    if (data.cities) setAvailableCities(data.cities)
+        if (preloadedFilters) {
+            setAvailableCountries(preloadedFilters.countries)
+            setAvailableCities(preloadedFilters.cities)
+        } else {
+            const loadFilters = async () => {
+                try {
+                    const res = await fetch('/api/leads/filters')
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data.countries) setAvailableCountries(data.countries)
+                        if (data.cities) setAvailableCities(data.cities)
+                    }
+                } catch (err) {
+                    console.error('Error loading filters:', err)
                 }
-            } catch (err) {
-                console.error('Error loading filters:', err)
             }
+            loadFilters()
         }
-        loadFilters()
-    }, [])
+    }, [preloadedFilters])
 
     const sendToMarathon = async (leadId: string) => {
         try {
@@ -332,18 +457,112 @@ export default function LeadsPage() {
                 )}>
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="relative flex-1">
-                            {isSearching ? (
-                                <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-500 animate-spin" />
+                            {isSearching || isSearchFetching ? (
+                                <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-500 animate-spin z-10" />
                             ) : (
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
                             )}
                             <input
+                                ref={searchInputRef}
                                 type="text"
-                                placeholder="Buscar por empresa, contacto, email o domain..."
-                                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm"
+                                placeholder="Buscar leads por empresa, contacto, email, teléfono..."
+                                className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm"
                                 value={search}
                                 onChange={(e) => handleSearchChange(e.target.value)}
+                                onKeyDown={handleSearchKeyDown}
+                                onFocus={() => { if (search.trim() && searchResults.length > 0) setShowSearchDropdown(true) }}
+                                autoComplete="off"
                             />
+                            {search && (
+                                <button
+                                    onClick={clearSearch}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors z-10"
+                                >
+                                    <XIcon size={14} />
+                                </button>
+                            )}
+
+                            {/* Search Results Dropdown */}
+                            {showSearchDropdown && search.trim() && (
+                                <div
+                                    ref={searchDropdownRef}
+                                    className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-[420px] overflow-y-auto"
+                                >
+                                    {isSearchFetching && searchResults.length === 0 ? (
+                                        <div className="flex items-center justify-center py-8">
+                                            <Loader2 className="h-5 w-5 text-indigo-500 animate-spin mr-2" />
+                                            <span className="text-sm text-gray-500">Buscando...</span>
+                                        </div>
+                                    ) : searchResults.length === 0 && !isSearchFetching ? (
+                                        <div className="text-center py-8 px-4">
+                                            <Search className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                                            <p className="text-sm font-medium text-gray-500">No se encontraron resultados</p>
+                                            <p className="text-xs text-gray-400 mt-1">Intenta con otro término de búsqueda</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Resultados · {searchResults.length}</span>
+                                            </div>
+                                            {searchResults.map((result, idx) => (
+                                                <button
+                                                    key={result.id}
+                                                    onClick={() => {
+                                                        openLead(result.id)
+                                                        setShowSearchDropdown(false)
+                                                    }}
+                                                    onMouseEnter={() => setSearchHighlight(idx)}
+                                                    className={clsx(
+                                                        "w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-b border-gray-50 last:border-0",
+                                                        searchHighlight === idx ? "bg-indigo-50" : "hover:bg-gray-50"
+                                                    )}
+                                                >
+                                                    <div className="shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                                                        <Building2 size={14} className="text-indigo-600" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-bold text-gray-900 truncate">
+                                                                {highlightMatch(result.company_name || result.domain || '', search)}
+                                                            </span>
+                                                            <span className={clsx(
+                                                                "shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md border",
+                                                                statusColors[result.status] || 'bg-gray-50 text-gray-600 border-gray-200'
+                                                            )}>
+                                                                {statusLabels[result.status] || result.status}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                                                            {result.email && (
+                                                                <span className="flex items-center truncate">
+                                                                    <Mail size={10} className="mr-1 text-gray-400 shrink-0" />
+                                                                    {highlightMatch(result.email.split(':')[0].trim(), search)}
+                                                                </span>
+                                                            )}
+                                                            {result.phone && (
+                                                                <span className="flex items-center shrink-0">
+                                                                    <Phone size={10} className="mr-1 text-gray-400" />
+                                                                    {result.phone.split(':')[0].trim()}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {(result.city || result.country) && (
+                                                            <div className="flex items-center gap-1 mt-0.5 text-[11px] text-gray-400">
+                                                                <MapPin size={9} className="shrink-0" />
+                                                                {[result.city, result.country].filter(Boolean).join(', ')}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <ChevronRight size={14} className="text-gray-300 shrink-0 mt-2" />
+                                                </button>
+                                            ))}
+                                            <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 text-center">
+                                                <span className="text-[10px] text-gray-400">Pulsa <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] font-mono">↑↓</kbd> para navegar · <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] font-mono">Enter</kbd> para abrir · <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] font-mono">Esc</kbd> para cerrar</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className="flex items-center gap-2">
                             {isAdmin && (

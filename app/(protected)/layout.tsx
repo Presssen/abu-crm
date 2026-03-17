@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/auth/client'
 import { NotificationProvider } from './components/ui/NotificationProvider'
+import { AppDataProvider, useAppData } from './components/AppDataProvider'
 import {
     LayoutDashboard,
     Users,
@@ -158,6 +159,8 @@ export default function ProtectedLayout({
         : navigation.filter(n => n.name !== 'Finances')
 
     return (
+        <AppDataProvider>
+        <AppLoadingScreen />
         <div className="flex h-screen overflow-hidden bg-white">
             {/* Mobile Menu Button — Liquid Glass */}
             <div className="md:hidden fixed top-4 right-4 z-50">
@@ -333,6 +336,71 @@ export default function ProtectedLayout({
                     onClick={() => setIsMobileMenuOpen(false)}
                 />
             )}
+        </div>
+        </AppDataProvider>
+    )
+}
+
+// ─── Full-screen loading screen ──────────────────────────────────────
+function AppLoadingScreen() {
+    const { isAppLoading, loadProgress, loadMessage } = useAppData()
+
+    if (!isAppLoading) return null
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center">
+            <div className="text-center space-y-8 max-w-md w-full px-8">
+                {/* Logo */}
+                <div className="flex items-center justify-center gap-3">
+                    <img
+                        src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"
+                        alt="ABU CRM"
+                        className="h-14 w-auto"
+                    />
+                    <span className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                        ABU CRM
+                    </span>
+                </div>
+
+                {/* Circular progress */}
+                <div className="relative mx-auto w-28 h-28">
+                    <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="#f1f5f9" strokeWidth="5" />
+                        <circle
+                            cx="50" cy="50" r="42" fill="none"
+                            stroke="url(#app-progress-gradient)" strokeWidth="5"
+                            strokeLinecap="round"
+                            strokeDasharray={`${2 * Math.PI * 42}`}
+                            strokeDashoffset={`${2 * Math.PI * 42 * (1 - Math.min(loadProgress, 100) / 100)}`}
+                            className="transition-all duration-300 ease-out"
+                        />
+                        <defs>
+                            <linearGradient id="app-progress-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stopColor="#6366f1" />
+                                <stop offset="100%" stopColor="#a855f7" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-2xl font-bold text-indigo-600">
+                            {Math.round(Math.min(loadProgress, 100))}%
+                        </span>
+                    </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="space-y-3">
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${Math.min(loadProgress, 100)}%` }}
+                        />
+                    </div>
+                    <p className="text-sm font-medium text-gray-400">
+                        {loadMessage}
+                    </p>
+                </div>
+            </div>
         </div>
     )
 }

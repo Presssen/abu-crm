@@ -5,16 +5,15 @@ import { createClient } from '@/lib/auth/client'
 import {
     MoreHorizontal,
     Plus,
-    Building2,
     Mail,
     Phone,
-    User,
-    ChevronRight
+    ChevronRight,
+    RefreshCw
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import CreateLeadModal from '../components/CreateLeadModal'
 import LeadDetailModal from '../components/LeadDetailModal'
-
+import { useAppData } from '../components/AppDataProvider'
 
 const STAGES = [
     { id: 'new', label: 'Nuevos', color: 'bg-blue-500' },
@@ -108,8 +107,17 @@ export default function PipelinePage() {
     const supabaseRef = useRef(createClient())
     const supabase = supabaseRef.current
 
-    const [leads, setLeads] = useState<Lead[]>([])
-    const [loading, setLoading] = useState(true)
+    // Global data — already loaded in layout, INSTANT access
+    const {
+        pipelineLeads: leads,
+        pipelinePagination: stagePagination,
+        setPipelineLeads: setLeads,
+        setPipelinePagination: setStagePagination,
+        refreshPipeline,
+        fetchMoreForStage,
+    } = useAppData()
+
+    const [isRefreshing, setIsRefreshing] = useState(false)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
     const [dragOverStage, setDragOverStage] = useState<string | null>(null)
@@ -120,94 +128,25 @@ export default function PipelinePage() {
         }
         return false
     })
-
+    const LEADS_PER_PAGE = 25
 
     const handleExcludePasswordChange = useCallback((checked: boolean) => {
         setExcludePasswordProtected(checked)
         localStorage.setItem('pipeline_exclude_password', String(checked))
     }, [])
 
-    // Pagination state per stage
-    const [stagePagination, setStagePagination] = useState<Record<string, { page: number; hasMore: boolean; loading: boolean }>>({
-        new: { page: 1, hasMore: true, loading: false },
-        contacted: { page: 1, hasMore: true, loading: false },
-        demo_scheduled: { page: 1, hasMore: true, loading: false },
-        proposal_sent: { page: 1, hasMore: true, loading: false },
-        won: { page: 1, hasMore: true, loading: false },
-        lost: { page: 1, hasMore: true, loading: false },
-    })
-    const LEADS_PER_PAGE = 25
-
-    const fetchLeads = useCallback(async (stageId?: string, append = false) => {
-        if (!append) {
-            setLoading(true)
-            setLeads([])
-        }
-
-        try {
-            // Build query params
-            const params = new URLSearchParams()
-            if (excludePasswordProtected) params.set('excludePassword', 'true')
-
-            if (stageId && append) {
-                // Pagination for a specific stage
-                const currentPage = stagePagination[stageId].page
-                params.set('stage', stageId)
-                params.set('page', String(currentPage))
-
-                setStagePagination(prev => ({
-                    ...prev,
-                    [stageId]: { ...prev[stageId], loading: true }
-                }))
-
-                const res = await fetch(`/api/pipeline?${params.toString()}`)
-                if (!res.ok) throw new Error('Failed to fetch pipeline data')
-                const data = await res.json()
-
-                setLeads(prev => [...prev, ...(data.leads || [])])
-                setStagePagination(prev => ({
-                    ...prev,
-                    [stageId]: {
-                        page: currentPage + 1,
-                        hasMore: data.hasMore,
-                        loading: false
-                    }
-                }))
-                return
-            }
-
-            // Initial load: fetch all stages via server-side API
-            const res = await fetch(`/api/pipeline?${params.toString()}`)
-            if (!res.ok) throw new Error('Failed to fetch pipeline data')
-            const data = await res.json()
-
-            // Combine all leads from all stages
-            const allLeads = data.stages.flatMap((r: any) => r.leads)
-            setLeads(allLeads)
-
-            // Update pagination state
-            const newPagination: typeof stagePagination = {}
-            data.stages.forEach((r: any) => {
-                newPagination[r.stageId] = {
-                    page: 2,
-                    hasMore: r.hasMore,
-                    loading: false
-                }
-            })
-            setStagePagination(newPagination)
-
-        } catch (error) {
-            console.error('Error fetching leads:', error)
-        } finally {
-            setLoading(false)
-        }
-    }, [excludePasswordProtected, stagePagination])
-
+    // Re-fetch when password filter changes
+    const isInitialMount = useRef(true)
     useEffect(() => {
-        fetchLeads()
-    }, [excludePasswordProtected])
+        if (isInitialMount.current) {
+            isInitialMount.current = false
+            return
+        }
+        setIsRefreshing(true)
+        refreshPipeline(excludePasswordProtected).finally(() => setIsRefreshing(false))
+    }, [excludePasswordProtected]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Pre-group leads by stage — O(N) once instead of O(N×6) per render
+    // Pre-group leads by stage
     const leadsByStage = useMemo(() => {
         const map: Record<string, Lead[]> = {}
         for (const stage of STAGES) {
@@ -216,13 +155,13 @@ export default function PipelinePage() {
         for (const lead of leads) {
             const key = (lead.status || '').toLowerCase().trim()
             if (map[key]) {
-                map[key].push(lead)
+                map[key].push(lead as Lead)
             }
         }
         return map
     }, [leads])
 
-    // Optimistic status update — no full refetch
+    // Optimistic status update
     const handleUpdateStatus = useCallback(async (leadId: string, newStatus: string) => {
         try {
             const updates: any = { status: newStatus }
@@ -233,27 +172,24 @@ export default function PipelinePage() {
                 updates.won_at = null
             }
 
-            // Optimistic local update
             setLeads(prev => prev.map(l =>
                 l.id === leadId ? { ...l, ...updates } : l
             ))
 
-            // Fire background update
             const { error } = await supabase
                 .from('leads')
                 .update(updates)
                 .eq('id', leadId)
 
             if (error) {
-                // Rollback on error — refetch everything
                 console.error('Error updating lead status:', error)
-                fetchLeads()
+                refreshPipeline(excludePasswordProtected)
             }
         } catch (error) {
             console.error('Error updating lead status:', error)
-            fetchLeads()
+            refreshPipeline(excludePasswordProtected)
         }
-    }, [supabase, fetchLeads])
+    }, [supabase, refreshPipeline, setLeads, excludePasswordProtected])
 
     const handleDragStart = useCallback((e: React.DragEvent, lead: Lead) => {
         setDraggedLead(lead)
@@ -270,7 +206,6 @@ export default function PipelinePage() {
         setDragOverStage(null)
 
         if (draggedLead && draggedLead.status !== stageId) {
-            // Optimistic update — just move the lead locally
             await handleUpdateStatus(draggedLead.id, stageId)
             setDraggedLead(null)
         }
@@ -280,32 +215,24 @@ export default function PipelinePage() {
         setSelectedLeadId(leadId)
     }, [])
 
-    const openCreateModal = useCallback(() => {
-        setIsCreateModalOpen(true)
-    }, [])
-
-    const closeCreateModal = useCallback(() => {
-        setIsCreateModalOpen(false)
-    }, [])
-
-    const closeDetailModal = useCallback(() => {
-        setSelectedLeadId(null)
-    }, [])
+    const openCreateModal = useCallback(() => setIsCreateModalOpen(true), [])
+    const closeCreateModal = useCallback(() => setIsCreateModalOpen(false), [])
+    const closeDetailModal = useCallback(() => setSelectedLeadId(null), [])
 
     const handleLeadCreated = useCallback(() => {
-        fetchLeads()
-    }, [fetchLeads])
+        refreshPipeline(excludePasswordProtected)
+    }, [refreshPipeline, excludePasswordProtected])
 
     const handleLeadUpdated = useCallback(() => {
-        fetchLeads()
-    }, [fetchLeads])
+        refreshPipeline(excludePasswordProtected)
+    }, [refreshPipeline, excludePasswordProtected])
 
     const handleLoadMore = useCallback((stageId: string) => {
-        fetchLeads(stageId, true)
-    }, [fetchLeads])
+        fetchMoreForStage(stageId, excludePasswordProtected)
+    }, [fetchMoreForStage, excludePasswordProtected])
 
     return (
-        <div className="flex flex-col h-full p-6 space-y-6">
+        <div className="relative flex flex-col h-full p-6 space-y-6">
             {/* Fixed Header */}
             <div className="flex-shrink-0 flex items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
@@ -313,6 +240,12 @@ export default function PipelinePage() {
                     <p className="text-sm text-gray-500">Visualiza y gestiona el flujo de tus oportunidades.</p>
                 </div>
                 <div className="flex items-center gap-4">
+                    {isRefreshing && (
+                        <div className="flex items-center gap-1.5 text-xs text-indigo-500 font-medium animate-pulse">
+                            <RefreshCw size={12} className="animate-spin" />
+                            Actualizando...
+                        </div>
+                    )}
                     <label className="flex items-center gap-2 cursor-pointer group">
                         <input
                             type="checkbox"
@@ -369,44 +302,35 @@ export default function PipelinePage() {
                                 </div>
 
                                 <div className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
-                                    {loading ? (
-                                        Array.from({ length: 2 }).map((_, i) => (
-                                            <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 animate-pulse h-28" />
-                                        ))
-                                    ) : (
-                                        <>
-                                            {stageLeads.map((lead) => (
-                                                <LeadCard
-                                                    key={lead.id}
-                                                    lead={lead}
-                                                    onDragStart={handleDragStart}
-                                                    onUpdateStatus={handleUpdateStatus}
-                                                    onSelect={handleSelectLead}
-                                                    isDragged={draggedLead?.id === lead.id}
-                                                />
-                                            ))}
+                                    {stageLeads.map((lead) => (
+                                        <LeadCard
+                                            key={lead.id}
+                                            lead={lead}
+                                            onDragStart={handleDragStart}
+                                            onUpdateStatus={handleUpdateStatus}
+                                            onSelect={handleSelectLead}
+                                            isDragged={draggedLead?.id === lead.id}
+                                        />
+                                    ))}
 
-                                            {/* Load More Button */}
-                                            {stagePagination[stage.id]?.hasMore && (
-                                                <button
-                                                    onClick={() => handleLoadMore(stage.id)}
-                                                    disabled={stagePagination[stage.id]?.loading}
-                                                    className="w-full py-2.5 flex items-center justify-center text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border-2 border-indigo-200 hover:border-indigo-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                                >
-                                                    {stagePagination[stage.id]?.loading ? (
-                                                        <>
-                                                            <div className="h-3 w-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mr-2" />
-                                                            Cargando...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Plus size={14} className="mr-1" />
-                                                            Cargar más ({LEADS_PER_PAGE})
-                                                        </>
-                                                    )}
-                                                </button>
+                                    {stagePagination[stage.id]?.hasMore && (
+                                        <button
+                                            onClick={() => handleLoadMore(stage.id)}
+                                            disabled={stagePagination[stage.id]?.loading}
+                                            className="w-full py-2.5 flex items-center justify-center text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border-2 border-indigo-200 hover:border-indigo-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {stagePagination[stage.id]?.loading ? (
+                                                <>
+                                                    <div className="h-3 w-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mr-2" />
+                                                    Cargando...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Plus size={14} className="mr-1" />
+                                                    Cargar más ({LEADS_PER_PAGE})
+                                                </>
                                             )}
-                                        </>
+                                        </button>
                                     )}
 
                                     <button
@@ -447,7 +371,6 @@ export default function PipelinePage() {
                     onUpdate={handleLeadUpdated}
                 />
             )}
-
         </div>
     )
 }

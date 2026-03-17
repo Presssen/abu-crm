@@ -40,6 +40,7 @@ import LogCallModal from '../components/LogCallModal'
 import { enrichLead } from '@/app/actions/enrich-lead'
 import { useNotification } from '../components/ui/NotificationProvider'
 import MobileMarathon from '../components/MobileMarathon'
+import { useAppData } from '../components/AppDataProvider'
 
 interface Lead {
     id: string
@@ -61,6 +62,7 @@ interface Lead {
 
 export default function MarathonPage() {
     const supabase = createClient()
+    const { filters: preloadedFilters } = useAppData()
     const [leads, setLeads] = useState<Lead[]>([])
     const [currentIndex, setCurrentIndexState] = useState(0)
     const [restoredLeadId] = useState(() => {
@@ -168,21 +170,25 @@ export default function MarathonPage() {
         localStorage.setItem('marathon_view_mode', viewMode)
     }, [planFilter, countryFilter, excludePasswordProtected, viewMode])
 
-    // Fetch available countries/cities on mount — fast RPC endpoint
+    // Use preloaded filters from global context, fallback to API
     useEffect(() => {
-        const fetchFilters = async () => {
-            try {
-                const res = await fetch('/api/leads/filters')
-                if (res.ok) {
-                    const data = await res.json()
-                    if (data.countries) setAvailableCountries(data.countries)
+        if (preloadedFilters) {
+            setAvailableCountries(preloadedFilters.countries)
+        } else {
+            const fetchFilters = async () => {
+                try {
+                    const res = await fetch('/api/leads/filters')
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data.countries) setAvailableCountries(data.countries)
+                    }
+                } catch (err) {
+                    console.error('Error loading filters:', err)
                 }
-            } catch (err) {
-                console.error('Error loading filters:', err)
             }
+            fetchFilters()
         }
-        fetchFilters()
-    }, [])
+    }, [preloadedFilters])
 
     useEffect(() => {
         fetchLeads()
