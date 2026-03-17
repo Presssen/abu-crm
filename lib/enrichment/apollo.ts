@@ -237,62 +237,26 @@ export async function searchPeople(
             return await searchPeopleViaOrgChart(cleanDomain, apiKey)
         }
 
-        // Step 2: Get full profiles via bulk_match with IDs
-        const ids = foundPeople.map((p: any) => p.id).filter(Boolean)
-
-        if (ids.length === 0) {
-            return { success: true, people: [] }
-        }
-
-        const matchRes = await fetch(`${APOLLO_API_BASE}/people/bulk_match`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Api-Key': apiKey
-            },
-            body: JSON.stringify({
-                details: ids.map((id: string) => ({ id }))
-            })
+        // Step 2: Map results from api_search directly (NO bulk_match — that consumes credits)
+        // Emails and phones will only be revealed when user explicitly clicks "Desbloquear"
+        const people: EnrichedContact[] = foundPeople.map((p: any) => {
+            // api_search returns first_name but last_name is often obfuscated
+            // Use the full name from the 'name' field if available
+            const name = p.name || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown'
+            
+            return {
+                id: p.id,
+                name,
+                title: p.title || p.headline || '',
+                email: null, // Don't reveal — costs credits
+                phone: null, // Don't reveal — costs credits
+                linkedin_url: p.linkedin_url || undefined,
+                has_email: p.has_email !== false, // hints for the UI
+                has_phone: p.has_direct_phone === true,
+            } as EnrichedContact
         })
 
-        if (!matchRes.ok) {
-            console.warn('[Apollo] bulk_match failed, falling back to partial data')
-            // Use partial data from api_search — DO NOT use last_name_obfuscated (masked with ***)
-            const people: EnrichedContact[] = foundPeople.map((p: any) => ({
-                id: p.id,
-                name: (p.first_name || 'Unknown').trim(),
-                title: p.title || '',
-                email: null,
-                phone: null,
-                linkedin_url: p.linkedin_url || undefined,
-            }))
-            return { success: true, people }
-        }
-
-        const matchData = await matchRes.json()
-        const matches = matchData.matches || []
-
-        console.log(`[Apollo] bulk_match returned ${matches.filter(Boolean).length} profiles (${matchData.credits_consumed || 0} credits)`)
-
-        const people: EnrichedContact[] = []
-        for (let i = 0; i < matches.length; i++) {
-            const m = matches[i]
-            if (!m) continue
-
-            const email = m.email && !m.email.includes('email_not_unlocked') ? m.email : null
-            const phone = m.phone_numbers?.[0]?.sanitized_number || null
-
-            people.push({
-                id: m.id || ids[i] || '',
-                name: [m.first_name, m.last_name].filter(Boolean).join(' ') || m.name || 'Unknown',
-                title: m.title || '',
-                email,
-                phone,
-                linkedin_url: m.linkedin_url || undefined,
-            })
-        }
-
-        console.log(`[Apollo] Successfully found ${people.length} people`)
+        console.log(`[Apollo] Successfully found ${people.length} people (no credits consumed)`)
         return { success: true, people }
     } catch (error: any) {
         console.error('[Apollo] People search error:', error)
