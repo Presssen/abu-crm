@@ -2099,9 +2099,10 @@ export default function MarathonPage() {
                                 {savingDetails && <span className="text-[10px] text-emerald-600 font-bold animate-pulse">Guardando...</span>}
                             </div>
                             <textarea
+                                key={currentLead.id}
                                 className="w-full h-32 bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-gray-700 placeholder-yellow-800/30 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 resize-none transition-shadow"
                                 placeholder="Escribe notas importantes de la llamada aquí..."
-                                defaultValue={currentLead.notes}
+                                defaultValue={currentLead.notes || ''}
                                 onBlur={(e) => {
                                     handleAction('save_notes', e.target.value)
                                 }}
