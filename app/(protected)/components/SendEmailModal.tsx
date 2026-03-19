@@ -212,8 +212,10 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
 
     if (!isOpen) return null
 
-    // If we're searching for email options from a lead that's passed as prop but not in 'leads' yet
-    const availableEmails = selectedLead?.email ? selectedLead.email.split(':').map((e: string) => e.trim()).filter(Boolean) : []
+    // Include both lead-level emails AND contact emails as "To" options
+    const leadEmails = selectedLead?.email ? selectedLead.email.split(':').map((e: string) => e.trim()).filter(Boolean) : []
+    const contactEmails = leadContacts.map(c => c.email).filter(Boolean)
+    const availableEmails = [...new Set([...leadEmails, ...contactEmails])]
 
     // All CC-able emails: lead emails (excluding current To) + lead_contacts emails
     const ccSuggestions = [
