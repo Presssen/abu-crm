@@ -64,6 +64,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const [isEditing, setIsEditing] = useState(false)
     const [lead, setLead] = useState<any>(null)
     const [contacts, setContacts] = useState<any[]>([])
+    const [contactEdits, setContactEdits] = useState<Record<string, any>>({})
     const [emails, setEmails] = useState<any[]>([])
     const [meetings, setMeetings] = useState<any[]>([])
     const [tasks, setTasks] = useState<any[]>([])
@@ -222,6 +223,17 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 .eq('id', leadId)
 
             if (error) throw error
+
+            // Save buffered contact edits to the database
+            const contactSavePromises = Object.entries(contactEdits).map(
+                ([contactId, updates]) =>
+                    supabase
+                        .from('lead_contacts')
+                        .update(updates)
+                        .eq('id', contactId)
+            )
+            await Promise.all(contactSavePromises)
+            setContactEdits({})
 
             setIsEditing(false)
             await fetchLeadDetails()
@@ -613,8 +625,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                             {isEditing ? (
                                                                 <input
                                                                     className="text-sm font-bold text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1 w-full focus:border-gray-900 outline-none"
-                                                                    value={contact.name}
-                                                                    onChange={e => handleUpdateContact(contact.id, { name: e.target.value })}
+                                                                    value={contactEdits[contact.id]?.name ?? contact.name}
+                                                                    onChange={e => setContactEdits(prev => ({ ...prev, [contact.id]: { ...prev[contact.id], name: e.target.value } }))}
                                                                 />
                                                             ) : (
                                                                 <div className="flex items-center gap-2">
@@ -627,8 +639,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                             {isEditing ? (
                                                                 <input
                                                                     className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-2 py-0.5 w-full mt-1 focus:border-gray-900 outline-none"
-                                                                    value={contact.job_title || ''}
-                                                                    onChange={e => handleUpdateContact(contact.id, { job_title: e.target.value })}
+                                                                    value={contactEdits[contact.id]?.job_title ?? contact.job_title ?? ''}
+                                                                    onChange={e => setContactEdits(prev => ({ ...prev, [contact.id]: { ...prev[contact.id], job_title: e.target.value } }))}
                                                                     placeholder="Cargo / Puesto"
                                                                 />
                                                             ) : (
@@ -652,8 +664,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                                 {isEditing ? (
                                                                     <input
                                                                         className="text-[11px] text-gray-600 font-medium bg-white border border-gray-200 rounded-lg px-2 py-0.5 w-full focus:border-gray-900 outline-none"
-                                                                        value={contact.email || ''}
-                                                                        onChange={e => handleUpdateContact(contact.id, { email: e.target.value })}
+                                                                        value={contactEdits[contact.id]?.email ?? contact.email ?? ''}
+                                                                        onChange={e => setContactEdits(prev => ({ ...prev, [contact.id]: { ...prev[contact.id], email: e.target.value } }))}
                                                                     />
                                                                 ) : (
                                                                     <span className="text-[11px] text-gray-600 font-medium truncate">{contact.email || 'Sin email'}</span>
@@ -674,8 +686,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                                 {isEditing ? (
                                                                     <input
                                                                         className="text-[11px] text-gray-600 font-medium bg-white border border-gray-200 rounded-lg px-2 py-0.5 w-full focus:border-gray-900 outline-none"
-                                                                        value={contact.phone || ''}
-                                                                        onChange={e => handleUpdateContact(contact.id, { phone: e.target.value })}
+                                                                        value={contactEdits[contact.id]?.phone ?? contact.phone ?? ''}
+                                                                        onChange={e => setContactEdits(prev => ({ ...prev, [contact.id]: { ...prev[contact.id], phone: e.target.value } }))}
                                                                     />
                                                                 ) : (
                                                                     <span className="text-[11px] text-gray-600 font-medium truncate">{contact.phone || 'Sin teléfono'}</span>
