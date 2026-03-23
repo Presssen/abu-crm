@@ -28,6 +28,7 @@ import { clsx } from 'clsx'
 import SendEmailModal from './SendEmailModal'
 import LogCallModal from './LogCallModal'
 import ApolloEnrichmentModal from './ApolloEnrichmentModal'
+import CreateTaskModal from './CreateTaskModal'
 import { useNotification } from './ui/NotificationProvider'
 import { enrichLead } from '@/app/actions/enrich-lead'
 
@@ -73,6 +74,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
     const [isLogCallModalOpen, setIsLogCallModalOpen] = useState(false)
     const [showApolloModal, setShowApolloModal] = useState(false)
+    const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
     const [selectedToEmail, setSelectedToEmail] = useState('')
 
     // Edit Form
@@ -957,10 +959,19 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                 </div>
 
                                 <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                                    <h5 className="text-xs font-bold text-gray-900 flex items-center mb-4">
-                                        <FileText size={14} className="mr-2 text-emerald-500" />
-                                        Tareas Pendientes ({tasks.length})
-                                    </h5>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h5 className="text-xs font-bold text-gray-900 flex items-center">
+                                            <FileText size={14} className="mr-2 text-emerald-500" />
+                                            Tareas Pendientes ({tasks.length})
+                                        </h5>
+                                        <button
+                                            onClick={() => setShowCreateTaskModal(true)}
+                                            className="p-1 px-2 bg-emerald-50 text-emerald-600 rounded-md text-[10px] font-bold hover:bg-emerald-100 transition-all flex items-center gap-1"
+                                        >
+                                            <Plus size={10} />
+                                            Añadir
+                                        </button>
+                                    </div>
                                     <div className="space-y-2">
                                         {tasks.map(t => (
                                             <div key={t.id} className="flex items-start space-x-2.5 p-2.5 bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-all">
@@ -1019,6 +1030,13 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                 leadId={leadId}
                 domain={lead?.domain || ''}
                 onSuccess={() => fetchLeadDetails()}
+            />
+
+            <CreateTaskModal
+                isOpen={showCreateTaskModal}
+                onClose={() => setShowCreateTaskModal(false)}
+                onSuccess={() => fetchLeadDetails()}
+                initialLeadId={leadId}
             />
         </div>
     )
