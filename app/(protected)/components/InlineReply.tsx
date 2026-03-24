@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Send, Calendar, Sparkles } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useNotification } from './ui/NotificationProvider'
+import RichTextEditor from './ui/RichTextEditor'
 
 interface InlineReplyProps {
     leadId?: string
@@ -43,7 +44,8 @@ export default function InlineReply({
                     subject: subject || 'Respuesta',
                     body: body,
                     threadId: threadId,
-                    parentMessageId: parentMessageId
+                    parentMessageId: parentMessageId,
+                    isHtml: true
                 })
             })
 
@@ -65,20 +67,19 @@ export default function InlineReply({
         <div className="bg-white border-t border-gray-100 p-6 z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
             <div className="max-w-4xl mx-auto space-y-4">
                 <div className="relative group">
-                    <textarea
+                    <RichTextEditor
                         value={body}
-                        onChange={(e) => setBody(e.target.value)}
+                        onChange={(html) => setBody(html)}
                         placeholder="Escribe tu respuesta aquí..."
-                        rows={3}
-                        className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-[24px] outline-none focus:ring-4 focus:ring-indigo-500/10 focus:bg-white focus:border-indigo-500 transition-all text-sm leading-relaxed resize-none font-medium placeholder:text-gray-400"
+                        minRows={3}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                                 handleSubmit()
                             }
                         }}
                     />
-                    <div className="absolute bottom-4 right-4 flex items-center space-x-2">
-                        <span className="text-[10px] text-gray-400 font-bold hidden group-focus-within:block">
+                    <div className="flex items-center justify-end mt-1 pr-1">
+                        <span className="text-[10px] text-gray-400 font-bold">
                             ⌘ + Enter para enviar
                         </span>
                     </div>

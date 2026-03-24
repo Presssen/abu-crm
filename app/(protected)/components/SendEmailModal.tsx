@@ -5,6 +5,7 @@ import { createClient } from '@/lib/auth/client'
 import { X, Send, User, Mail, ChevronDown, Sparkles, Layout, Variable, Eye, Plus, UserPlus } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useNotification } from './ui/NotificationProvider'
+import RichTextEditor from './ui/RichTextEditor'
 
 interface SendEmailModalProps {
     isOpen: boolean
@@ -130,7 +131,8 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                     cc: formData.cc_emails.length > 0 ? formData.cc_emails.join(', ') : undefined,
                     subject: finalSubject,
                     body: finalBody,
-                    threadId: initialThreadId
+                    threadId: initialThreadId,
+                    isHtml: true
                 })
             })
 
@@ -405,13 +407,11 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                                     </button>
                                 ))}
                             </div>
-                            <textarea
-                                required
+                            <RichTextEditor
                                 value={formData.body}
-                                onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                                rows={10}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-sm leading-relaxed resize-none font-medium"
+                                onChange={(html) => setFormData({ ...formData, body: html })}
                                 placeholder="Escribe tu mensaje aquí..."
+                                minRows={10}
                             />
                         </div>
                     </div>
@@ -430,8 +430,12 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                                     <div className="text-xs font-bold text-gray-400">CC: <span className="text-gray-600">{formData.cc_emails.join(', ')}</span></div>
                                 )}
                             </div>
-                            <div className="flex-1 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap font-medium">
-                                {getPreviewContent(formData.body) || <span className="text-gray-300 italic">Escribe tu mensaje para ver la vista previa...</span>}
+                            <div className="flex-1 text-sm text-gray-800 leading-relaxed font-medium prose prose-sm max-w-none">
+                                {getPreviewContent(formData.body) ? (
+                                    <div dangerouslySetInnerHTML={{ __html: getPreviewContent(formData.body) }} />
+                                ) : (
+                                    <span className="text-gray-300 italic">Escribe tu mensaje para ver la vista previa...</span>
+                                )}
                             </div>
                             <div className="mt-8 pt-6 border-t border-gray-50 text-[10px] text-gray-400 text-center uppercase tracking-widest font-black">
                                 Enviado via Gmail CRM Integration

@@ -5,7 +5,7 @@ import { callGmailApi } from '@/lib/gmail'
 export async function POST(request: Request) {
     try {
         const bodyData = await request.json()
-        const { to, cc, subject, body, lead_id, threadId, parentMessageId } = bodyData
+        const { to, cc, subject, body, lead_id, threadId, parentMessageId, isHtml } = bodyData
 
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -35,9 +35,17 @@ export async function POST(request: Request) {
         // Or we can proactively refresh if we suspect it's old.
         // Let's implement a helper to refresh if the request fails with 401.
 
+        // RFC 2047 MIME encoding for non-ASCII subject headers
+        const encodeMimeHeader = (text: string): string => {
+            // Check if the text contains non-ASCII characters
+            if (!/[^\x00-\x7F]/.test(text)) return text
+            const encoded = Buffer.from(text, 'utf-8').toString('base64')
+            return `=?UTF-8?B?${encoded}?=`
+        }
+
         const sendEmail = async (token: string) => {
             // Construct MIME message
-            const formattedBody = body.replace(/\n/g, '<br>')
+            const formattedBody = isHtml ? body : body.replace(/\n/g, '<br>')
 
             // Handle Subject for threading
             let finalSubject = subject
@@ -48,7 +56,7 @@ export async function POST(request: Request) {
             const headers = [
                 `To: ${to}`,
                 ...(cc ? [`Cc: ${cc}`] : []),
-                `Subject: ${finalSubject}`,
+                `Subject: ${encodeMimeHeader(finalSubject)}`,
                 `Content-Type: text/html; charset=utf-8`,
             ]
 
