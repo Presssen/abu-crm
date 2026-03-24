@@ -98,10 +98,12 @@ export default function MarathonPage() {
     // Filters state
     const [planFilter, setPlanFilter] = useState<string>('all')
     const [countryFilter, setCountryFilter] = useState<string>('all')
+    const [sectorFilter, setSectorFilter] = useState<string>('all')
     const [excludePasswordProtected, setExcludePasswordProtected] = useState<boolean>(true)
     const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
     const [isAdmin, setIsAdmin] = useState(false)
     const [availableCountries, setAvailableCountries] = useState<string[]>([])
+    const [availableSectors, setAvailableSectors] = useState<string[]>([])
 
     // Activity state
     const [emailHistory, setEmailHistory] = useState<any[]>([])
@@ -154,10 +156,12 @@ export default function MarathonPage() {
     useEffect(() => {
         const savedPlan = localStorage.getItem('marathon_plan_filter')
         const savedCountry = localStorage.getItem('marathon_country_filter')
+        const savedSector = localStorage.getItem('marathon_sector_filter')
         const savedExclude = localStorage.getItem('marathon_exclude_password')
         const savedViewMode = localStorage.getItem('marathon_view_mode')
         if (savedPlan) setPlanFilter(savedPlan)
         if (savedCountry) setCountryFilter(savedCountry)
+        if (savedSector) setSectorFilter(savedSector)
         if (savedExclude !== null) setExcludePasswordProtected(savedExclude === 'true')
         if (savedViewMode === 'mine' || savedViewMode === 'all') setViewMode(savedViewMode)
     }, [])
@@ -166,14 +170,16 @@ export default function MarathonPage() {
     useEffect(() => {
         localStorage.setItem('marathon_plan_filter', planFilter)
         localStorage.setItem('marathon_country_filter', countryFilter)
+        localStorage.setItem('marathon_sector_filter', sectorFilter)
         localStorage.setItem('marathon_exclude_password', String(excludePasswordProtected))
         localStorage.setItem('marathon_view_mode', viewMode)
-    }, [planFilter, countryFilter, excludePasswordProtected, viewMode])
+    }, [planFilter, countryFilter, sectorFilter, excludePasswordProtected, viewMode])
 
     // Use preloaded filters from global context, fallback to API
     useEffect(() => {
         if (preloadedFilters) {
             setAvailableCountries(preloadedFilters.countries)
+            if (preloadedFilters.categories) setAvailableSectors(preloadedFilters.categories)
         } else {
             const fetchFilters = async () => {
                 try {
@@ -181,6 +187,7 @@ export default function MarathonPage() {
                     if (res.ok) {
                         const data = await res.json()
                         if (data.countries) setAvailableCountries(data.countries)
+                        if (data.categories) setAvailableSectors(data.categories)
                     }
                 } catch (err) {
                     console.error('Error loading filters:', err)
@@ -193,7 +200,7 @@ export default function MarathonPage() {
     useEffect(() => {
         fetchLeads()
         fetchUserGoal()
-    }, [planFilter, countryFilter, excludePasswordProtected, viewMode])
+    }, [planFilter, countryFilter, sectorFilter, excludePasswordProtected, viewMode])
 
     useEffect(() => {
         if (leads[currentIndex]) {
@@ -294,6 +301,11 @@ export default function MarathonPage() {
             // Apply Country Filter
             if (countryFilter !== 'all') {
                 query = query.eq('country', countryFilter)
+            }
+
+            // Apply Sector Filter
+            if (sectorFilter !== 'all') {
+                query = query.eq('categories', sectorFilter)
             }
 
             // Apply Password Protected Exclusion
@@ -754,6 +766,21 @@ export default function MarathonPage() {
                             >
                                 <option value="all">Todos los países</option>
                                 {availableCountries.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-600 block mb-2">Sector:</label>
+                            <select
+                                value={sectorFilter}
+                                onChange={(e) => {
+                                    setSectorFilter(e.target.value)
+                                    setCurrentIndex(0)
+                                }}
+                                className="w-full text-sm font-medium bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="all">Todos los sectores</option>
+                                {availableSectors.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
 
@@ -1412,6 +1439,21 @@ export default function MarathonPage() {
                     >
                         <option value="all">Todos</option>
                         {availableCountries.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+                <div className="h-4 w-px bg-gray-200" />
+                <div className="flex items-center space-x-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sector:</label>
+                    <select
+                        value={sectorFilter}
+                        onChange={(e) => {
+                            setSectorFilter(e.target.value)
+                            setCurrentIndex(0)
+                        }}
+                        className="text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                        <option value="all">Todos</option>
+                        {availableSectors.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                 </div>
                 <div className="h-4 w-px bg-gray-200" />

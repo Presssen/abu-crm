@@ -20,9 +20,10 @@ export async function GET() {
         const db = createAdminClient(supabaseUrl, supabaseKey)
 
         // Use RPC functions — SQL DISTINCT is instant even with 100k+ rows
-        const [countriesRes, citiesRes] = await Promise.all([
+        const [countriesRes, citiesRes, categoriesRes] = await Promise.all([
             db.rpc('get_distinct_countries'),
             db.rpc('get_distinct_cities'),
+            db.rpc('get_distinct_categories'),
         ])
 
         const countries = countriesRes.data
@@ -31,8 +32,11 @@ export async function GET() {
         const cities = citiesRes.data
             ? citiesRes.data.map((r: any) => r.city).filter(Boolean)
             : []
+        const categories = categoriesRes.data
+            ? categoriesRes.data.map((r: any) => r.category).filter(Boolean)
+            : []
 
-        return NextResponse.json({ countries, cities })
+        return NextResponse.json({ countries, cities, categories })
     } catch (error: any) {
         console.error('Filters API error:', error)
         return NextResponse.json(

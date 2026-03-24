@@ -33,7 +33,7 @@ interface AppData {
     leadsLoaded: boolean
 
     // Filters
-    filters: { countries: string[]; cities: string[] } | null
+    filters: { countries: string[]; cities: string[]; categories: string[] } | null
     filtersLoaded: boolean
 
     // Loading state
@@ -108,7 +108,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const [leadsLoaded, setLeadsLoaded] = useState(alreadyPreloaded)
 
     // Filters state — init from cache
-    const [filters, setFilters] = useState<{ countries: string[]; cities: string[] } | null>(
+    const [filters, setFilters] = useState<{ countries: string[]; cities: string[]; categories: string[] } | null>(
         () => readCache(CACHE_KEYS.filters)
     )
     const [filtersLoaded, setFiltersLoaded] = useState(alreadyPreloaded)
@@ -232,7 +232,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             const res = await fetch('/api/leads/filters')
             if (!res.ok) throw new Error('Filters fetch failed')
             const data = await res.json()
-            setFilters({ countries: data.countries || [], cities: data.cities || [] })
+            setFilters({ countries: data.countries || [], cities: data.cities || [], categories: data.categories || [] })
             setFiltersLoaded(true)
         } catch (error) {
             console.error('Filters preload error:', error)
