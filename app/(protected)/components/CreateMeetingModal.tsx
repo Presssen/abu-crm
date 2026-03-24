@@ -145,13 +145,15 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
             const endTime = new Date(startDate.getTime() + duration * 60 * 1000).toISOString()
 
             const lead = leads.find(l => l.id === formData.lead_id)
-            const allAttendees = [...guests]
-            if (lead?.email) allAttendees.push(lead.email)
+            const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+            const leadEmail = lead?.email?.trim() || ''
+            const allAttendees = [...guests, ...(leadEmail && isValidEmail(leadEmail) ? [leadEmail] : [])].filter(e => e && isValidEmail(e))
 
             // 1. Create Meeting in DB
+            const calendarTitle = 'Reunión ABU'
             const meetingTitle = lead
-                ? `Reunión con ${lead.company_name}`
-                : 'Reunión CRM'
+                ? `Reunión ABU - ${lead.company_name}`
+                : 'Reunión ABU'
             const { data: meeting, error: meetingError } = await supabase.from('meetings').insert([{
                 lead_id: formData.lead_id || null,
                 owner_id: ownerId,
@@ -176,7 +178,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        title: meetingTitle,
+                        title: calendarTitle,
                         start_time: startTime,
                         end_time: endTime,
                         location: formData.location,
@@ -210,7 +212,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
 
             // 3. Send Confirmation Email (if requested)
             let emailSent = false
-            if (formData.send_confirmation && lead?.email) {
+            if (formData.send_confirmation && leadEmail && isValidEmail(leadEmail)) {
                 try {
                     const meetLinkHtml = googleMeetLink ? `\n\nEnlace de la reunión: ${googleMeetLink}` : ''
 
@@ -218,9 +220,9 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            lead_id: lead.id,
-                            to: lead.email,
-                            subject: `Confirmación de Reunión: ${lead.company_name}`,
+                            lead_id: lead!.id,
+                            to: leadEmail,
+                            subject: `Reunión ABU - ${lead!.company_name}`,
                             body: `Hola ${lead.contact_name || 'hola'},\n\nTe confirmo nuestra reunión programada para el día ${startDate.toLocaleDateString('es-ES')} a las ${selectedTime}.\n\nLugar: ${formData.location || (googleMeetLink ? 'Google Meet' : 'Online')}${meetLinkHtml}\n\nNotas: ${formData.notes || 'N/A'}\n\nSaludos.`,
                         })
                     })
