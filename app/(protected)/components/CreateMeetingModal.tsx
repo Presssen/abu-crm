@@ -165,8 +165,12 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
 
             if (meetingError) throw meetingError
 
+            // Track warnings for partial failures
+            const warnings: string[] = []
+
             // 2. Sync with Google Calendar
             let googleMeetLink = ''
+            let calendarSynced = false
             try {
                 const calendarRes = await fetch('/api/calendar/create-event', {
                     method: 'POST',
@@ -184,7 +188,9 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                 const calendarData = await calendarRes.json()
                 if (!calendarRes.ok) {
                     console.warn('Google Calendar Sync Failed:', calendarData.error)
+                    warnings.push(`Calendar: ${calendarData.error || 'No se pudo sincronizar'}`)
                 } else {
+                    calendarSynced = true
                     googleMeetLink = calendarData.meetLink || calendarData.link
 
                     const updates: any = { google_event_id: calendarData.googleEventId }
@@ -197,24 +203,39 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                         .update(updates)
                         .eq('id', meeting.id)
                 }
-            } catch (calError) {
+            } catch (calError: any) {
                 console.error('Calendar Sync Error:', calError)
+                warnings.push('Calendar: Error de conexión')
             }
 
             // 3. Send Confirmation Email (if requested)
+            let emailSent = false
             if (formData.send_confirmation && lead?.email) {
-                const meetLinkHtml = googleMeetLink ? `\n\nEnlace de la reunión: ${googleMeetLink}` : ''
+                try {
+                    const meetLinkHtml = googleMeetLink ? `\n\nEnlace de la reunión: ${googleMeetLink}` : ''
 
-                await fetch('/api/gmail/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        lead_id: lead.id,
-                        to: lead.email,
-                        subject: `Confirmación de Reunión: ${lead.company_name}`,
-                        body: `Hola ${lead.contact_name || 'hola'},\n\nTe confirmo nuestra reunión programada para el día ${startDate.toLocaleDateString('es-ES')} a las ${selectedTime}.\n\nLugar: ${formData.location || (googleMeetLink ? 'Google Meet' : 'Online')}${meetLinkHtml}\n\nNotas: ${formData.notes || 'N/A'}\n\nSaludos.`,
+                    const emailRes = await fetch('/api/gmail/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            lead_id: lead.id,
+                            to: lead.email,
+                            subject: `Confirmación de Reunión: ${lead.company_name}`,
+                            body: `Hola ${lead.contact_name || 'hola'},\n\nTe confirmo nuestra reunión programada para el día ${startDate.toLocaleDateString('es-ES')} a las ${selectedTime}.\n\nLugar: ${formData.location || (googleMeetLink ? 'Google Meet' : 'Online')}${meetLinkHtml}\n\nNotas: ${formData.notes || 'N/A'}\n\nSaludos.`,
+                        })
                     })
-                })
+
+                    if (!emailRes.ok) {
+                        const emailData = await emailRes.json().catch(() => ({}))
+                        console.warn('Email send failed:', emailData.error)
+                        warnings.push(`Email: ${emailData.error || 'No se pudo enviar'}`)
+                    } else {
+                        emailSent = true
+                    }
+                } catch (emailError: any) {
+                    console.error('Email Send Error:', emailError)
+                    warnings.push('Email: Error de conexión')
+                }
             }
 
             // 4. Update Lead Status & Last Activity
@@ -234,7 +255,12 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                     .eq('id', formData.lead_id)
             }
 
-            showSuccess('Reunión agendada')
+            // 5. Show appropriate feedback
+            if (warnings.length > 0) {
+                showError(`Reunión guardada, pero hubo problemas:\n${warnings.join('\n')}\n\nRevisa tu conexión en Configuración → Integraciones.`)
+            } else {
+                showSuccess('Reunión agendada' + (calendarSynced ? ' y sincronizada con Calendar' : '') + (emailSent ? ' · Email enviado' : ''))
+            }
             onSuccess()
             onClose()
         } catch (error: any) {
