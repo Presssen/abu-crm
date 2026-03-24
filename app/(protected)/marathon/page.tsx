@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/auth/client'
 import {
     Phone,
@@ -27,7 +27,8 @@ import {
     Star,
     Trash2,
     X,
-    Lock
+    Lock,
+    Search
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
@@ -143,6 +144,14 @@ export default function MarathonPage() {
 
     const [isMobile, setIsMobile] = useState(false)
 
+    // Search state
+    const [marathonSearch, setMarathonSearch] = useState('')
+    const [searchResults, setSearchResults] = useState<Lead[]>([])
+    const [showSearchResults, setShowSearchResults] = useState(false)
+    const [searching, setSearching] = useState(false)
+    const searchTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const searchContainerRef = useRef<HTMLDivElement>(null)
+
     useEffect(() => {
         const checkMobile = () => {
             setIsMobile(window.innerWidth < 1024)
@@ -151,6 +160,63 @@ export default function MarathonPage() {
         window.addEventListener('resize', checkMobile)
         return () => window.removeEventListener('resize', checkMobile)
     }, [])
+
+    // Close search results on click outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+                setShowSearchResults(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    // Search handler with debounce
+    const handleMarathonSearch = (query: string) => {
+        setMarathonSearch(query)
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+        if (!query.trim()) {
+            setSearchResults([])
+            setShowSearchResults(false)
+            return
+        }
+        setSearching(true)
+        setShowSearchResults(true)
+        searchTimerRef.current = setTimeout(async () => {
+            try {
+                const q = query.trim().toLowerCase()
+                const { data } = await supabase
+                    .from('leads')
+                    .select('id, company_name, contact_name, email, phone, status, domain, city, country, plan, platform, platform_rank, shopify_status, categories, notes, created_at')
+                    .or(`company_name.ilike.%${q}%,contact_name.ilike.%${q}%,email.ilike.%${q}%`)
+                    .limit(8)
+                setSearchResults((data as Lead[]) || [])
+            } catch (err) {
+                console.error('Search error:', err)
+            } finally {
+                setSearching(false)
+            }
+        }, 300)
+    }
+
+    const handleSelectSearchResult = (lead: Lead) => {
+        // Check if lead is already in the current list
+        const existingIdx = leads.findIndex(l => l.id === lead.id)
+        if (existingIdx >= 0) {
+            setCurrentIndex(existingIdx)
+        } else {
+            // Inject lead at current position + 1 and navigate to it
+            const newLeads = [...leads]
+            const insertAt = currentIndex + 1
+            newLeads.splice(insertAt, 0, lead)
+            setLeads(newLeads)
+            setCurrentIndex(insertAt)
+        }
+        setMarathonSearch('')
+        setSearchResults([])
+        setShowSearchResults(false)
+    }
 
     // Load filters from localStorage
     useEffect(() => {
@@ -1384,6 +1450,55 @@ export default function MarathonPage() {
                             Progreso: <span className="text-indigo-600 font-bold">{progress}</span> <span className="text-gray-300">/</span> {dailyGoal}
                         </span>
                     </div>
+                </div>
+
+                {/* Search bar */}
+                <div ref={searchContainerRef} className="relative flex-1 max-w-xs mx-4">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                    <input
+                        type="text"
+                        placeholder="Buscar lead..."
+                        value={marathonSearch}
+                        onChange={(e) => handleMarathonSearch(e.target.value)}
+                        onFocus={() => { if (marathonSearch.trim()) setShowSearchResults(true) }}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none transition-all text-gray-900 placeholder-gray-400"
+                    />
+                    {showSearchResults && (
+                        <div className="absolute z-50 w-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden max-h-64 overflow-y-auto">
+                            {searching ? (
+                                <div className="flex items-center justify-center py-4">
+                                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                                </div>
+                            ) : searchResults.length > 0 ? (
+                                searchResults.map(r => (
+                                    <button
+                                        key={r.id}
+                                        type="button"
+                                        onClick={() => handleSelectSearchResult(r)}
+                                        className="w-full px-3 py-2.5 text-left hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <span className="text-xs font-bold text-gray-900">{r.company_name}</span>
+                                                {r.contact_name && <span className="text-[10px] text-gray-400 ml-2">· {r.contact_name}</span>}
+                                            </div>
+                                            <span className={clsx(
+                                                "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded",
+                                                r.status === 'new' ? 'bg-blue-50 text-blue-600' :
+                                                r.status === 'contacted' ? 'bg-amber-50 text-amber-600' :
+                                                r.status === 'won' ? 'bg-green-50 text-green-600' :
+                                                r.status === 'lost' ? 'bg-red-50 text-red-600' :
+                                                'bg-gray-50 text-gray-500'
+                                            )}>{r.status}</span>
+                                        </div>
+                                        {r.email && <p className="text-[10px] text-gray-400 mt-0.5">{r.email}</p>}
+                                    </button>
+                                ))
+                            ) : (
+                                <div className="py-4 text-center text-xs text-gray-400">Sin resultados</div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex items-center bg-gray-100/50 p-1 rounded-lg space-x-1">
