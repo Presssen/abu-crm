@@ -89,10 +89,12 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
     }
 
     const handleApplyTemplate = (template: Template) => {
+        // Convert plain-text newlines to HTML <br> so the RichTextEditor preserves spacing
+        const htmlBody = template.body.replace(/\n/g, '<br>')
         setFormData({
             ...formData,
             subject: template.subject,
-            body: template.body
+            body: htmlBody
         })
     }
 
