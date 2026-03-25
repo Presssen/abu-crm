@@ -194,7 +194,8 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
         let preview = text
         if (selectedLead) {
             preview = preview.replace(/\{\{company_name\}\}/g, selectedLead.company_name || '[Empresa]')
-            preview = preview.replace(/\{\{contact_name\}\}/g, selectedLead.contact_name || '[Contacto]')
+            const firstName = selectedLead.contact_name ? selectedLead.contact_name.split(' ')[0] : '[Contacto]'
+            preview = preview.replace(/\{\{contact_name\}\}/g, firstName)
             preview = preview.replace(/\{\{sector\}\}/g, selectedLead.categories || '[Categoría]')
             preview = preview.replace(/\{\{categories\}\}/g, selectedLead.categories || '[Categoría]')
             preview = preview.replace(/\{\{country\}\}/g, selectedLead.country || '[País]')
