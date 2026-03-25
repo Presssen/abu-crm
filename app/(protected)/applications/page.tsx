@@ -17,7 +17,8 @@ import {
     ChevronUp,
     Download,
     User,
-    Search
+    Search,
+    Trash2
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -94,6 +95,26 @@ export default function ApplicationsPage() {
             }
         } catch (err) {
             console.error('Error updating application:', err)
+        } finally {
+            setSavingId(null)
+        }
+    }
+
+    const deleteApplication = async (id: string) => {
+        if (!confirm('¿Seguro que quieres eliminar esta candidatura? Esta acción no se puede deshacer.')) return
+        setSavingId(id)
+        try {
+            const res = await fetch('/api/applications', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            })
+            if (res.ok) {
+                setApplications(apps => apps.filter(a => a.id !== id))
+                if (expandedId === id) setExpandedId(null)
+            }
+        } catch (err) {
+            console.error('Error deleting application:', err)
         } finally {
             setSavingId(null)
         }
@@ -245,38 +266,41 @@ export default function ApplicationsPage() {
                                             </div>
                                         )}
 
-                                        {/* CV */}
-                                        <div className="flex flex-wrap gap-2">
-                                            {app.cv_url && (
-                                                <a
-                                                    href={app.cv_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-colors"
-                                                >
-                                                    <Download size={14} /> Descargar CV
-                                                </a>
-                                            )}
-                                            {app.linkedin_url && (
-                                                <a
-                                                    href={app.linkedin_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors"
-                                                >
-                                                    LinkedIn
-                                                </a>
-                                            )}
-                                            {app.video_url && (
-                                                <a
-                                                    href={app.video_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-sm font-bold hover:bg-purple-100 transition-colors"
-                                                >
-                                                    Ver vídeo
-                                                </a>
-                                            )}
+                                        {/* CV, LinkedIn, Video */}
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Documentos y enlaces</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {app.cv_url ? (
+                                                    <a href={app.cv_url} target="_blank" rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-colors">
+                                                        <Download size={14} /> Descargar CV
+                                                    </a>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-400 rounded-xl text-sm font-medium border border-dashed border-gray-200">
+                                                        <Download size={14} /> CV no adjuntado
+                                                    </span>
+                                                )}
+                                                {app.linkedin_url ? (
+                                                    <a href={app.linkedin_url} target="_blank" rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors">
+                                                        LinkedIn
+                                                    </a>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-400 rounded-xl text-sm font-medium border border-dashed border-gray-200">
+                                                        LinkedIn no proporcionado
+                                                    </span>
+                                                )}
+                                                {app.video_url ? (
+                                                    <a href={app.video_url} target="_blank" rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-sm font-bold hover:bg-purple-100 transition-colors">
+                                                        Ver vídeo
+                                                    </a>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-400 rounded-xl text-sm font-medium border border-dashed border-gray-200">
+                                                        Vídeo no proporcionado
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
 
                                         {/* Notes */}
@@ -296,7 +320,7 @@ export default function ApplicationsPage() {
                                         </div>
 
                                         {/* Actions */}
-                                        <div className="flex flex-wrap gap-2 pt-2">
+                                        <div className="flex flex-wrap items-center gap-2 pt-2">
                                             {['pending', 'reviewed', 'accepted', 'rejected'].map(s => {
                                                 const c = statusConfig[s]
                                                 return (
@@ -316,6 +340,14 @@ export default function ApplicationsPage() {
                                                     </button>
                                                 )
                                             })}
+                                            <div className="flex-1" />
+                                            <button
+                                                onClick={() => deleteApplication(app.id)}
+                                                disabled={savingId === app.id}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-red-500 hover:bg-red-50 hover:text-red-700 border border-transparent hover:border-red-200 transition-all"
+                                            >
+                                                <Trash2 size={13} /> Eliminar
+                                            </button>
                                         </div>
                                     </div>
                                 )}

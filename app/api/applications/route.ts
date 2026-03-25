@@ -164,3 +164,35 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 }
+
+// DELETE: Remove application (authenticated only)
+export async function DELETE(request: NextRequest) {
+    try {
+        const supabase = await createServerClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const { id } = await request.json()
+
+        if (!id) {
+            return NextResponse.json({ error: 'Application ID required' }, { status: 400 })
+        }
+
+        const { error } = await supabase
+            .from('applications')
+            .delete()
+            .eq('id', id)
+
+        if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 })
+        }
+
+        return NextResponse.json({ success: true })
+
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+}
