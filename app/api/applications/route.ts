@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/auth/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Public Supabase client (no auth needed for application submissions)
+// Server-side Supabase client that bypasses RLS for public submissions
 function createPublicClient() {
     return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 }
 
