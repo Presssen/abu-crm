@@ -146,13 +146,31 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
 
             showSuccess('Email enviado correctamente via Gmail')
 
-            // Update Lead Status & Last Activity
+            // Update Lead Status & Last Activity + Auto-claim
             if (formData.lead_id) {
-                // If status is 'new', move to 'contacted'
+                const now = new Date().toISOString()
+                const { data: userData2 } = await supabase.auth.getUser()
+                const userId = userData2.user?.id
+
+                // Auto-claim: if lead has no owner, assign to the sending user
+                if (userId) {
+                    await supabase
+                        .from('leads')
+                        .update({
+                            owner_id: userId,
+                            claimed_at: now,
+                            last_activity_at: now,
+                            status: 'contacted'
+                        })
+                        .eq('id', formData.lead_id)
+                        .is('owner_id', null)
+                }
+
+                // For already-owned leads, update status
                 await supabase
                     .from('leads')
                     .update({
-                        last_activity_at: new Date().toISOString(),
+                        last_activity_at: now,
                         status: 'contacted'
                     })
                     .eq('id', formData.lead_id)
@@ -161,7 +179,7 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                 // Always update last_activity_at (fallback/safety)
                 await supabase
                     .from('leads')
-                    .update({ last_activity_at: new Date().toISOString() })
+                    .update({ last_activity_at: now })
                     .eq('id', formData.lead_id)
             }
 

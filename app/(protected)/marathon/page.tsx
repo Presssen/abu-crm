@@ -59,6 +59,10 @@ interface Lead {
     plan?: string
     shopify_status?: string
     created_at: string
+    owner_id?: string | null
+    claimed_at?: string | null
+    last_activity_at?: string | null
+    owner_name?: string | null
 }
 
 export default function MarathonPage() {
@@ -102,6 +106,7 @@ export default function MarathonPage() {
     const [sectorFilter, setSectorFilter] = useState<string>('all')
     const [excludePasswordProtected, setExcludePasswordProtected] = useState<boolean>(true)
     const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
+    const [claimingLead, setClaimingLead] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
     const [availableCountries, setAvailableCountries] = useState<string[]>([])
     const [availableSectors, setAvailableSectors] = useState<string[]>([])
@@ -343,6 +348,45 @@ export default function MarathonPage() {
         }
     }
 
+    // Claim a lead before performing an action (email, call, meeting)
+    const claimLead = async (leadId: string): Promise<{ claimed: boolean; message?: string }> => {
+        try {
+            setClaimingLead(true)
+            const res = await fetch('/api/leads/claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lead_id: leadId })
+            })
+            const data = await res.json()
+            if (data.claimed) {
+                // Update local lead state with ownership
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    const updatedLeads = [...leads]
+                    const idx = updatedLeads.findIndex(l => l.id === leadId)
+                    if (idx >= 0) {
+                        updatedLeads[idx] = {
+                            ...updatedLeads[idx],
+                            owner_id: user.id,
+                            claimed_at: new Date().toISOString(),
+                            owner_name: 'Tú'
+                        }
+                        setLeads(updatedLeads)
+                    }
+                }
+                return { claimed: true }
+            } else {
+                showError(data.message || 'Este lead ya está siendo gestionado por otro usuario')
+                return { claimed: false, message: data.message }
+            }
+        } catch (error) {
+            console.error('Error claiming lead:', error)
+            return { claimed: true } // Allow action on network error (fail open)
+        } finally {
+            setClaimingLead(false)
+        }
+    }
+
     const fetchLeads = async () => {
         setLoading(true)
         try {
@@ -351,10 +395,10 @@ export default function MarathonPage() {
             const userIsAdmin = profile?.role === 'admin'
             setIsAdmin(userIsAdmin)
 
-            // Fetch leads that are 'new' — only select columns needed for Marathon
+            // Fetch leads that are 'new' — ALL users see ALL leads (pool model)
             let query = supabase
                 .from('leads')
-                .select('id, company_name, contact_name, email, phone, status, domain, city, country, plan, platform, platform_rank, shopify_status, categories, notes, tags, owner_id, created_at, source')
+                .select('id, company_name, contact_name, email, phone, status, domain, city, country, plan, platform, platform_rank, shopify_status, categories, notes, tags, owner_id, claimed_at, last_activity_at, created_at, source')
                 .eq('status', 'new')
 
             // Apply Plan Filter
@@ -379,11 +423,9 @@ export default function MarathonPage() {
                 query = query.neq('shopify_status', 'Password Protected')
             }
 
-            // If not admin, only show leads owned by the user
-            // If admin and viewMode is 'mine', only show own leads
-            if (!userIsAdmin && user) {
-                query = query.eq('owner_id', user.id)
-            } else if (userIsAdmin && viewMode === 'mine' && user) {
+            // Pool model: show ALL leads to everyone
+            // Only filter by 'mine' if user explicitly selects that view
+            if (viewMode === 'mine' && user) {
                 query = query.eq('owner_id', user.id)
             }
 
@@ -391,13 +433,44 @@ export default function MarathonPage() {
 
             if (error) throw error
 
-            // Randomize client-side for "surprise" effect or keep DB order
-            const shuffled = (data || []).sort(() => Math.random() - 0.5)
-            setLeads(shuffled)
+            // For leads with owners, fetch owner names for display
+            const leadsWithOwners = data || []
+            const ownerIds = [...new Set(leadsWithOwners.filter(l => l.owner_id).map(l => l.owner_id))]
+            let ownerMap: Record<string, string> = {}
+            if (ownerIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('id, first_name, last_name, email')
+                    .in('id', ownerIds)
+                if (profiles) {
+                    profiles.forEach(p => {
+                        ownerMap[p.id] = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email || 'Usuario'
+                    })
+                }
+            }
+
+            // Mark stale leads (30+ days without activity) as effectively free
+            const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
+            const enrichedLeads = leadsWithOwners.map(l => {
+                const isStale = l.owner_id && l.last_activity_at &&
+                    new Date(l.last_activity_at).getTime() < thirtyDaysAgo
+                return {
+                    ...l,
+                    owner_name: l.owner_id
+                        ? (l.owner_id === user?.id ? 'Tú' : (ownerMap[l.owner_id] || 'Usuario'))
+                        : null,
+                    // If stale, treat as free
+                    ...(isStale ? { owner_id: null, owner_name: null, claimed_at: null } : {})
+                }
+            })
+
+            // Randomize client-side for "surprise" effect
+            const shuffled = enrichedLeads.sort(() => Math.random() - 0.5)
+            setLeads(shuffled as Lead[])
 
             // Restore position by lead ID if available
             if (restoredLeadId) {
-                const idx = shuffled.findIndex((l: Lead) => l.id === restoredLeadId)
+                const idx = shuffled.findIndex((l: any) => l.id === restoredLeadId)
                 if (idx >= 0) {
                     setCurrentIndexState(idx)
                 }
@@ -473,7 +546,13 @@ export default function MarathonPage() {
         }
     }
 
-    const handleLogCall = () => {
+    const handleLogCall = async () => {
+        if (!currentLead) return
+        // Auto-claim on call
+        if (!currentLead.owner_id) {
+            const result = await claimLead(currentLead.id)
+            if (!result.claimed) return
+        }
         setIsLogCallModalOpen(true)
     }
 
@@ -865,27 +944,25 @@ export default function MarathonPage() {
                             </span>
                         </label>
 
-                        {isAdmin && (
-                            <div>
-                                <label className="text-xs font-bold text-gray-600 block mb-2">Ver:</label>
-                                <div className="flex bg-gray-100 rounded-lg p-0.5">
-                                    <button
-                                        onClick={() => { setViewMode('all'); setCurrentIndex(0) }}
-                                        className={`flex-1 px-3 py-2 rounded-md text-xs font-bold transition-all ${viewMode === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                                            }`}
-                                    >
-                                        Todos los leads
-                                    </button>
-                                    <button
-                                        onClick={() => { setViewMode('mine'); setCurrentIndex(0) }}
-                                        className={`flex-1 px-3 py-2 rounded-md text-xs font-bold transition-all ${viewMode === 'mine' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                                            }`}
-                                    >
-                                        Mis leads
-                                    </button>
-                                </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-600 block mb-2">Ver:</label>
+                            <div className="flex bg-gray-100 rounded-lg p-0.5">
+                                <button
+                                    onClick={() => { setViewMode('all'); setCurrentIndex(0) }}
+                                    className={`flex-1 px-3 py-2 rounded-md text-xs font-bold transition-all ${viewMode === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    Pool (Todos)
+                                </button>
+                                <button
+                                    onClick={() => { setViewMode('mine'); setCurrentIndex(0) }}
+                                    className={`flex-1 px-3 py-2 rounded-md text-xs font-bold transition-all ${viewMode === 'mine' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    Mis leads
+                                </button>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 
@@ -916,11 +993,21 @@ export default function MarathonPage() {
                     onEnrich={handleEnrich}
                     onSearchApollo={() => setShowApolloModal(true)}
                     onLogCall={handleLogCall}
-                    onSendEmail={(email) => {
+                    onSendEmail={async (email) => {
+                        if (!currentLead.owner_id) {
+                            const result = await claimLead(currentLead.id)
+                            if (!result.claimed) return
+                        }
                         setEmailInitialTo(email)
                         setIsEmailModalOpen(true)
                     }}
-                    onScheduleMeeting={() => setIsMeetingModalOpen(true)}
+                    onScheduleMeeting={async () => {
+                        if (!currentLead.owner_id) {
+                            const result = await claimLead(currentLead.id)
+                            if (!result.claimed) return
+                        }
+                        setIsMeetingModalOpen(true)
+                    }}
                     onScheduleTask={(title) => {
                         setTaskInitialTitle(title)
                         setIsTaskModalOpen(true)
@@ -1997,6 +2084,28 @@ export default function MarathonPage() {
                             )}
                         </div>
 
+                        {/* Ownership Badge */}
+                        {currentLead.owner_name && (
+                            <div className={clsx(
+                                "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold mt-2",
+                                currentLead.owner_name === 'Tú'
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                            )}>
+                                <User size={12} />
+                                {currentLead.owner_name === 'Tú'
+                                    ? '✅ Este lead es tuyo'
+                                    : `⚠️ Gestionado por ${currentLead.owner_name}`
+                                }
+                            </div>
+                        )}
+                        {!currentLead.owner_id && (
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 mt-2">
+                                <Zap size={12} />
+                                🆓 Lead libre — se te asignará al contactar
+                            </div>
+                        )}
+
                         <div className="h-px w-full bg-gray-100" />
 
                         {/* 2. Contact Grid */}
@@ -2288,7 +2397,13 @@ export default function MarathonPage() {
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
-                                        onClick={() => setIsEmailModalOpen(true)}
+                                        onClick={async () => {
+                                            if (!currentLead.owner_id) {
+                                                const result = await claimLead(currentLead.id)
+                                                if (!result.claimed) return
+                                            }
+                                            setIsEmailModalOpen(true)
+                                        }}
                                         className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm transition-all group"
                                     >
                                         <div className="flex items-center">
@@ -2300,7 +2415,13 @@ export default function MarathonPage() {
                                         <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-400 transition-colors" />
                                     </button>
                                     <button
-                                        onClick={() => setIsMeetingModalOpen(true)}
+                                        onClick={async () => {
+                                            if (!currentLead.owner_id) {
+                                                const result = await claimLead(currentLead.id)
+                                                if (!result.claimed) return
+                                            }
+                                            setIsMeetingModalOpen(true)
+                                        }}
                                         className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:border-purple-200 hover:bg-purple-50/50 hover:shadow-sm transition-all group"
                                     >
                                         <div className="flex items-center">

@@ -38,12 +38,27 @@ export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadN
 
             if (error) throw error
 
-            // Update Lead Status & Last Activity
+            // Update Lead Status & Last Activity + Auto-claim
             if (leadId) {
+                const now = new Date().toISOString()
+
+                // Auto-claim: if lead has no owner, assign to the calling user
                 await supabase
                     .from('leads')
                     .update({
-                        last_activity_at: new Date().toISOString(),
+                        owner_id: user.id,
+                        claimed_at: now,
+                        last_activity_at: now,
+                        status: 'contacted'
+                    })
+                    .eq('id', leadId)
+                    .is('owner_id', null)
+
+                // For already-owned leads, just update activity and status
+                await supabase
+                    .from('leads')
+                    .update({
+                        last_activity_at: now,
                         status: 'contacted'
                     })
                     .eq('id', leadId)
@@ -52,7 +67,7 @@ export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadN
                 // Always update last_activity_at (fallback/safety)
                 await supabase
                     .from('leads')
-                    .update({ last_activity_at: new Date().toISOString() })
+                    .update({ last_activity_at: now })
                     .eq('id', leadId)
             }
 

@@ -186,12 +186,27 @@ export async function POST(request: Request) {
 
         if (logError) console.error('❌ Error logging email to DB:', logError)
 
-        // 4. Update Lead Status & Last Activity
+        // 4. Update Lead Status & Last Activity + Auto-claim if unowned
         if (lead_id) {
+            const now = new Date().toISOString()
+
+            // Auto-claim: if lead has no owner, assign to the sending user
+            await supabase
+                .from('leads')
+                .update({
+                    owner_id: user.id,
+                    claimed_at: now,
+                    last_activity_at: now,
+                    status: 'contacted'
+                })
+                .eq('id', lead_id)
+                .is('owner_id', null)
+
+            // For already-owned leads, just update activity and status
             const { error: updateError } = await supabase
                 .from('leads')
                 .update({
-                    last_activity_at: new Date().toISOString(),
+                    last_activity_at: now,
                     status: 'contacted'
                 })
                 .eq('id', lead_id)
@@ -202,7 +217,7 @@ export async function POST(request: Request) {
             // Always update last_activity_at (fallback/safety)
             await supabase
                 .from('leads')
-                .update({ last_activity_at: new Date().toISOString() })
+                .update({ last_activity_at: now })
                 .eq('id', lead_id)
         }
 

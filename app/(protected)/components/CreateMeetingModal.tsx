@@ -240,20 +240,35 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess, initial
                 }
             }
 
-            // 4. Update Lead Status & Last Activity
+            // 4. Update Lead Status & Last Activity + Auto-claim
             if (formData.lead_id) {
+                const now = new Date().toISOString()
+
+                // Auto-claim: if lead has no owner, assign to the meeting creator
+                await supabase
+                    .from('leads')
+                    .update({
+                        owner_id: ownerId,
+                        claimed_at: now,
+                        last_activity_at: now,
+                        status: 'demo_scheduled'
+                    })
+                    .eq('id', formData.lead_id)
+                    .is('owner_id', null)
+
+                // For already-owned leads, update status
                 await supabase
                     .from('leads')
                     .update({
                         status: 'demo_scheduled',
-                        last_activity_at: new Date().toISOString()
+                        last_activity_at: now
                     })
                     .eq('id', formData.lead_id)
                     .in('status', ['new', 'contacted'])
 
                 await supabase
                     .from('leads')
-                    .update({ last_activity_at: new Date().toISOString() })
+                    .update({ last_activity_at: now })
                     .eq('id', formData.lead_id)
             }
 
