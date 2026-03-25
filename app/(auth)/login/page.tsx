@@ -218,6 +218,15 @@ export default function LoginPage() {
                         Create an account
                     </Link>
                 </div>
+
+                <div className="mt-3">
+                    <Link
+                        href="/apply"
+                        className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-indigo-200 rounded-lg text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                    >
+                        📋 Candidaturas Prácticas Verano 2026
+                    </Link>
+                </div>
             </div>
         </div>
     )

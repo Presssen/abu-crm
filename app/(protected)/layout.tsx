@@ -23,7 +23,8 @@ import {
     ChevronLeft,
     ChevronRight,
     DollarSign,
-    MessageSquare
+    MessageSquare,
+    FileText
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -155,7 +156,7 @@ export default function ProtectedLayout({
 
     // Add Admin and Finances tabs only for admin users
     const fullNavigation = userRole === 'admin'
-        ? [...navigation, { name: 'Admin', href: '/admin', icon: Shield }]
+        ? [...navigation, { name: 'Candidaturas', href: '/applications', icon: FileText }, { name: 'Admin', href: '/admin', icon: Shield }]
         : navigation.filter(n => n.name !== 'Finances')
 
     return (
