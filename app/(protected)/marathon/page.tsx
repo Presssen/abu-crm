@@ -107,9 +107,11 @@ export default function MarathonPage() {
     const [excludePasswordProtected, setExcludePasswordProtected] = useState<boolean>(true)
     const [viewMode, setViewMode] = useState<'all' | 'mine'>('all')
     const [claimingLead, setClaimingLead] = useState(false)
+    const [filtersReady, setFiltersReady] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
     const [availableCountries, setAvailableCountries] = useState<string[]>([])
     const [availableSectors, setAvailableSectors] = useState<string[]>([])
+    const leadsRef = useRef<Lead[]>([])
 
     // Activity state
     const [emailHistory, setEmailHistory] = useState<any[]>([])
@@ -223,7 +225,7 @@ export default function MarathonPage() {
         setShowSearchResults(false)
     }
 
-    // Load filters from localStorage
+    // Load filters from localStorage — set all at once, then mark as ready
     useEffect(() => {
         const savedPlan = localStorage.getItem('marathon_plan_filter')
         const savedCountry = localStorage.getItem('marathon_country_filter')
@@ -235,6 +237,8 @@ export default function MarathonPage() {
         if (savedSector) setSectorFilter(savedSector)
         if (savedExclude !== null) setExcludePasswordProtected(savedExclude === 'true')
         if (savedViewMode === 'mine' || savedViewMode === 'all') setViewMode(savedViewMode)
+        // Mark filters as ready AFTER all state updates are batched
+        setFiltersReady(true)
     }, [])
 
     // Save filters to localStorage
@@ -269,9 +273,10 @@ export default function MarathonPage() {
     }, [preloadedFilters])
 
     useEffect(() => {
+        if (!filtersReady) return
         fetchLeads()
         fetchUserGoal()
-    }, [planFilter, countryFilter, sectorFilter, excludePasswordProtected, viewMode])
+    }, [filtersReady, planFilter, countryFilter, sectorFilter, excludePasswordProtected, viewMode])
 
     useEffect(() => {
         if (leads[currentIndex]) {
@@ -293,7 +298,7 @@ export default function MarathonPage() {
             })
             setIsEditingLead(false)
         }
-    }, [currentIndex, leads])
+    }, [currentIndex, leads.length])
 
     const handleUpdateLead = async () => {
         if (!currentLead) return
@@ -471,13 +476,16 @@ export default function MarathonPage() {
                 }
             })
 
-            // Randomize client-side for "surprise" effect
-            const shuffled = enrichedLeads.sort(() => Math.random() - 0.5)
-            setLeads(shuffled as Lead[])
+            // Sort by created_at descending for stable ordering
+            const sorted = enrichedLeads.sort((a, b) => 
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+            setLeads(sorted as Lead[])
+            leadsRef.current = sorted as Lead[]
 
             // Restore position by lead ID if available
             if (restoredLeadId) {
-                const idx = shuffled.findIndex((l: any) => l.id === restoredLeadId)
+                const idx = sorted.findIndex((l: any) => l.id === restoredLeadId)
                 if (idx >= 0) {
                     setCurrentIndexState(idx)
                 }
@@ -558,19 +566,23 @@ export default function MarathonPage() {
                 .single()
 
             if (freshLead && user) {
-                const updatedLeads = [...leads]
-                const idx = updatedLeads.findIndex(l => l.id === leadId)
+                const currentLeads = leadsRef.current
+                const idx = currentLeads.findIndex(l => l.id === leadId)
                 if (idx >= 0) {
                     const hasActivity = !!freshLead.last_activity_at
-                    updatedLeads[idx] = {
-                        ...updatedLeads[idx],
+                    const updatedLead = {
+                        ...currentLeads[idx],
                         ...freshLead,
                         owner_name: hasActivity && freshLead.owner_id
-                            ? (freshLead.owner_id === user.id ? 'Tú' : updatedLeads[idx].owner_name)
+                            ? (freshLead.owner_id === user.id ? 'Tú' : currentLeads[idx].owner_name)
                             : null,
                         owner_id: hasActivity ? freshLead.owner_id : null,
                     }
-                    setLeads(updatedLeads)
+                    // Update via ref to avoid triggering useEffect loop
+                    const newLeads = [...currentLeads]
+                    newLeads[idx] = updatedLead
+                    leadsRef.current = newLeads
+                    setLeads(newLeads)
                 }
             }
         } catch (error) {
