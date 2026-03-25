@@ -42,17 +42,16 @@ export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadN
             if (leadId) {
                 const now = new Date().toISOString()
 
-                // Auto-claim: if lead has no owner, assign to the calling user
+                // Auto-claim: if lead has no owner or no prior activity, assign to this user
                 await supabase
                     .from('leads')
                     .update({
                         owner_id: user.id,
-                        claimed_at: now,
                         last_activity_at: now,
                         status: 'contacted'
                     })
                     .eq('id', leadId)
-                    .is('owner_id', null)
+                    .or('owner_id.is.null,last_activity_at.is.null')
 
                 // For already-owned leads, just update activity and status
                 await supabase

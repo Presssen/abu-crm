@@ -152,18 +152,17 @@ export default function SendEmailModal({ isOpen, onClose, onSuccess, initialLead
                 const { data: userData2 } = await supabase.auth.getUser()
                 const userId = userData2.user?.id
 
-                // Auto-claim: if lead has no owner, assign to the sending user
+                // Auto-claim: if lead has no owner or no prior activity, assign to this user
                 if (userId) {
                     await supabase
                         .from('leads')
                         .update({
                             owner_id: userId,
-                            claimed_at: now,
                             last_activity_at: now,
                             status: 'contacted'
                         })
                         .eq('id', formData.lead_id)
-                        .is('owner_id', null)
+                        .or('owner_id.is.null,last_activity_at.is.null')
                 }
 
                 // For already-owned leads, update status

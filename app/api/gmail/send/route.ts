@@ -190,17 +190,16 @@ export async function POST(request: Request) {
         if (lead_id) {
             const now = new Date().toISOString()
 
-            // Auto-claim: if lead has no owner, assign to the sending user
+            // Auto-claim: if lead has no owner or no prior activity, assign to sender
             await supabase
                 .from('leads')
                 .update({
                     owner_id: user.id,
-                    claimed_at: now,
                     last_activity_at: now,
                     status: 'contacted'
                 })
                 .eq('id', lead_id)
-                .is('owner_id', null)
+                .or('owner_id.is.null,last_activity_at.is.null')
 
             // For already-owned leads, just update activity and status
             const { error: updateError } = await supabase

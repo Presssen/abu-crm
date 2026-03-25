@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/auth/server'
 
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+
+// A lead is "claimable" (effectively free) if:
+// 1. No owner_id at all
+// 2. Has owner_id but NO last_activity_at (no real interactions ever recorded)
+// 3. Has owner_id and last_activity_at is older than 30 days (stale)
+function isLeadClaimable(lead: any): boolean {
+    if (!lead.owner_id) return true
+    if (!lead.last_activity_at) return true
+    return new Date(lead.last_activity_at).getTime() < Date.now() - THIRTY_DAYS_MS
+}
+
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createClient()
@@ -14,10 +26,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'lead_id is required' }, { status: 400 })
         }
 
-        // First check if the lead is already claimed by the current user
+        // First check the lead's current state
         const { data: lead } = await supabase
             .from('leads')
-            .select('id, owner_id, last_activity_at, claimed_at')
+            .select('id, owner_id, last_activity_at')
             .eq('id', lead_id)
             .single()
 
@@ -25,22 +37,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
         }
 
-        // Already claimed by this user — no-op success
+        // Already owned by this user — no-op success
         if (lead.owner_id === user.id) {
             return NextResponse.json({ claimed: true, alreadyOwned: true })
         }
 
-        // Check if lead is claimable:
-        // 1. No owner (free lead)
-        // 2. Owner exists but last_activity_at is older than 30 days (stale)
-        const isStale = lead.owner_id && lead.last_activity_at &&
-            new Date(lead.last_activity_at).getTime() < Date.now() - 30 * 24 * 60 * 60 * 1000
-
-        const isFree = !lead.owner_id
-
-        if (!isFree && !isStale) {
-            // Lead is claimed by someone else and still active
-            // Fetch the claimer's name for display
+        // Check if the lead is claimable
+        if (!isLeadClaimable(lead)) {
+            // Lead has a real active owner — fetch name for display
             const { data: ownerProfile } = await supabase
                 .from('profiles')
                 .select('first_name, last_name, email')
@@ -58,20 +62,19 @@ export async function POST(request: NextRequest) {
             })
         }
 
-        // Optimistic claim: UPDATE with WHERE condition to prevent race conditions
-        // Only claim if still free or stale at the moment of update
+        // Optimistic claim: UPDATE with WHERE conditions to prevent race conditions
+        // The lead is claimable if: no owner, OR no activity, OR activity older than 30 days
         const now = new Date().toISOString()
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+        const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS).toISOString()
 
         const { data: updated, error: updateError } = await supabase
             .from('leads')
             .update({
                 owner_id: user.id,
-                claimed_at: now,
                 last_activity_at: now
             })
             .eq('id', lead_id)
-            .or(`owner_id.is.null,last_activity_at.lt.${thirtyDaysAgo}`)
+            .or(`owner_id.is.null,last_activity_at.is.null,last_activity_at.lt.${thirtyDaysAgo}`)
             .select('id')
 
         if (updateError) {
