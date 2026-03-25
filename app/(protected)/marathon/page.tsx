@@ -548,6 +548,31 @@ export default function MarathonPage() {
             } else {
                 setContacts(contactsList)
             }
+
+            // Refresh the lead's ownership data after any action
+            const { data: { user } } = await supabase.auth.getUser()
+            const { data: freshLead } = await supabase
+                .from('leads')
+                .select('owner_id, last_activity_at, status, contact_name, email, phone')
+                .eq('id', leadId)
+                .single()
+
+            if (freshLead && user) {
+                const updatedLeads = [...leads]
+                const idx = updatedLeads.findIndex(l => l.id === leadId)
+                if (idx >= 0) {
+                    const hasActivity = !!freshLead.last_activity_at
+                    updatedLeads[idx] = {
+                        ...updatedLeads[idx],
+                        ...freshLead,
+                        owner_name: hasActivity && freshLead.owner_id
+                            ? (freshLead.owner_id === user.id ? 'Tú' : updatedLeads[idx].owner_name)
+                            : null,
+                        owner_id: hasActivity ? freshLead.owner_id : null,
+                    }
+                    setLeads(updatedLeads)
+                }
+            }
         } catch (error) {
             console.error('Error fetching activity:', error)
         }

@@ -28,6 +28,11 @@ DROP POLICY IF EXISTS "Users can update own leads" ON leads;
 DROP POLICY IF EXISTS "Users can update their own leads" ON leads;
 DROP POLICY IF EXISTS "Users can delete their own leads" ON leads;
 DROP POLICY IF EXISTS "Admins can delete leads" ON leads;
+-- Also drop policies from previous version of this migration
+DROP POLICY IF EXISTS "All users can view all leads" ON leads;
+DROP POLICY IF EXISTS "Users can insert leads" ON leads;
+DROP POLICY IF EXISTS "Users can update accessible leads" ON leads;
+DROP POLICY IF EXISTS "Only admins can delete leads" ON leads;
 
 -- SELECT: All authenticated users can see ALL leads (pool model)
 CREATE POLICY "All users can view all leads" ON leads
@@ -37,11 +42,13 @@ CREATE POLICY "All users can view all leads" ON leads
 CREATE POLICY "Users can insert leads" ON leads
     FOR INSERT WITH CHECK (auth.uid() = owner_id);
 
--- UPDATE: Users can update leads they own, unowned leads (claim), or if admin
+-- UPDATE: Users can update leads they own, unowned leads, leads without
+-- any activity (never contacted = free to claim), or if admin
 CREATE POLICY "Users can update accessible leads" ON leads
     FOR UPDATE USING (
         auth.uid() = owner_id
         OR owner_id IS NULL
+        OR last_activity_at IS NULL
         OR is_admin()
     );
 
