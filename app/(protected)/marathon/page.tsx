@@ -396,9 +396,10 @@ export default function MarathonPage() {
             setIsAdmin(userIsAdmin)
 
             // Fetch leads that are 'new' — ALL users see ALL leads (pool model)
+            // Note: claimed_at may not exist until migration_lead_pool.sql is run
             let query = supabase
                 .from('leads')
-                .select('id, company_name, contact_name, email, phone, status, domain, city, country, plan, platform, platform_rank, shopify_status, categories, notes, tags, owner_id, claimed_at, last_activity_at, created_at, source')
+                .select('id, company_name, contact_name, email, phone, status, domain, city, country, plan, platform, platform_rank, shopify_status, categories, notes, tags, owner_id, last_activity_at, created_at, source')
                 .eq('status', 'new')
 
             // Apply Plan Filter
@@ -449,18 +450,24 @@ export default function MarathonPage() {
                 }
             }
 
-            // Mark stale leads (30+ days without activity) as effectively free
+            // Determine effective ownership:
+            // - If owner_id exists but NO last_activity_at → treat as free (no real interaction)
+            // - If owner_id exists and last_activity_at > 30 days ago → treat as stale/free
+            // - If owner_id exists and last_activity_at is recent → truly managed
             const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
             const enrichedLeads = leadsWithOwners.map(l => {
-                const isStale = l.owner_id && l.last_activity_at &&
-                    new Date(l.last_activity_at).getTime() < thirtyDaysAgo
+                const hasActivity = !!l.last_activity_at
+                const isStale = hasActivity && new Date(l.last_activity_at).getTime() < thirtyDaysAgo
+                const isEffectivelyFree = !l.owner_id || !hasActivity || isStale
+
                 return {
                     ...l,
-                    owner_name: l.owner_id
-                        ? (l.owner_id === user?.id ? 'Tú' : (ownerMap[l.owner_id] || 'Usuario'))
-                        : null,
-                    // If stale, treat as free
-                    ...(isStale ? { owner_id: null, owner_name: null, claimed_at: null } : {})
+                    // Only show owner if there's real activity and it's not stale
+                    owner_id: isEffectivelyFree ? null : l.owner_id,
+                    owner_name: isEffectivelyFree
+                        ? null
+                        : (l.owner_id === user?.id ? 'Tú' : (ownerMap[l.owner_id] || 'Usuario')),
+                    claimed_at: isEffectivelyFree ? null : (l as any).claimed_at || null,
                 }
             })
 
@@ -829,6 +836,59 @@ export default function MarathonPage() {
         if (!error) {
             setContacts(contacts.map(c => c.id === contactId ? { ...c, ...updates } : c))
         }
+    }
+
+    const setPrimaryContact = async (contact: any) => {
+        if (!currentLead || contact.is_primary) return
+
+        // 1. Unset all other contacts as non-primary
+        await supabase
+            .from('lead_contacts')
+            .update({ is_primary: false })
+            .eq('lead_id', currentLead.id)
+
+        // 2. Set the selected contact as primary
+        const { error } = await supabase
+            .from('lead_contacts')
+            .update({ is_primary: true })
+            .eq('id', contact.id)
+
+        if (error) {
+            showError('Error al cambiar contacto principal')
+            return
+        }
+
+        // 3. Update the lead's contact_name and contact_role
+        const leadUpdate: any = { contact_name: contact.name }
+        if (contact.job_title) leadUpdate.contact_role = contact.job_title
+        if (contact.email && !contact.email.includes('email_not_unlocked')) {
+            // Prepend this email to the lead's email list
+            const existingEmails = currentLead.email ? currentLead.email.split(':').map((e: string) => e.trim()).filter(Boolean) : []
+            const filtered = existingEmails.filter((e: string) => e !== contact.email)
+            leadUpdate.email = [contact.email, ...filtered].join(' : ')
+        }
+        if (contact.phone) {
+            const existingPhones = currentLead.phone ? currentLead.phone.split(':').map((p: string) => p.trim()).filter(Boolean) : []
+            const filtered = existingPhones.filter((p: string) => p !== contact.phone)
+            leadUpdate.phone = [contact.phone, ...filtered].join(' : ')
+        }
+
+        await supabase
+            .from('leads')
+            .update(leadUpdate)
+            .eq('id', currentLead.id)
+
+        // 4. Update local state
+        setContacts(contacts.map(c => ({
+            ...c,
+            is_primary: c.id === contact.id
+        })))
+
+        const updatedLeads = [...leads]
+        updatedLeads[currentIndex] = { ...currentLead, ...leadUpdate }
+        setLeads(updatedLeads)
+
+        showSuccess(`${contact.name} es ahora el contacto principal`)
     }
 
     const setFavorite = async (type: 'email' | 'phone', idx: number) => {
@@ -2230,11 +2290,25 @@ export default function MarathonPage() {
                                         {contacts.map((contact) => (
                                             <div key={contact.id} className="p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all space-y-2">
                                                 <div className="flex items-start justify-between">
-                                                    <div>
-                                                        <h4 className="text-sm font-bold text-gray-900">{contact.name}</h4>
-                                                        <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider mt-0.5">
-                                                            {contact.job_title || 'Colaborador'}
-                                                        </p>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => setPrimaryContact(contact)}
+                                                            className={clsx(
+                                                                "p-0.5 rounded transition-all shrink-0",
+                                                                contact.is_primary
+                                                                    ? "text-amber-500 cursor-default"
+                                                                    : "text-gray-300 hover:text-amber-400 cursor-pointer"
+                                                            )}
+                                                            title={contact.is_primary ? 'Contacto principal' : 'Marcar como contacto principal'}
+                                                        >
+                                                            <Star size={14} className={contact.is_primary ? "fill-amber-500" : ""} />
+                                                        </button>
+                                                        <div>
+                                                            <h4 className="text-sm font-bold text-gray-900">{contact.name}</h4>
+                                                            <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider mt-0.5">
+                                                                {contact.job_title || 'Colaborador'}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                     {contact.is_primary && (
                                                         <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[8px] font-bold uppercase">
