@@ -29,6 +29,7 @@ import SendEmailModal from './SendEmailModal'
 import LogCallModal from './LogCallModal'
 import ApolloEnrichmentModal from './ApolloEnrichmentModal'
 import CreateTaskModal from './CreateTaskModal'
+import CreateMeetingModal from './CreateMeetingModal'
 import { useNotification } from './ui/NotificationProvider'
 import { enrichLead } from '@/app/actions/enrich-lead'
 
@@ -75,6 +76,7 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
     const [isLogCallModalOpen, setIsLogCallModalOpen] = useState(false)
     const [showApolloModal, setShowApolloModal] = useState(false)
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false)
+    const [showMeetingModal, setShowMeetingModal] = useState(false)
     const [selectedToEmail, setSelectedToEmail] = useState('')
 
     // Edit Form
@@ -852,13 +854,22 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                     )}
 
                                     {!isEditing && (
-                                        <button
-                                            onClick={logCall}
-                                            className="mt-4 w-full py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
-                                        >
-                                            <Phone size={12} />
-                                            Registrar Llamada Realizada
-                                        </button>
+                                        <div className="mt-4 grid grid-cols-2 gap-2">
+                                            <button
+                                                onClick={logCall}
+                                                className="py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Phone size={12} />
+                                                Registrar Llamada
+                                            </button>
+                                            <button
+                                                onClick={() => setShowMeetingModal(true)}
+                                                className="py-2 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Calendar size={12} />
+                                                Agendar Reunión
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
 
@@ -1035,6 +1046,13 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
             <CreateTaskModal
                 isOpen={showCreateTaskModal}
                 onClose={() => setShowCreateTaskModal(false)}
+                onSuccess={() => fetchLeadDetails()}
+                initialLeadId={leadId}
+            />
+
+            <CreateMeetingModal
+                isOpen={showMeetingModal}
+                onClose={() => setShowMeetingModal(false)}
                 onSuccess={() => fetchLeadDetails()}
                 initialLeadId={leadId}
             />
