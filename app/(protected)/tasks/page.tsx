@@ -10,13 +10,16 @@ import {
     Calendar,
     AlertCircle,
     ChevronRight,
-    Search
+    Search,
+    Building2
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import CreateTaskModal from '../components/CreateTaskModal'
+import LeadDetailModal from '../components/LeadDetailModal'
 
 interface Task {
     id: string
+    lead_id: string | null
     title: string
     due_date: string
     status: string
@@ -32,6 +35,7 @@ export default function TasksPage() {
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'open' | 'done'>('open')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
     const fetchTasks = async () => {
         setLoading(true)
@@ -64,7 +68,8 @@ export default function TasksPage() {
         fetchTasks()
     }, [filter])
 
-    const handleToggleStatus = async (task: Task) => {
+    const handleToggleStatus = async (task: Task, e: React.MouseEvent) => {
+        e.stopPropagation()
         const newStatus = task.status === 'open' ? 'done' : 'open'
         try {
             const { error } = await supabase
@@ -168,14 +173,18 @@ export default function TasksPage() {
                     tasks.map((task) => (
                         <div
                             key={task.id}
+                            onClick={() => {
+                                if (task.lead_id) setSelectedLeadId(task.lead_id)
+                            }}
                             className={clsx(
                                 "group bg-white p-6 rounded-2xl border transition-all flex items-center justify-between",
-                                task.status === 'done' ? "opacity-60 border-gray-50" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-100"
+                                task.status === 'done' ? "opacity-60 border-gray-50" : "border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-100",
+                                task.lead_id ? "cursor-pointer" : ""
                             )}
                         >
                             <div className="flex items-center space-x-4">
                                 <button
-                                    onClick={() => handleToggleStatus(task)}
+                                    onClick={(e) => handleToggleStatus(task, e)}
                                     className={clsx(
                                         "transition-colors rounded-full p-1",
                                         task.status === 'done' ? "text-emerald-500" : "text-gray-300 hover:text-indigo-500"
@@ -198,9 +207,9 @@ export default function TasksPage() {
                                             </div>
                                         )}
                                         {task.leads && (
-                                            <div className="text-xs font-medium text-gray-500 flex items-center">
-                                                <ChevronRight size={12} className="mr-1.5 text-gray-300" />
-                                                Lead: {task.leads.company_name}
+                                            <div className="text-xs font-medium text-indigo-600 flex items-center hover:text-indigo-800 transition-colors">
+                                                <Building2 size={12} className="mr-1.5" />
+                                                {task.leads.company_name}
                                             </div>
                                         )}
                                         <div className={clsx(
@@ -213,13 +222,24 @@ export default function TasksPage() {
                                 </div>
                             </div>
 
-                            <button className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-50 transition-all">
-                                <Search size={20} />
-                            </button>
+                            {task.lead_id && (
+                                <div className="opacity-0 group-hover:opacity-100 p-2 text-indigo-400 hover:text-indigo-600 rounded-xl hover:bg-indigo-50 transition-all">
+                                    <Search size={20} />
+                                </div>
+                            )}
                         </div>
                     ))
                 )}
             </div>
+
+            {selectedLeadId && (
+                <LeadDetailModal
+                    isOpen={!!selectedLeadId}
+                    onClose={() => setSelectedLeadId(null)}
+                    leadId={selectedLeadId}
+                    onUpdate={fetchTasks}
+                />
+            )}
         </div>
     )
 }

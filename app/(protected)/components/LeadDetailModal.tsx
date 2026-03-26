@@ -92,7 +92,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
         categories: '',
         status: '',
         plan: '',
-        shopify_status: ''
+        shopify_status: '',
+        notes: ''
     })
 
     useEffect(() => {
@@ -124,7 +125,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     categories: leadData.categories || '',
                     status: leadData.status || 'new',
                     plan: leadData.plan || 'Shopify Standard',
-                    shopify_status: leadData.shopify_status || ''
+                    shopify_status: leadData.shopify_status || '',
+                    notes: leadData.notes || ''
                 })
             }
 
@@ -222,7 +224,8 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                     categories: editForm.categories,
                     status: editForm.status,
                     plan: editForm.plan,
-                    shopify_status: editForm.shopify_status
+                    shopify_status: editForm.shopify_status,
+                    notes: editForm.notes
                 })
                 .eq('id', leadId)
 
@@ -850,6 +853,27 @@ export default function LeadDetailModal({ isOpen, onClose, leadId, onUpdate }: L
                                                     )}
                                                 </div>
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {/* Notes Section */}
+                                    {(lead.notes || isEditing) && (
+                                        <div className="mt-4 space-y-2">
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                                                <FileText size={12} className="mr-1.5" /> Notas de Seguimiento
+                                            </label>
+                                            {isEditing ? (
+                                                <textarea
+                                                    value={editForm.notes || ''}
+                                                    onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                                                    className="w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-gray-900 min-h-[80px] resize-y"
+                                                    placeholder="Añade notas de seguimiento..."
+                                                />
+                                            ) : (
+                                                <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                                                    {lead.notes}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
