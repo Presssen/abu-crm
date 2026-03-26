@@ -41,6 +41,7 @@ import LogCallModal from '../components/LogCallModal'
 import { enrichLead } from '@/app/actions/enrich-lead'
 import { useNotification } from '../components/ui/NotificationProvider'
 import MobileMarathon from '../components/MobileMarathon'
+import ContactCard from '../components/ContactCard'
 import { useAppData } from '../components/AppDataProvider'
 
 interface Lead {
@@ -860,22 +861,20 @@ export default function MarathonPage() {
         }
     }
 
-    // Local-only update (instant, no DB call) — used on every keystroke
-    const handleUpdateContactLocal = (contactId: string, updates: any) => {
-        setContacts(prev => prev.map(c => c.id === contactId ? { ...c, ...updates } : c))
-    }
-
-    // Save to DB — used on blur (when user leaves the field)
-    const handleSaveContact = async (contactId: string, updates: any) => {
+    // Save contact to DB — used by ContactCard on blur
+    const handleSaveContact = useCallback(async (contactId: string, updates: any) => {
         const { error } = await supabase
             .from('lead_contacts')
             .update(updates)
             .eq('id', contactId)
 
-        if (error) {
+        if (!error) {
+            // Update parent contacts state so other components see fresh data
+            setContacts(prev => prev.map(c => c.id === contactId ? { ...c, ...updates } : c))
+        } else {
             console.error('Error saving contact:', error)
         }
-    }
+    }, [supabase])
 
     const setPrimaryContact = async (contact: any) => {
         if (!currentLead || contact.is_primary) return
@@ -2077,50 +2076,15 @@ export default function MarathonPage() {
                                         {contacts.length > 0 && (
                                             <div className="space-y-2">
                                                 {contacts.map((contact) => (
-                                                    <div key={contact.id} className="p-3 bg-white rounded-lg border border-gray-200 space-y-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <input
-                                                                type="text"
-                                                                value={contact.name}
-                                                                onChange={(e) => handleUpdateContactLocal(contact.id, { name: e.target.value })}
-                                                                onBlur={(e) => handleSaveContact(contact.id, { name: e.target.value })}
-                                                                className="flex-1 text-sm font-semibold bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
-                                                                placeholder="Nombre"
-                                                            />
-                                                            <button
-                                                                onClick={() => handleDeleteContact(contact.id)}
-                                                                className="p-1 text-rose-500 hover:bg-rose-50 rounded"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
-                                                        </div>
-                                                        <input
-                                                            type="text"
-                                                            value={contact.job_title || ''}
-                                                            onChange={(e) => handleUpdateContactLocal(contact.id, { job_title: e.target.value })}
-                                                            onBlur={(e) => handleSaveContact(contact.id, { job_title: e.target.value })}
-                                                            className="w-full text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
-                                                            placeholder="Cargo"
-                                                        />
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <input
-                                                                type="email"
-                                                                value={contact.email || ''}
-                                                                onChange={(e) => handleUpdateContactLocal(contact.id, { email: e.target.value })}
-                                                                onBlur={(e) => handleSaveContact(contact.id, { email: e.target.value })}
-                                                                className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
-                                                                placeholder="Email"
-                                                            />
-                                                            <input
-                                                                type="tel"
-                                                                value={contact.phone || ''}
-                                                                onChange={(e) => handleUpdateContactLocal(contact.id, { phone: e.target.value })}
-                                                                onBlur={(e) => handleSaveContact(contact.id, { phone: e.target.value })}
-                                                                className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
-                                                                placeholder="Teléfono"
-                                                            />
-                                                        </div>
-                                                    </div>
+                                                    <ContactCard
+                                                        key={contact.id}
+                                                        contact={contact}
+                                                        onSave={handleSaveContact}
+                                                        onDelete={handleDeleteContact}
+                                                        onSetPrimary={setPrimaryContact}
+                                                        onReveal={revealContactData}
+                                                        isRevealing={revealingContactId === contact.id}
+                                                    />
                                                 ))}
                                             </div>
                                         )}

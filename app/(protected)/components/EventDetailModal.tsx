@@ -121,20 +121,31 @@ export default function EventDetailModal({ isOpen, onClose, eventId, onDelete }:
                     ) : event ? (
                         <div className="space-y-6">
                             {lead && (
-                                <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                                <a
+                                    href={`/leads?leadId=${lead.id}`}
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        onClose()
+                                        window.location.href = `/leads?leadId=${lead.id}`
+                                    }}
+                                    className="block p-4 bg-indigo-50 rounded-2xl border border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200 transition-all cursor-pointer group"
+                                >
                                     <div className="flex items-center space-x-3">
-                                        <div className="h-12 w-12 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
+                                        <div className="h-12 w-12 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 flex items-center justify-center text-indigo-600 font-bold text-lg transition-colors">
                                             {lead.company_name.charAt(0)}
                                         </div>
-                                        <div>
-                                            <p className="font-bold text-gray-900">{lead.company_name}</p>
+                                        <div className="flex-1">
+                                            <p className="font-bold text-gray-900 group-hover:text-indigo-700 transition-colors flex items-center gap-2">
+                                                {lead.company_name}
+                                                <ExternalLink size={14} className="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </p>
                                             <p className="text-sm text-gray-600 flex items-center">
                                                 <User size={14} className="mr-1" />
                                                 {lead.contact_name}
                                             </p>
                                         </div>
                                     </div>
-                                </div>
+                                </a>
                             )}
 
                             <div className="grid grid-cols-2 gap-6">
