@@ -1094,16 +1094,14 @@ export default function MarathonPage() {
                     onLogCall={handleLogCall}
                     onSendEmail={async (email) => {
                         if (!currentLead.owner_id) {
-                            const result = await claimLead(currentLead.id)
-                            if (!result.claimed) return
+                            fetch('/api/leads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lead_id: currentLead.id }) })
                         }
                         setEmailInitialTo(email)
                         setIsEmailModalOpen(true)
                     }}
                     onScheduleMeeting={async () => {
                         if (!currentLead.owner_id) {
-                            const result = await claimLead(currentLead.id)
-                            if (!result.claimed) return
+                            fetch('/api/leads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lead_id: currentLead.id }) })
                         }
                         setIsMeetingModalOpen(true)
                     }}
@@ -2526,10 +2524,9 @@ export default function MarathonPage() {
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
-                                        onClick={async () => {
+                                        onClick={() => {
                                             if (!currentLead.owner_id) {
-                                                const result = await claimLead(currentLead.id)
-                                                if (!result.claimed) return
+                                                fetch('/api/leads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lead_id: currentLead.id }) })
                                             }
                                             setIsEmailModalOpen(true)
                                         }}
@@ -2544,10 +2541,9 @@ export default function MarathonPage() {
                                         <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-400 transition-colors" />
                                     </button>
                                     <button
-                                        onClick={async () => {
+                                        onClick={() => {
                                             if (!currentLead.owner_id) {
-                                                const result = await claimLead(currentLead.id)
-                                                if (!result.claimed) return
+                                                fetch('/api/leads/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lead_id: currentLead.id }) })
                                             }
                                             setIsMeetingModalOpen(true)
                                         }}
