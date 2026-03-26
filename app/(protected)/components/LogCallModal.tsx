@@ -28,6 +28,18 @@ export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadN
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error('No user found')
 
+            // First, claim the lead via API (uses service role, bypasses RLS)
+            const claimRes = await fetch('/api/leads/claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lead_id: leadId })
+            })
+            const claimData = await claimRes.json()
+            if (!claimData.claimed) {
+                showError(claimData.message || 'Este lead ya está siendo gestionado por otro usuario')
+                return
+            }
+
             const { error } = await supabase
                 .from('calls')
                 .insert({
@@ -38,35 +50,16 @@ export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadN
 
             if (error) throw error
 
-            // Update Lead Status & Last Activity + Auto-claim
+            // Update Lead Status & Last Activity (we already own it after claim)
             if (leadId) {
                 const now = new Date().toISOString()
 
-                // Auto-claim: if lead has no owner or no prior activity, assign to this user
-                await supabase
-                    .from('leads')
-                    .update({
-                        owner_id: user.id,
-                        last_activity_at: now,
-                        status: 'contacted'
-                    })
-                    .eq('id', leadId)
-                    .or('owner_id.is.null,last_activity_at.is.null')
-
-                // For already-owned leads, just update activity and status
                 await supabase
                     .from('leads')
                     .update({
                         last_activity_at: now,
                         status: 'contacted'
                     })
-                    .eq('id', leadId)
-                    .in('status', ['new', 'contacted'])
-
-                // Always update last_activity_at (fallback/safety)
-                await supabase
-                    .from('leads')
-                    .update({ last_activity_at: now })
                     .eq('id', leadId)
             }
 

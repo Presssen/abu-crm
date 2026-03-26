@@ -1,9 +1,12 @@
 -- ============================================================
 -- Fix: Allow claiming stale leads (>30 days without activity)
--- The UPDATE RLS policy was missing the stale lead condition,
--- preventing users from claiming leads that had an owner_id and
--- a last_activity_at older than 30 days. The UI showed them as
--- "libre" but the DB blocked the update.
+-- 
+-- BUG: The UPDATE RLS policy was missing the stale lead condition,
+-- preventing users from claiming leads that had owner_id set and
+-- last_activity_at older than 30 days. The UI showed them as
+-- "libre" but the DB silently blocked the UPDATE (0 rows returned).
+--
+-- RUN THIS IN SUPABASE SQL EDITOR
 -- ============================================================
 
 -- Drop and recreate the UPDATE policy to include stale leads

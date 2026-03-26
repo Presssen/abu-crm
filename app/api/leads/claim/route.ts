@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/auth/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -11,6 +12,15 @@ function isLeadClaimable(lead: any): boolean {
     if (!lead.owner_id) return true
     if (!lead.last_activity_at) return true
     return new Date(lead.last_activity_at).getTime() < Date.now() - THIRTY_DAYS_MS
+}
+
+// Service role client bypasses RLS — needed because the RLS UPDATE policy
+// may not cover all claimable conditions (e.g. stale leads with owner_id set)
+function getServiceClient() {
+    return createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 }
 
 export async function POST(request: NextRequest) {
@@ -26,8 +36,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'lead_id is required' }, { status: 400 })
         }
 
-        // First check the lead's current state
-        const { data: lead } = await supabase
+        // Use service role to read the lead (bypasses RLS for accurate state)
+        const admin = getServiceClient()
+
+        const { data: lead } = await admin
             .from('leads')
             .select('id, owner_id, last_activity_at')
             .eq('id', lead_id)
@@ -45,7 +57,7 @@ export async function POST(request: NextRequest) {
         // Check if the lead is claimable
         if (!isLeadClaimable(lead)) {
             // Lead has a real active owner — fetch name for display
-            const { data: ownerProfile } = await supabase
+            const { data: ownerProfile } = await admin
                 .from('profiles')
                 .select('first_name, last_name, email')
                 .eq('id', lead.owner_id)
@@ -62,19 +74,19 @@ export async function POST(request: NextRequest) {
             })
         }
 
-        // Optimistic claim: UPDATE with WHERE conditions to prevent race conditions
-        // The lead is claimable if: no owner, OR no activity, OR activity older than 30 days
+        // Claim the lead using service role to bypass RLS restrictions
         const now = new Date().toISOString()
         const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS).toISOString()
 
-        const { data: updated, error: updateError } = await supabase
+        const { data: updated, error: updateError } = await admin
             .from('leads')
             .update({
                 owner_id: user.id,
-                last_activity_at: now
+                last_activity_at: now,
+                claimed_at: now
             })
             .eq('id', lead_id)
-            .or(`owner_id.is.null,last_activity_at.is.null,last_activity_at.lt.${thirtyDaysAgo}`)
+            .or(`owner_id.is.null,owner_id.eq.${user.id},last_activity_at.is.null,last_activity_at.lt.${thirtyDaysAgo}`)
             .select('id')
 
         if (updateError) {
