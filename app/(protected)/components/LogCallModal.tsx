@@ -1,9 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/auth/client'
 import { Phone, AlignLeft, Check, X } from 'lucide-react'
-import { clsx } from 'clsx'
 import { useNotification } from './ui/NotificationProvider'
 
 interface LogCallModalProps {
@@ -15,7 +13,6 @@ interface LogCallModalProps {
 }
 
 export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadName }: LogCallModalProps) {
-    const supabase = createClient()
     const { showSuccess, showError } = useNotification()
     const [loading, setLoading] = useState(false)
     const [notes, setNotes] = useState('')
@@ -25,42 +22,17 @@ export default function LogCallModal({ isOpen, onClose, onSuccess, leadId, leadN
         setLoading(true)
 
         try {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) throw new Error('No user found')
-
-            // First, claim the lead via API (uses service role, bypasses RLS)
-            const claimRes = await fetch('/api/leads/claim', {
+            // Single server-side call that handles everything:
+            // auto-claim + insert call + update lead status
+            const res = await fetch('/api/leads/log-call', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lead_id: leadId })
+                body: JSON.stringify({ lead_id: leadId, notes })
             })
-            const claimData = await claimRes.json()
-            if (!claimData.claimed) {
-                showError(claimData.message || 'Este lead ya está siendo gestionado por otro usuario')
-                return
-            }
 
-            const { error } = await supabase
-                .from('calls')
-                .insert({
-                    lead_id: leadId,
-                    owner_id: user.id,
-                    notes: notes
-                })
-
-            if (error) throw error
-
-            // Update Lead Status & Last Activity (we already own it after claim)
-            if (leadId) {
-                const now = new Date().toISOString()
-
-                await supabase
-                    .from('leads')
-                    .update({
-                        last_activity_at: now,
-                        status: 'contacted'
-                    })
-                    .eq('id', leadId)
+            const data = await res.json()
+            if (!res.ok) {
+                throw new Error(data.error || 'Error al registrar la llamada')
             }
 
             showSuccess('Llamada registrada correctamente')

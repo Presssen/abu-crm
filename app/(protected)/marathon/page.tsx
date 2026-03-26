@@ -592,11 +592,7 @@ export default function MarathonPage() {
 
     const handleLogCall = async () => {
         if (!currentLead) return
-        // Auto-claim on call
-        if (!currentLead.owner_id) {
-            const result = await claimLead(currentLead.id)
-            if (!result.claimed) return
-        }
+        // Modal handles everything server-side (claim + insert) via /api/leads/log-call
         setIsLogCallModalOpen(true)
     }
 
@@ -1602,7 +1598,19 @@ export default function MarathonPage() {
                 <LogCallModal
                     isOpen={isLogCallModalOpen}
                     onClose={() => setIsLogCallModalOpen(false)}
-                    onSuccess={() => fetchActivity(currentLead.id)}
+                    onSuccess={async () => {
+                        fetchActivity(currentLead.id)
+                        // Update local state to reflect ownership
+                        const { data: { user } } = await supabase.auth.getUser()
+                        if (user) {
+                            const updatedLeads = [...leads]
+                            const idx = updatedLeads.findIndex(l => l.id === currentLead.id)
+                            if (idx >= 0) {
+                                updatedLeads[idx] = { ...updatedLeads[idx], owner_id: user.id, owner_name: 'Tú', status: 'contacted' }
+                                setLeads(updatedLeads)
+                            }
+                        }
+                    }}
                     leadId={currentLead.id}
                     leadName={currentLead.company_name}
                 />
@@ -2659,7 +2667,18 @@ export default function MarathonPage() {
             <LogCallModal
                 isOpen={isLogCallModalOpen}
                 onClose={() => setIsLogCallModalOpen(false)}
-                onSuccess={() => fetchActivity(currentLead.id)}
+                onSuccess={async () => {
+                    fetchActivity(currentLead.id)
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user) {
+                        const updatedLeads = [...leads]
+                        const idx = updatedLeads.findIndex(l => l.id === currentLead.id)
+                        if (idx >= 0) {
+                            updatedLeads[idx] = { ...updatedLeads[idx], owner_id: user.id, owner_name: 'Tú', status: 'contacted' }
+                            setLeads(updatedLeads)
+                        }
+                    }
+                }}
                 leadId={currentLead.id}
                 leadName={currentLead.company_name}
             />
