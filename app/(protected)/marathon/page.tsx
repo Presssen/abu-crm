@@ -860,14 +860,20 @@ export default function MarathonPage() {
         }
     }
 
-    const handleUpdateContact = async (contactId: string, updates: any) => {
+    // Local-only update (instant, no DB call) — used on every keystroke
+    const handleUpdateContactLocal = (contactId: string, updates: any) => {
+        setContacts(prev => prev.map(c => c.id === contactId ? { ...c, ...updates } : c))
+    }
+
+    // Save to DB — used on blur (when user leaves the field)
+    const handleSaveContact = async (contactId: string, updates: any) => {
         const { error } = await supabase
             .from('lead_contacts')
             .update(updates)
             .eq('id', contactId)
 
-        if (!error) {
-            setContacts(contacts.map(c => c.id === contactId ? { ...c, ...updates } : c))
+        if (error) {
+            console.error('Error saving contact:', error)
         }
     }
 
@@ -2078,7 +2084,8 @@ export default function MarathonPage() {
                                                             <input
                                                                 type="text"
                                                                 value={contact.name}
-                                                                onChange={(e) => handleUpdateContact(contact.id, { name: e.target.value })}
+                                                                onChange={(e) => handleUpdateContactLocal(contact.id, { name: e.target.value })}
+                                                                onBlur={(e) => handleSaveContact(contact.id, { name: e.target.value })}
                                                                 className="flex-1 text-sm font-semibold bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
                                                                 placeholder="Nombre"
                                                             />
@@ -2092,7 +2099,8 @@ export default function MarathonPage() {
                                                         <input
                                                             type="text"
                                                             value={contact.job_title || ''}
-                                                            onChange={(e) => handleUpdateContact(contact.id, { job_title: e.target.value })}
+                                                            onChange={(e) => handleUpdateContactLocal(contact.id, { job_title: e.target.value })}
+                                                            onBlur={(e) => handleSaveContact(contact.id, { job_title: e.target.value })}
                                                             className="w-full text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
                                                             placeholder="Cargo"
                                                         />
@@ -2100,14 +2108,16 @@ export default function MarathonPage() {
                                                             <input
                                                                 type="email"
                                                                 value={contact.email || ''}
-                                                                onChange={(e) => handleUpdateContact(contact.id, { email: e.target.value })}
+                                                                onChange={(e) => handleUpdateContactLocal(contact.id, { email: e.target.value })}
+                                                                onBlur={(e) => handleSaveContact(contact.id, { email: e.target.value })}
                                                                 className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
                                                                 placeholder="Email"
                                                             />
                                                             <input
                                                                 type="tel"
                                                                 value={contact.phone || ''}
-                                                                onChange={(e) => handleUpdateContact(contact.id, { phone: e.target.value })}
+                                                                onChange={(e) => handleUpdateContactLocal(contact.id, { phone: e.target.value })}
+                                                                onBlur={(e) => handleSaveContact(contact.id, { phone: e.target.value })}
                                                                 className="text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
                                                                 placeholder="Teléfono"
                                                             />
