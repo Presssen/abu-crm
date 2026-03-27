@@ -28,7 +28,9 @@ import {
     Trash2,
     X,
     Lock,
-    Search
+    Search,
+    Pencil,
+    Check
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
@@ -134,6 +136,15 @@ export default function MarathonPage() {
     const [revealingContact, setRevealingContact] = useState(false)
     const [contactToReveal, setContactToReveal] = useState<any>(null)
     const [showRevealConfirm, setShowRevealConfirm] = useState(false)
+    const [showAddContactForm, setShowAddContactForm] = useState(false)
+    const [newContactForm, setNewContactForm] = useState({ name: '', job_title: '', email: '', phone: '' })
+    const [editingContactId, setEditingContactId] = useState<string | null>(null)
+    const [editContactForm, setEditContactForm] = useState({ name: '', job_title: '', email: '', phone: '' })
+    const [confirmDeleteContactId, setConfirmDeleteContactId] = useState<string | null>(null)
+    const [addingPhone, setAddingPhone] = useState(false)
+    const [addingEmail, setAddingEmail] = useState(false)
+    const [newPhoneValue, setNewPhoneValue] = useState('')
+    const [newEmailValue, setNewEmailValue] = useState('')
     const [editForm, setEditForm] = useState({
         company_name: '',
         contact_name: '',
@@ -299,7 +310,7 @@ export default function MarathonPage() {
             })
             setIsEditingLead(false)
         }
-    }, [currentIndex, leads.length])
+    }, [currentIndex, leads.length, leads[currentIndex]?.phone, leads[currentIndex]?.email])
 
     const handleUpdateLead = async () => {
         if (!currentLead) return
@@ -344,6 +355,7 @@ export default function MarathonPage() {
                 notes: editForm.notes
             }
             setLeads(updatedLeads)
+            leadsRef.current = updatedLeads
             setIsEditingLead(false)
             showSuccess('Lead actualizado correctamente')
         } catch (error) {
@@ -378,6 +390,7 @@ export default function MarathonPage() {
                             owner_name: 'Tú'
                         }
                         setLeads(updatedLeads)
+                        leadsRef.current = updatedLeads
                     }
                 }
                 return { claimed: true }
@@ -562,7 +575,7 @@ export default function MarathonPage() {
             const { data: { user } } = await supabase.auth.getUser()
             const { data: freshLead } = await supabase
                 .from('leads')
-                .select('owner_id, last_activity_at, status, contact_name, email, phone')
+                .select('owner_id, last_activity_at, status, contact_name, email, phone, company_name')
                 .eq('id', leadId)
                 .single()
 
@@ -695,6 +708,7 @@ export default function MarathonPage() {
                 ...leadUpdate,
             }
             setLeads(updatedLeads)
+            leadsRef.current = updatedLeads
 
             // 5. Feedback
             const messages: string[] = []
@@ -711,13 +725,21 @@ export default function MarathonPage() {
         }
     }
 
-    const handleAddContact = async () => {
-        if (!currentLead) return
+    const handleAddContact = () => {
+        setNewContactForm({ name: '', job_title: '', email: '', phone: '' })
+        setShowAddContactForm(true)
+    }
+
+    const handleSaveNewContact = async () => {
+        if (!currentLead || !newContactForm.name.trim()) return
         const { data, error } = await supabase
             .from('lead_contacts')
             .insert({
                 lead_id: currentLead.id,
-                name: 'Nuevo Contacto',
+                name: newContactForm.name.trim(),
+                job_title: newContactForm.job_title.trim() || null,
+                email: newContactForm.email.trim() || null,
+                phone: newContactForm.phone.trim() || null,
                 is_primary: contacts.length === 0
             })
             .select()
@@ -725,6 +747,9 @@ export default function MarathonPage() {
 
         if (!error && data) {
             setContacts([...contacts, data])
+            setShowAddContactForm(false)
+            setNewContactForm({ name: '', job_title: '', email: '', phone: '' })
+            showSuccess('Contacto añadido')
         }
     }
 
@@ -849,7 +874,6 @@ export default function MarathonPage() {
     }
 
     const handleDeleteContact = async (contactId: string) => {
-        if (!confirm('¿Eliminar este contacto?')) return
         const { error } = await supabase
             .from('lead_contacts')
             .delete()
@@ -857,7 +881,11 @@ export default function MarathonPage() {
 
         if (!error) {
             setContacts(contacts.filter(c => c.id !== contactId))
+            setConfirmDeleteContactId(null)
             showSuccess('Contacto eliminado')
+        } else {
+            showError('Error al eliminar contacto')
+            setConfirmDeleteContactId(null)
         }
     }
 
@@ -2109,15 +2137,16 @@ export default function MarathonPage() {
                                 </div>
                             ) : (
                                 <div>
-                                    <div className="flex items-start justify-between group">
+                                    <div className="flex items-start justify-between">
                                         <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight leading-tight mb-2">
                                             {currentLead.company_name}
                                         </h2>
                                         <button
                                             onClick={() => setIsEditingLead(true)}
-                                            className="p-2 opacity-0 group-hover:opacity-100 hover:bg-gray-50 rounded-lg text-gray-400 transition-all"
+                                            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-500 hover:text-gray-700 transition-all"
+                                            title="Editar lead"
                                         >
-                                            <Sparkles size={16} />
+                                            <Pencil size={16} />
                                         </button>
                                     </div>
                                     <div className="flex items-center text-gray-600 font-medium text-lg mt-1">
@@ -2193,13 +2222,65 @@ export default function MarathonPage() {
                                     <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
                                         <Phone size={12} className="mr-1.5" /> Teléfonos
                                     </h3>
-                                    <button
-                                        onClick={() => setIsEditingLead(true)}
-                                        className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
-                                    >
-                                        <Plus size={12} />
-                                    </button>
+                                    {!addingPhone && (
+                                        <button
+                                            onClick={() => { setNewPhoneValue(''); setAddingPhone(true) }}
+                                            className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
+                                        >
+                                            <Plus size={12} />
+                                        </button>
+                                    )}
                                 </div>
+                                {addingPhone && (
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="tel"
+                                            value={newPhoneValue}
+                                            onChange={(e) => setNewPhoneValue(e.target.value)}
+                                            placeholder="+34 600 000 000"
+                                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && newPhoneValue.trim()) {
+                                                    const updated = [...phones, newPhoneValue.trim()]
+                                                    const joined = updated.join(' : ')
+                                                    supabase.from('leads').update({ phone: joined }).eq('id', currentLead.id)
+                                                    const newLeads = [...leads]
+                                                    newLeads[currentIndex] = { ...currentLead, phone: joined }
+                                                    setLeads(newLeads)
+                                                    leadsRef.current = newLeads
+                                                    setAddingPhone(false)
+                                                    showSuccess('Teléfono añadido')
+                                                }
+                                                if (e.key === 'Escape') setAddingPhone(false)
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                if (!newPhoneValue.trim()) return
+                                                const updated = [...phones, newPhoneValue.trim()]
+                                                const joined = updated.join(' : ')
+                                                supabase.from('leads').update({ phone: joined }).eq('id', currentLead.id)
+                                                const newLeads = [...leads]
+                                                newLeads[currentIndex] = { ...currentLead, phone: joined }
+                                                setLeads(newLeads)
+                                                leadsRef.current = newLeads
+                                                setAddingPhone(false)
+                                                showSuccess('Teléfono añadido')
+                                            }}
+                                            disabled={!newPhoneValue.trim()}
+                                            className="px-3 py-2 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-all disabled:opacity-30"
+                                        >
+                                            <Check size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => setAddingPhone(false)}
+                                            className="px-2 py-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
                                 <div className="space-y-2">
                                     {phones.length > 0 ? phones.map((phone, idx) => (
                                         <div key={idx} className="group flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:border-emerald-200 hover:shadow-sm transition-all">
@@ -2220,14 +2301,32 @@ export default function MarathonPage() {
                                                 )}
                                                 <span className="text-sm font-bold text-gray-900 font-mono tracking-tight truncate">{phone}</span>
                                             </div>
-                                            <a
-                                                href={`tel:${phone}`}
-                                                className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors shrink-0"
-                                            >
-                                                <Phone size={14} />
-                                            </a>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <a
+                                                    href={`tel:${phone}`}
+                                                    className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
+                                                >
+                                                    <Phone size={14} />
+                                                </a>
+                                                <button
+                                                    onClick={() => {
+                                                        const updated = phones.filter((_, i) => i !== idx)
+                                                        const joined = updated.join(' : ')
+                                                        supabase.from('leads').update({ phone: joined }).eq('id', currentLead.id)
+                                                        const newLeads = [...leads]
+                                                        newLeads[currentIndex] = { ...currentLead, phone: joined }
+                                                        setLeads(newLeads)
+                                                        leadsRef.current = newLeads
+                                                        showSuccess('Teléfono eliminado')
+                                                    }}
+                                                    className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="Eliminar teléfono"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
                                         </div>
-                                    )) : (
+                                    )) : !addingPhone && (
                                         <div className="p-3 border border-dashed border-gray-200 rounded-xl text-center">
                                             <span className="text-xs text-gray-400 italic">Sin teléfonos registrados</span>
                                         </div>
@@ -2241,13 +2340,65 @@ export default function MarathonPage() {
                                     <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
                                         <Mail size={12} className="mr-1.5" /> Emails
                                     </h3>
-                                    <button
-                                        onClick={() => setIsEditingLead(true)}
-                                        className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
-                                    >
-                                        <Plus size={12} />
-                                    </button>
+                                    {!addingEmail && (
+                                        <button
+                                            onClick={() => { setNewEmailValue(''); setAddingEmail(true) }}
+                                            className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
+                                        >
+                                            <Plus size={12} />
+                                        </button>
+                                    )}
                                 </div>
+                                {addingEmail && (
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="email"
+                                            value={newEmailValue}
+                                            onChange={(e) => setNewEmailValue(e.target.value)}
+                                            placeholder="email@ejemplo.com"
+                                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && newEmailValue.trim()) {
+                                                    const updated = [...emails, newEmailValue.trim()]
+                                                    const joined = updated.join(' : ')
+                                                    supabase.from('leads').update({ email: joined }).eq('id', currentLead.id)
+                                                    const newLeads = [...leads]
+                                                    newLeads[currentIndex] = { ...currentLead, email: joined }
+                                                    setLeads(newLeads)
+                                                    leadsRef.current = newLeads
+                                                    setAddingEmail(false)
+                                                    showSuccess('Email añadido')
+                                                }
+                                                if (e.key === 'Escape') setAddingEmail(false)
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                if (!newEmailValue.trim()) return
+                                                const updated = [...emails, newEmailValue.trim()]
+                                                const joined = updated.join(' : ')
+                                                supabase.from('leads').update({ email: joined }).eq('id', currentLead.id)
+                                                const newLeads = [...leads]
+                                                newLeads[currentIndex] = { ...currentLead, email: joined }
+                                                setLeads(newLeads)
+                                                leadsRef.current = newLeads
+                                                setAddingEmail(false)
+                                                showSuccess('Email añadido')
+                                            }}
+                                            disabled={!newEmailValue.trim()}
+                                            className="px-3 py-2 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-all disabled:opacity-30"
+                                        >
+                                            <Check size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => setAddingEmail(false)}
+                                            className="px-2 py-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
                                 <div className="space-y-2">
                                     {emails.length > 0 ? emails.map((email, idx) => (
                                         <div key={idx} className="group flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:border-blue-200 hover:shadow-sm transition-all">
@@ -2268,17 +2419,35 @@ export default function MarathonPage() {
                                                 )}
                                                 <span className="text-sm font-medium text-gray-700 font-mono tracking-tight truncate max-w-[180px]">{email}</span>
                                             </div>
-                                            <button
-                                                onClick={() => {
-                                                    setEmailInitialTo(email)
-                                                    setIsEmailModalOpen(true)
-                                                }}
-                                                className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors shrink-0"
-                                            >
-                                                <Mail size={14} />
-                                            </button>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <button
+                                                    onClick={() => {
+                                                        setEmailInitialTo(email)
+                                                        setIsEmailModalOpen(true)
+                                                    }}
+                                                    className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                                                >
+                                                    <Mail size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const updated = emails.filter((_, i) => i !== idx)
+                                                        const joined = updated.join(' : ')
+                                                        supabase.from('leads').update({ email: joined }).eq('id', currentLead.id)
+                                                        const newLeads = [...leads]
+                                                        newLeads[currentIndex] = { ...currentLead, email: joined }
+                                                        setLeads(newLeads)
+                                                        leadsRef.current = newLeads
+                                                        showSuccess('Email eliminado')
+                                                    }}
+                                                    className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="Eliminar email"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
                                         </div>
-                                    )) : (
+                                    )) : !addingEmail && (
                                         <div className="p-3 border border-dashed border-gray-200 rounded-xl text-center">
                                             <span className="text-xs text-gray-400 italic">Sin emails registrados</span>
                                         </div>
@@ -2287,111 +2456,333 @@ export default function MarathonPage() {
                             </div>
                         </div>
 
-                        {/* Additional Contacts Section - Read Mode */}
-                        {contacts.length > 0 && (
-                            <>
-                                <div className="h-px w-full bg-gray-100" />
-                                <div>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
-                                            <User size={12} className="mr-1.5" /> Contactos Adicionales
-                                        </h3>
+                        {/* Additional Contacts Section - Read Mode (always visible) */}
+                        <div className="h-px w-full bg-gray-100" />
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                                    <User size={12} className="mr-1.5" /> Contactos Adicionales
+                                </h3>
+                                <button
+                                    onClick={handleAddContact}
+                                    className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-500 hover:text-gray-700 text-[10px] font-bold transition-all"
+                                >
+                                    <Plus size={12} />
+                                    Añadir
+                                </button>
+                            </div>
+
+                            {/* Inline Add Contact Form */}
+                            {showAddContactForm && (
+                                <div className="mb-4 p-4 bg-white rounded-xl border-2 border-indigo-200 space-y-3">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nombre *</label>
+                                            <input
+                                                type="text"
+                                                value={newContactForm.name}
+                                                onChange={(e) => setNewContactForm(f => ({ ...f, name: e.target.value }))}
+                                                placeholder="Nombre completo"
+                                                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cargo</label>
+                                            <input
+                                                type="text"
+                                                value={newContactForm.job_title}
+                                                onChange={(e) => setNewContactForm(f => ({ ...f, job_title: e.target.value }))}
+                                                placeholder="Ej: CEO, Director..."
+                                                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</label>
+                                            <input
+                                                type="email"
+                                                value={newContactForm.email}
+                                                onChange={(e) => setNewContactForm(f => ({ ...f, email: e.target.value }))}
+                                                placeholder="email@ejemplo.com"
+                                                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Teléfono</label>
+                                            <input
+                                                type="tel"
+                                                value={newContactForm.phone}
+                                                onChange={(e) => setNewContactForm(f => ({ ...f, phone: e.target.value }))}
+                                                placeholder="+34 600 000 000"
+                                                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 justify-end pt-1">
                                         <button
-                                            onClick={() => setIsEditingLead(true)}
-                                            className="p-1 hover:bg-gray-50 rounded text-gray-400 hover:text-indigo-600 transition-all"
+                                            onClick={() => setShowAddContactForm(false)}
+                                            className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-all"
                                         >
-                                            <Plus size={12} />
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={handleSaveNewContact}
+                                            disabled={!newContactForm.name.trim()}
+                                            className="px-4 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-all disabled:opacity-30"
+                                        >
+                                            Guardar
                                         </button>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {contacts.map((contact) => (
-                                            <div key={contact.id} className="p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all space-y-2">
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => setPrimaryContact(contact)}
-                                                            className={clsx(
-                                                                "p-0.5 rounded transition-all shrink-0",
-                                                                contact.is_primary
-                                                                    ? "text-amber-500 cursor-default"
-                                                                    : "text-gray-300 hover:text-amber-400 cursor-pointer"
-                                                            )}
-                                                            title={contact.is_primary ? 'Contacto principal' : 'Marcar como contacto principal'}
-                                                        >
-                                                            <Star size={14} className={contact.is_primary ? "fill-amber-500" : ""} />
-                                                        </button>
+                                </div>
+                            )}
+
+                            {contacts.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {contacts.map((contact) => {
+                                        const isEditing = editingContactId === contact.id
+
+                                        if (isEditing) {
+                                            return (
+                                                <div key={contact.id} className="p-4 bg-white rounded-xl border-2 border-indigo-200 space-y-3">
+                                                    <div className="grid grid-cols-2 gap-3">
                                                         <div>
-                                                            <h4 className="text-sm font-bold text-gray-900">{contact.name}</h4>
-                                                            <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider mt-0.5">
-                                                                {contact.job_title || 'Colaborador'}
-                                                            </p>
+                                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nombre *</label>
+                                                            <input
+                                                                type="text"
+                                                                value={editContactForm.name}
+                                                                onChange={(e) => setEditContactForm(f => ({ ...f, name: e.target.value }))}
+                                                                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                                                autoFocus
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cargo</label>
+                                                            <input
+                                                                type="text"
+                                                                value={editContactForm.job_title}
+                                                                onChange={(e) => setEditContactForm(f => ({ ...f, job_title: e.target.value }))}
+                                                                placeholder="Ej: CEO, Director..."
+                                                                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</label>
+                                                            <input
+                                                                type="email"
+                                                                value={editContactForm.email}
+                                                                onChange={(e) => setEditContactForm(f => ({ ...f, email: e.target.value }))}
+                                                                placeholder="email@ejemplo.com"
+                                                                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Teléfono</label>
+                                                            <input
+                                                                type="tel"
+                                                                value={editContactForm.phone}
+                                                                onChange={(e) => setEditContactForm(f => ({ ...f, phone: e.target.value }))}
+                                                                placeholder="+34 600 000 000"
+                                                                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                                                            />
                                                         </div>
                                                     </div>
-                                                    {contact.is_primary && (
-                                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[8px] font-bold uppercase">
-                                                            Principal
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="space-y-1.5 pt-2 border-t border-gray-100">
-                                                    {contact.email && !contact.email.includes('email_not_unlocked') ? (
+                                                    <div className="flex gap-2 justify-end pt-1">
                                                         <button
-                                                            onClick={() => {
-                                                                setEmailInitialTo(contact.email)
-                                                                setIsEmailModalOpen(true)
+                                                            onClick={() => setEditingContactId(null)}
+                                                            className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-all"
+                                                        >
+                                                            Cancelar
+                                                        </button>
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (!editContactForm.name.trim()) return
+                                                                const updates = {
+                                                                    name: editContactForm.name.trim(),
+                                                                    job_title: editContactForm.job_title.trim() || null,
+                                                                    email: editContactForm.email.trim() || null,
+                                                                    phone: editContactForm.phone.trim() || null,
+                                                                }
+                                                                const { error } = await supabase
+                                                                    .from('lead_contacts')
+                                                                    .update(updates)
+                                                                    .eq('id', contact.id)
+                                                                if (!error) {
+                                                                    setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, ...updates } : c))
+                                                                    setEditingContactId(null)
+                                                                    showSuccess('Contacto actualizado')
+                                                                } else {
+                                                                    showError('Error al actualizar')
+                                                                }
                                                             }}
-                                                            className="flex items-center justify-between w-full group p-1.5 -m-1.5 rounded-lg hover:bg-blue-50 transition-all"
+                                                            disabled={!editContactForm.name.trim()}
+                                                            className="px-4 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-all disabled:opacity-30"
                                                         >
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <Mail size={10} className="text-gray-400 group-hover:text-blue-500 shrink-0" />
-                                                                <span className="text-[11px] text-gray-600 group-hover:text-blue-600 font-medium truncate">{contact.email}</span>
-                                                            </div>
-                                                            <Mail size={10} className="text-blue-500 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+                                                            Guardar
                                                         </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => revealContactData(contact, 'email')}
-                                                            disabled={revealingContactId === contact.id}
-                                                            className="flex items-center gap-1.5 text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors disabled:opacity-50"
-                                                        >
-                                                            {revealingContactId === contact.id ? (
-                                                                <Loader2 size={10} className="animate-spin" />
-                                                            ) : (
-                                                                <Lock size={10} />
-                                                            )}
-                                                            Desbloquear email
-                                                        </button>
-                                                    )}
-                                                    {contact.phone ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <Phone size={10} className="text-gray-400 shrink-0" />
-                                                            <a
-                                                                href={`tel:${contact.phone}`}
-                                                                className="text-[11px] text-gray-600 font-medium hover:text-emerald-600 transition-colors"
-                                                            >
-                                                                {contact.phone}
-                                                            </a>
-                                                        </div>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => revealContactData(contact, 'phone')}
-                                                            disabled={revealingContactId === contact.id}
-                                                            className="flex items-center gap-1.5 text-[10px] text-emerald-600 hover:text-emerald-800 font-medium transition-colors disabled:opacity-50"
-                                                        >
-                                                            {revealingContactId === contact.id ? (
-                                                                <Loader2 size={10} className="animate-spin" />
-                                                            ) : (
-                                                                <Lock size={10} />
-                                                            )}
-                                                            Desbloquear teléfono
-                                                        </button>
-                                                    )}
+                                                    </div>
                                                 </div>
+                                            )
+                                        }
+
+                                        return (
+                                        <div key={contact.id} className="p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all space-y-2">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => setPrimaryContact(contact)}
+                                                        className={clsx(
+                                                            "p-0.5 rounded transition-all shrink-0",
+                                                            contact.is_primary
+                                                                ? "text-amber-500 cursor-default"
+                                                                : "text-gray-300 hover:text-amber-400 cursor-pointer"
+                                                        )}
+                                                        title={contact.is_primary ? 'Contacto principal' : 'Marcar como contacto principal'}
+                                                    >
+                                                        <Star size={14} className={contact.is_primary ? "fill-amber-500" : ""} />
+                                                    </button>
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-gray-900">{contact.name}</h4>
+                                                        <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider mt-0.5">
+                                                            {contact.job_title || 'Colaborador'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            <div className="flex items-center gap-1.5">
+                                                {contact.is_primary && (
+                                                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[8px] font-bold uppercase">
+                                                        Principal
+                                                    </span>
+                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingContactId(contact.id)
+                                                        setEditContactForm({
+                                                            name: contact.name || '',
+                                                            job_title: contact.job_title || '',
+                                                            email: contact.email || '',
+                                                            phone: contact.phone || '',
+                                                        })
+                                                    }}
+                                                    className="p-1 text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all"
+                                                    title="Editar contacto"
+                                                >
+                                                    <Pencil size={13} />
+                                                </button>
+                                                <button
+                                                    onClick={() => setConfirmDeleteContactId(contact.id)}
+                                                    className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="Eliminar contacto"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
                                             </div>
-                                        ))}
+                                            </div>
+                                            <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                                                {contact.email && !contact.email.includes('email_not_unlocked') ? (
+                                                    <button
+                                                        onClick={() => {
+                                                            setEmailInitialTo(contact.email)
+                                                            setIsEmailModalOpen(true)
+                                                        }}
+                                                        className="flex items-center justify-between w-full group p-1.5 -m-1.5 rounded-lg hover:bg-blue-50 transition-all"
+                                                    >
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <Mail size={10} className="text-gray-400 group-hover:text-blue-500 shrink-0" />
+                                                            <span className="text-[11px] text-gray-600 group-hover:text-blue-600 font-medium truncate">{contact.email}</span>
+                                                        </div>
+                                                        <Mail size={10} className="text-blue-500 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => revealContactData(contact, 'email')}
+                                                        disabled={revealingContactId === contact.id}
+                                                        className="flex items-center gap-1.5 text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors disabled:opacity-50"
+                                                    >
+                                                        {revealingContactId === contact.id ? (
+                                                            <Loader2 size={10} className="animate-spin" />
+                                                        ) : (
+                                                            <Lock size={10} />
+                                                        )}
+                                                        Desbloquear email
+                                                    </button>
+                                                )}
+                                                {contact.phone ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <Phone size={10} className="text-gray-400 shrink-0" />
+                                                        <a
+                                                            href={`tel:${contact.phone}`}
+                                                            className="text-[11px] text-gray-600 font-medium hover:text-emerald-600 transition-colors"
+                                                        >
+                                                            {contact.phone}
+                                                        </a>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => revealContactData(contact, 'phone')}
+                                                        disabled={revealingContactId === contact.id}
+                                                        className="flex items-center gap-1.5 text-[10px] text-emerald-600 hover:text-emerald-800 font-medium transition-colors disabled:opacity-50"
+                                                    >
+                                                        {revealingContactId === contact.id ? (
+                                                            <Loader2 size={10} className="animate-spin" />
+                                                        ) : (
+                                                            <Lock size={10} />
+                                                        )}
+                                                        Desbloquear teléfono
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        )
+                                    })}
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setShowApolloModal(true)}
+                                    className="w-full p-6 border-2 border-dashed border-gray-200 rounded-xl text-center hover:border-gray-300 hover:bg-gray-50/50 transition-all group cursor-pointer"
+                                >
+                                    <div className="w-10 h-10 bg-gray-100 group-hover:bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3 transition-colors">
+                                        <Search size={18} className="text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-bold text-gray-500 group-hover:text-gray-700 transition-colors">Buscar contactos en Apollo</p>
+                                    <p className="text-xs text-gray-400 mt-1">Encuentra personas clave de esta empresa</p>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Delete Contact Confirmation Modal */}
+                        {confirmDeleteContactId && (
+                            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                                <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 animate-in zoom-in-95 duration-200">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                                            <Trash2 size={18} className="text-red-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-bold text-gray-900">Eliminar contacto</h3>
+                                            <p className="text-xs text-gray-500 mt-0.5">
+                                                {contacts.find(c => c.id === confirmDeleteContactId)?.name || 'Este contacto'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-gray-600">
+                                        ¿Estás seguro de que quieres eliminar este contacto? Esta acción no se puede deshacer.
+                                    </p>
+                                    <div className="flex gap-2 justify-end">
+                                        <button
+                                            onClick={() => setConfirmDeleteContactId(null)}
+                                            className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-all"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteContact(confirmDeleteContactId)}
+                                            className="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700 transition-all"
+                                        >
+                                            Eliminar
+                                        </button>
                                     </div>
                                 </div>
-                            </>
+                            </div>
                         )}
 
                         <div className="h-px w-full bg-gray-100" />

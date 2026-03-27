@@ -54,9 +54,9 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true)
     const [selectedDate, setSelectedDate] = useState(new Date())
     const [dateRange, setDateRange] = useState<DateRange>({
-        start: new Date(new Date().setDate(new Date().getDate() - 30)),
+        start: new Date(new Date().setHours(0, 0, 0, 0)),
         end: new Date(new Date().setHours(23, 59, 59, 999)),
-        label: 'Últimos 30 días'
+        label: 'Hoy'
     })
     const [showDatePicker, setShowDatePicker] = useState(false)
     const [dailyMeetings, setDailyMeetings] = useState<any[]>([])
@@ -86,6 +86,7 @@ export default function DashboardPage() {
                     .select('id, email, first_name, last_name')
                     .order('email')
                 setTeamProfiles(profiles || [])
+                setSelectedUserId(user.id)
             }
         }
         initAdmin()

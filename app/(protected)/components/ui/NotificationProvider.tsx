@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { Check, AlertCircle, X } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -19,73 +19,88 @@ export function useNotification() {
     return context
 }
 
+interface Toast {
+    id: number
+    message: string
+    type: 'success' | 'error'
+    exiting: boolean
+}
+
+let toastCounter = 0
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
-    const [isVisible, setIsVisible] = useState(false)
-    const [message, setMessage] = useState('')
-    const [type, setType] = useState<'success' | 'error'>('success')
+    const [toasts, setToasts] = useState<Toast[]>([])
 
-    const showSuccess = (msg: string = 'Guardado') => {
-        setMessage(msg)
-        setType('success')
-        setIsVisible(true)
-        setTimeout(() => setIsVisible(false), 2500)
-    }
+    const removeToast = useCallback((id: number) => {
+        setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t))
+        setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id))
+        }, 300)
+    }, [])
 
-    const showError = (msg: string) => {
-        setMessage(msg)
-        setType('error')
-        setIsVisible(true)
-        // Errors stay a bit longer
-        setTimeout(() => setIsVisible(false), 5000)
-    }
+    const addToast = useCallback((message: string, type: 'success' | 'error', duration: number) => {
+        const id = ++toastCounter
+        setToasts(prev => [...prev, { id, message, type, exiting: false }])
+        setTimeout(() => removeToast(id), duration)
+    }, [removeToast])
+
+    const showSuccess = useCallback((msg: string = 'Guardado') => {
+        addToast(msg, 'success', 3000)
+    }, [addToast])
+
+    const showError = useCallback((msg: string) => {
+        addToast(msg, 'error', 5000)
+    }, [addToast])
 
     return (
         <NotificationContext.Provider value={{ showSuccess, showError }}>
             {children}
-            {/* Notification Centered Overlay */}
-            {isVisible && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-4">
-                    <div className="absolute inset-0 bg-gray-950/20 backdrop-blur-[2px] pointer-events-auto" onClick={() => setIsVisible(false)} />
-                    <div className={clsx(
-                        "relative backdrop-blur-xl shadow-2xl rounded-[2rem] p-8 flex flex-col items-center gap-6 border pointer-events-auto min-w-[320px] text-center animate-in zoom-in-95 fade-in duration-300",
-                        type === 'success'
-                            ? "bg-white/90 border-emerald-100/50"
-                            : "bg-white/90 border-rose-100/50"
-                    )}>
-                        <div className={clsx(
-                            "h-20 w-20 rounded-3xl flex items-center justify-center shadow-2xl shadow-inner animate-in zoom-in-50 duration-500 delay-150",
-                            type === 'success'
-                                ? "bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-200/50"
-                                : "bg-gradient-to-br from-rose-400 to-rose-600 shadow-rose-200/50"
-                        )}>
-                            {type === 'success' ? (
-                                <Check className="h-10 w-10 text-white" strokeWidth={4} />
+            {/* Toast Container — Bottom Right */}
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none" style={{ maxWidth: '380px' }}>
+                {toasts.map((toast) => (
+                    <div
+                        key={toast.id}
+                        style={{
+                            animation: toast.exiting
+                                ? 'toast-slide-down 0.3s ease-in forwards'
+                                : 'toast-slide-up 0.3s ease-out forwards',
+                        }}
+                        className={clsx(
+                            "pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg",
+                            toast.type === 'success'
+                                ? "bg-emerald-600 text-white"
+                                : "bg-rose-600 text-white"
+                        )}
+                    >
+                        <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                            {toast.type === 'success' ? (
+                                <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
                             ) : (
-                                <AlertCircle className="h-10 w-10 text-white" strokeWidth={4} />
+                                <AlertCircle className="h-3.5 w-3.5 text-white" strokeWidth={3} />
                             )}
                         </div>
-
-                        <div className="space-y-2">
-                            <h3 className={clsx(
-                                "text-[10px] font-black uppercase tracking-[0.2em]",
-                                type === 'success' ? "text-emerald-600" : "text-rose-600"
-                            )}>
-                                {type === 'success' ? 'Operación Exitosa' : 'Se ha producido un error'}
-                            </h3>
-                            <p className="text-xl font-bold text-gray-900 leading-tight whitespace-pre-wrap max-w-xs mx-auto">
-                                {message}
-                            </p>
-                        </div>
-
+                        <p className="text-sm font-semibold flex-1 leading-tight">
+                            {toast.message}
+                        </p>
                         <button
-                            onClick={() => setIsVisible(false)}
-                            className="mt-2 px-6 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs font-bold text-gray-500 transition-all uppercase tracking-widest"
+                            onClick={() => removeToast(toast.id)}
+                            className="p-1 hover:bg-white/20 rounded-lg text-white/70 hover:text-white transition-colors shrink-0"
                         >
-                            Cerrar
+                            <X size={14} />
                         </button>
                     </div>
-                </div>
-            )}
+                ))}
+            </div>
+            <style jsx global>{`
+                @keyframes toast-slide-up {
+                    from { opacity: 0; transform: translateY(16px) scale(0.95); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes toast-slide-down {
+                    from { opacity: 1; transform: translateY(0) scale(1); }
+                    to { opacity: 0; transform: translateY(16px) scale(0.95); }
+                }
+            `}</style>
         </NotificationContext.Provider>
     )
 }

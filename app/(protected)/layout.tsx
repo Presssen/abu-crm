@@ -345,8 +345,13 @@ export default function ProtectedLayout({
 // ─── Full-screen loading screen ──────────────────────────────────────
 function AppLoadingScreen() {
     const { isAppLoading, loadProgress, loadMessage } = useAppData()
+    const [mounted, setMounted] = useState(false)
 
-    if (!isAppLoading) return null
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    if (!mounted || !isAppLoading) return null
 
     return (
         <div className="fixed inset-0 z-[100] bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center">
