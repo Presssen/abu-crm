@@ -293,6 +293,12 @@ export default function MarathonPage() {
     useEffect(() => {
         if (leads[currentIndex]) {
             fetchActivity(leads[currentIndex].id)
+            setIsEditingLead(false)
+        }
+    }, [currentIndex, leads.length])
+
+    useEffect(() => {
+        if (leads[currentIndex]) {
             setEditForm({
                 company_name: leads[currentIndex].company_name || '',
                 contact_name: leads[currentIndex].contact_name || '',
@@ -308,7 +314,6 @@ export default function MarathonPage() {
                 status: leads[currentIndex].status || '',
                 notes: leads[currentIndex].notes || ''
             })
-            setIsEditingLead(false)
         }
     }, [currentIndex, leads.length, leads[currentIndex]?.phone, leads[currentIndex]?.email])
 
