@@ -1015,12 +1015,14 @@ export default function LeadsPage() {
                     isOpen={isMeetingModalOpen}
                     onClose={() => setIsMeetingModalOpen(false)}
                     onSuccess={fetchLeads}
+                    initialLeadId={selectedLead?.id}
                 />
 
                 <CreateTaskModal
                     isOpen={isTaskModalOpen}
                     onClose={() => setIsTaskModalOpen(false)}
                     onSuccess={fetchLeads}
+                    initialLeadId={selectedLead?.id}
                 />
 
                 <LogCallModal
