@@ -15,10 +15,10 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // Check if admin
+        // Check if admin + load saved filters
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, qualify_filters')
             .eq('id', user.id)
             .single()
         const isAdmin = profile?.role === 'admin'
@@ -113,7 +113,8 @@ export async function GET() {
             qualified,
             count: qualified.length,
             processedIds,
-            isAdmin
+            isAdmin,
+            qualifyFilters: profile?.qualify_filters || {}
         })
     } catch (error: any) {
         console.error('Qualify API GET error:', error)
@@ -231,8 +232,9 @@ export async function DELETE(request: NextRequest) {
 }
 
 /**
- * PATCH /api/qualify — Update notes for a qualified lead
- * Body: { qualified_id: string, notes: string }
+ * PATCH /api/qualify — Update notes for a qualified lead OR save user filter preferences
+ * Body: { qualified_id: string, notes: string }  — update lead notes
+ * Body: { qualify_filters: object }              — save filter preferences
  */
 export async function PATCH(request: NextRequest) {
     try {
@@ -243,6 +245,19 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json()
+
+        // Save filter preferences
+        if (body.qualify_filters !== undefined) {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ qualify_filters: body.qualify_filters })
+                .eq('id', user.id)
+
+            if (error) throw error
+            return NextResponse.json({ success: true })
+        }
+
+        // Update qualified lead notes
         const { qualified_id, notes } = body
 
         if (!qualified_id) {

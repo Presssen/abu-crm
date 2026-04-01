@@ -88,23 +88,11 @@ export default function QualifyPage() {
     const [showQualifiedPanel, setShowQualifiedPanel] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
 
-    // Filters — init from localStorage for persistence
-    const [planFilter, setPlanFilter] = useState<string>(() => {
-        if (typeof window !== 'undefined') return localStorage.getItem('qualify_filter_plan') || 'all'
-        return 'all'
-    })
-    const [countryFilter, setCountryFilter] = useState<string>(() => {
-        if (typeof window !== 'undefined') return localStorage.getItem('qualify_filter_country') || 'all'
-        return 'all'
-    })
-    const [sectorFilter, setSectorFilter] = useState<string>(() => {
-        if (typeof window !== 'undefined') return localStorage.getItem('qualify_filter_sector') || 'all'
-        return 'all'
-    })
-    const [excludePasswordProtected, setExcludePasswordProtected] = useState<boolean>(() => {
-        if (typeof window !== 'undefined') return localStorage.getItem('qualify_filter_excludePwd') !== 'false'
-        return true
-    })
+    // Filters — default values, will be overwritten from DB on mount
+    const [planFilter, setPlanFilter] = useState<string>('all')
+    const [countryFilter, setCountryFilter] = useState<string>('all')
+    const [sectorFilter, setSectorFilter] = useState<string>('all')
+    const [excludePasswordProtected, setExcludePasswordProtected] = useState<boolean>(true)
     const [showFilters, setShowFilters] = useState(false)
     const [availableCountries, setAvailableCountries] = useState<string[]>([])
     const [availableSectors, setAvailableSectors] = useState<string[]>([])
@@ -118,6 +106,7 @@ export default function QualifyPage() {
     // Processed leads tracking (which leads have been qualified or discarded)
     const [processedIds, setProcessedIds] = useState<Set<string>>(new Set())
     const [processedIdsLoaded, setProcessedIdsLoaded] = useState(false)
+    const [filtersLoadedFromDb, setFiltersLoadedFromDb] = useState(false)
 
     // Animation state
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
@@ -136,7 +125,24 @@ export default function QualifyPage() {
     const QUALIFIED_PAGE_SIZE = 50
     const [qualifiedPage, setQualifiedPage] = useState(0)
 
-    // Load qualified leads + processedIds from DB on mount
+    // Debounced save filters to DB
+    const filterSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const saveFiltersToDb = useCallback((filters: Record<string, any>) => {
+        if (filterSaveTimerRef.current) clearTimeout(filterSaveTimerRef.current)
+        filterSaveTimerRef.current = setTimeout(async () => {
+            try {
+                await fetch('/api/qualify', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ qualify_filters: filters })
+                })
+            } catch (err) {
+                console.error('Error saving filters:', err)
+            }
+        }, 500)
+    }, [])
+
+    // Load qualified leads + processedIds + saved filters from DB on mount
     const fetchQualifiedLeads = async () => {
         try {
             const res = await fetch('/api/qualify')
@@ -150,16 +156,26 @@ export default function QualifyPage() {
                 if (data.isAdmin !== undefined) {
                     setIsAdmin(data.isAdmin)
                 }
+                // Restore saved filters from DB
+                if (data.qualifyFilters && Object.keys(data.qualifyFilters).length > 0) {
+                    const f = data.qualifyFilters
+                    if (f.plan) setPlanFilter(f.plan)
+                    if (f.country) setCountryFilter(f.country)
+                    if (f.sector) setSectorFilter(f.sector)
+                    if (f.excludePassword !== undefined) setExcludePasswordProtected(f.excludePassword)
+                }
+                setFiltersLoadedFromDb(true)
                 return loadedIds
             }
         } catch (err) {
             console.error('Error loading qualified leads:', err)
         }
         setProcessedIdsLoaded(true)
+        setFiltersLoadedFromDb(true)
         return new Set<string>()
     }
 
-    // On mount: load processedIds FIRST, then fetch leads
+    // On mount: load processedIds + filters FIRST, then fetch leads
     useEffect(() => {
         const init = async () => {
             const loadedIds = await fetchQualifiedLeads()
@@ -169,19 +185,16 @@ export default function QualifyPage() {
         init()
     }, [])
 
-    // Persist filters to localStorage
+    // Persist filters to DB when they change (after initial load from DB)
     useEffect(() => {
-        localStorage.setItem('qualify_filter_plan', planFilter)
-    }, [planFilter])
-    useEffect(() => {
-        localStorage.setItem('qualify_filter_country', countryFilter)
-    }, [countryFilter])
-    useEffect(() => {
-        localStorage.setItem('qualify_filter_sector', sectorFilter)
-    }, [sectorFilter])
-    useEffect(() => {
-        localStorage.setItem('qualify_filter_excludePwd', String(excludePasswordProtected))
-    }, [excludePasswordProtected])
+        if (!filtersLoadedFromDb) return
+        saveFiltersToDb({
+            plan: planFilter,
+            country: countryFilter,
+            sector: sectorFilter,
+            excludePassword: excludePasswordProtected
+        })
+    }, [planFilter, countryFilter, sectorFilter, excludePasswordProtected, filtersLoadedFromDb])
 
     // Load filters + counts from preloaded context or API
     useEffect(() => {
