@@ -117,6 +117,7 @@ export default function QualifyPage() {
 
     // Processed leads tracking (which leads have been qualified or discarded)
     const [processedIds, setProcessedIds] = useState<Set<string>>(new Set())
+    const [processedIdsLoaded, setProcessedIdsLoaded] = useState(false)
 
     // Animation state
     const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
@@ -143,20 +144,29 @@ export default function QualifyPage() {
                 const data = await res.json()
                 setQualifiedLeads(data.qualified || [])
                 // Set processed IDs from DB (both qualified + discarded)
-                if (data.processedIds) {
-                    setProcessedIds(new Set(data.processedIds))
-                }
+                const loadedIds = new Set<string>(data.processedIds || [])
+                setProcessedIds(loadedIds)
+                setProcessedIdsLoaded(true)
                 if (data.isAdmin !== undefined) {
                     setIsAdmin(data.isAdmin)
                 }
+                return loadedIds
             }
         } catch (err) {
             console.error('Error loading qualified leads:', err)
         }
+        setProcessedIdsLoaded(true)
+        return new Set<string>()
     }
 
+    // On mount: load processedIds FIRST, then fetch leads
     useEffect(() => {
-        fetchQualifiedLeads()
+        const init = async () => {
+            const loadedIds = await fetchQualifiedLeads()
+            // Now fetch leads with the loaded IDs so they are excluded
+            await fetchLeads(loadedIds)
+        }
+        init()
     }, [])
 
     // Persist filters to localStorage
@@ -197,21 +207,32 @@ export default function QualifyPage() {
         loadFilters()
     }, [preloadedFilters])
 
-    // Fetch leads when filters change
+    // Re-fetch leads when filters change (but only after initial processedIds load)
+    const filtersRef = useRef({ planFilter, countryFilter, sectorFilter, excludePasswordProtected })
     useEffect(() => {
-        fetchLeads()
-    }, [planFilter, countryFilter, sectorFilter, excludePasswordProtected])
+        // Skip the initial render (handled by init above)
+        if (!processedIdsLoaded) return
+        const prev = filtersRef.current
+        const changed = prev.planFilter !== planFilter || prev.countryFilter !== countryFilter || prev.sectorFilter !== sectorFilter || prev.excludePasswordProtected !== excludePasswordProtected
+        filtersRef.current = { planFilter, countryFilter, sectorFilter, excludePasswordProtected }
+        if (changed) {
+            fetchLeads()
+        }
+    }, [planFilter, countryFilter, sectorFilter, excludePasswordProtected, processedIdsLoaded])
 
     // Re-fetch when processedIds changes and we're running low
     useEffect(() => {
+        if (!processedIdsLoaded) return
         if (leads.length > 0 && leads.filter(l => !processedIds.has(l.id)).length === 0) {
             // All current leads processed, fetch next batch
             fetchLeads()
         }
     }, [processedIds])
 
-    const fetchLeads = async () => {
+    const fetchLeads = async (overrideProcessedIds?: Set<string>) => {
         setLoading(true)
+        // Use override if provided (during init), otherwise use current state
+        const idsToUse = overrideProcessedIds || processedIds
         try {
             let query = supabase
                 .from('leads')
@@ -239,7 +260,7 @@ export default function QualifyPage() {
             }
 
             // Exclude already processed leads (qualified + discarded) at DB level
-            const idsToExclude = Array.from(processedIds)
+            const idsToExclude = Array.from(idsToUse)
             if (idsToExclude.length > 0) {
                 query = query.not('id', 'in', `(${idsToExclude.join(',')})`)
             }
@@ -264,7 +285,18 @@ export default function QualifyPage() {
         }
     }
 
-    const currentLead = leads[currentIndex]
+    // currentLead: always pick the first unprocessed lead from current position
+    const currentLead = (() => {
+        // First try from currentIndex forward
+        for (let i = currentIndex; i < leads.length; i++) {
+            if (!processedIds.has(leads[i].id)) return leads[i]
+        }
+        // Then try from beginning
+        for (let i = 0; i < currentIndex; i++) {
+            if (!processedIds.has(leads[i].id)) return leads[i]
+        }
+        return null
+    })()
 
     // Reset qualifyNotes when switching leads
     useEffect(() => {
