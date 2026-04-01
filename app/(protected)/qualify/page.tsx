@@ -56,6 +56,8 @@ interface Lead {
 interface QualifiedLead {
     qualified_id: string
     lead_id: string
+    user_id?: string
+    qualified_by?: string
     company_name: string
     domain?: string
     email: string
@@ -84,6 +86,7 @@ export default function QualifyPage() {
     // Qualified leads
     const [qualifiedLeads, setQualifiedLeads] = useState<QualifiedLead[]>([])
     const [showQualifiedPanel, setShowQualifiedPanel] = useState(false)
+    const [isAdmin, setIsAdmin] = useState(false)
 
     // Filters — init from localStorage for persistence
     const [planFilter, setPlanFilter] = useState<string>(() => {
@@ -142,6 +145,9 @@ export default function QualifyPage() {
                 // Set processed IDs from DB (both qualified + discarded)
                 if (data.processedIds) {
                     setProcessedIds(new Set(data.processedIds))
+                }
+                if (data.isAdmin !== undefined) {
+                    setIsAdmin(data.isAdmin)
                 }
             }
         } catch (err) {
@@ -475,6 +481,7 @@ export default function QualifyPage() {
                 'Teléfonos': lead.phone ? lead.phone.replace(/\s*:\s*/g, ', ') : '',
                 'Sector': lead.categories || '',
                 'Notas': lead.qualify_notes || '',
+                ...(isAdmin ? { 'Cualificado por': lead.qualified_by || '' } : {}),
             }))
 
             const ws = XLSX.utils.json_to_sheet(exportData)
@@ -487,6 +494,7 @@ export default function QualifyPage() {
                 { wch: 30 }, // Teléfonos
                 { wch: 25 }, // Sector
                 { wch: 40 }, // Notas
+                ...(isAdmin ? [{ wch: 25 }] : []), // Cualificado por
             ]
 
             const wb = XLSX.utils.book_new()
@@ -1241,6 +1249,12 @@ export default function QualifyPage() {
                                                             <p className="text-[10px] text-emerald-500 truncate flex items-center gap-1 mt-0.5">
                                                                 <StickyNote size={9} className="shrink-0" />
                                                                 {lead.qualify_notes}
+                                                            </p>
+                                                        )}
+                                                        {isAdmin && lead.qualified_by && (
+                                                            <p className="text-[10px] text-indigo-400 truncate flex items-center gap-1 mt-0.5">
+                                                                <User size={9} className="shrink-0" />
+                                                                {lead.qualified_by}
                                                             </p>
                                                         )}
                                                     </div>

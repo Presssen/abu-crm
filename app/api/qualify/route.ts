@@ -15,12 +15,22 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // Check if admin
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+        const isAdmin = profile?.role === 'admin'
+
         // 1. Get qualified leads with full lead data
-        const { data: qualifiedData, error: qualifiedError } = await supabase
+        // Admin sees ALL users' qualified leads; regular user sees only their own
+        let qualifiedQuery = supabase
             .from('qualified_leads')
             .select(`
                 id,
                 lead_id,
+                user_id,
                 status,
                 notes,
                 created_at,
@@ -41,11 +51,32 @@ export async function GET() {
                     status
                 )
             `)
-            .eq('user_id', user.id)
             .eq('status', 'qualified')
             .order('created_at', { ascending: true })
 
+        if (!isAdmin) {
+            qualifiedQuery = qualifiedQuery.eq('user_id', user.id)
+        }
+
+        const { data: qualifiedData, error: qualifiedError } = await qualifiedQuery
+
         if (qualifiedError) throw qualifiedError
+
+        // If admin, fetch user names for display
+        let userNameMap: Record<string, string> = {}
+        if (isAdmin && qualifiedData && qualifiedData.length > 0) {
+            const userIds = [...new Set(qualifiedData.map(r => r.user_id))]
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, email')
+                .in('id', userIds)
+            if (profiles) {
+                for (const p of profiles) {
+                    const name = [p.first_name, p.last_name].filter(Boolean).join(' ')
+                    userNameMap[p.id] = name || p.email || 'Usuario'
+                }
+            }
+        }
 
         // Flatten the joined data
         const qualified = (qualifiedData || []).map(row => {
@@ -53,6 +84,8 @@ export async function GET() {
             return {
                 qualified_id: row.id,
                 lead_id: row.lead_id,
+                user_id: row.user_id,
+                qualified_by: userNameMap[row.user_id] || '',
                 qualified_at: row.created_at,
                 qualify_notes: row.notes || '',
                 ...leadData,
@@ -60,6 +93,7 @@ export async function GET() {
         })
 
         // 2. Get ALL processed lead IDs (both qualified + discarded) for exclusion
+        // Always scoped to current user (each user qualifies independently)
         const { data: allProcessed, error: processedError } = await supabase
             .from('qualified_leads')
             .select('lead_id')
@@ -72,7 +106,8 @@ export async function GET() {
         return NextResponse.json({
             qualified,
             count: qualified.length,
-            processedIds
+            processedIds,
+            isAdmin
         })
     } catch (error: any) {
         console.error('Qualify API GET error:', error)
@@ -138,29 +173,46 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // Check if admin
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+        const isAdmin = profile?.role === 'admin'
+
         const { searchParams } = new URL(request.url)
         const qualifiedId = searchParams.get('id')
         const clearAll = searchParams.get('all') === 'true'
 
         if (clearAll) {
-            // Only clear qualified leads, keep discarded ones
-            const { error } = await supabase
+            // Admin clears ALL qualified leads from all users; regular user clears only own
+            let deleteQuery = supabase
                 .from('qualified_leads')
                 .delete()
-                .eq('user_id', user.id)
                 .eq('status', 'qualified')
 
+            if (!isAdmin) {
+                deleteQuery = deleteQuery.eq('user_id', user.id)
+            }
+
+            const { error } = await deleteQuery
             if (error) throw error
             return NextResponse.json({ success: true, cleared: true })
         }
 
         if (qualifiedId) {
-            const { error } = await supabase
+            // Admin can delete any; regular user only own
+            let deleteQuery = supabase
                 .from('qualified_leads')
                 .delete()
                 .eq('id', qualifiedId)
-                .eq('user_id', user.id)
 
+            if (!isAdmin) {
+                deleteQuery = deleteQuery.eq('user_id', user.id)
+            }
+
+            const { error } = await deleteQuery
             if (error) throw error
             return NextResponse.json({ success: true, removed: qualifiedId })
         }
