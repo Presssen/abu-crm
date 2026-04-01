@@ -24,7 +24,8 @@ import {
     ChevronRight,
     DollarSign,
     MessageSquare,
-    FileText
+    FileText,
+    Target
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -144,6 +145,7 @@ export default function ProtectedLayout({
     const navigation = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Marathon', href: '/marathon', icon: Zap },
+        { name: 'Cualificar', href: '/qualify', icon: Target },
         { name: 'Leads', href: '/leads', icon: Users },
         { name: 'Pipeline', href: '/pipeline', icon: Trello },
         { name: 'Tasks', href: '/tasks', icon: CheckSquare },
