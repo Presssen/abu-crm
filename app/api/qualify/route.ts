@@ -93,15 +93,21 @@ export async function GET() {
         })
 
         // 2. Get ALL processed lead IDs (both qualified + discarded) for exclusion
-        // Always scoped to current user (each user qualifies independently)
-        const { data: allProcessed, error: processedError } = await supabase
+        // Admin: exclude leads processed by ANY user (so nothing qualifed by anyone re-appears)
+        // Regular user: only their own
+        let processedQuery = supabase
             .from('qualified_leads')
             .select('lead_id')
-            .eq('user_id', user.id)
+
+        if (!isAdmin) {
+            processedQuery = processedQuery.eq('user_id', user.id)
+        }
+
+        const { data: allProcessed, error: processedError } = await processedQuery
 
         if (processedError) throw processedError
 
-        const processedIds = (allProcessed || []).map(r => r.lead_id)
+        const processedIds = [...new Set((allProcessed || []).map(r => r.lead_id))]
 
         return NextResponse.json({
             qualified,
