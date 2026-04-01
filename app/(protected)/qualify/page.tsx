@@ -105,6 +105,8 @@ export default function QualifyPage() {
     const [showFilters, setShowFilters] = useState(false)
     const [availableCountries, setAvailableCountries] = useState<string[]>([])
     const [availableSectors, setAvailableSectors] = useState<string[]>([])
+    const [sectorCounts, setSectorCounts] = useState<Record<string, number>>({})
+    const [countryCounts, setCountryCounts] = useState<Record<string, number>>({})
 
     // Web preview
     const [showWebPreview, setShowWebPreview] = useState(false)
@@ -125,6 +127,10 @@ export default function QualifyPage() {
 
     // AI enrichment tracking
     const [enrichingIds, setEnrichingIds] = useState<Set<string>>(new Set())
+
+    // Qualified panel pagination
+    const QUALIFIED_PAGE_SIZE = 50
+    const [qualifiedPage, setQualifiedPage] = useState(0)
 
     // Load qualified leads + processedIds from DB on mount
     const fetchQualifiedLeads = async () => {
@@ -161,26 +167,28 @@ export default function QualifyPage() {
         localStorage.setItem('qualify_filter_excludePwd', String(excludePasswordProtected))
     }, [excludePasswordProtected])
 
-    // Load filters from preloaded context
+    // Load filters + counts from preloaded context or API
     useEffect(() => {
-        if (preloadedFilters) {
-            setAvailableCountries(preloadedFilters.countries)
-            if (preloadedFilters.categories) setAvailableSectors(preloadedFilters.categories)
-        } else {
-            const fetchFilters = async () => {
-                try {
-                    const res = await fetch('/api/leads/filters')
-                    if (res.ok) {
-                        const data = await res.json()
-                        if (data.countries) setAvailableCountries(data.countries)
-                        if (data.categories) setAvailableSectors(data.categories)
-                    }
-                } catch (err) {
-                    console.error('Error loading filters:', err)
-                }
+        const loadFilters = async () => {
+            if (preloadedFilters) {
+                setAvailableCountries(preloadedFilters.countries)
+                if (preloadedFilters.categories) setAvailableSectors(preloadedFilters.categories)
             }
-            fetchFilters()
+            // Always fetch from API to get accurate counts (preloaded might not have them)
+            try {
+                const res = await fetch('/api/leads/filters')
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.countries) setAvailableCountries(data.countries)
+                    if (data.categories) setAvailableSectors(data.categories)
+                    if (data.countryCounts) setCountryCounts(data.countryCounts)
+                    if (data.categoryCounts) setSectorCounts(data.categoryCounts)
+                }
+            } catch (err) {
+                console.error('Error loading filters:', err)
+            }
         }
+        loadFilters()
     }, [preloadedFilters])
 
     // Fetch leads when filters change
@@ -662,7 +670,11 @@ export default function QualifyPage() {
                                 className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                             >
                                 <option value="all">Todos</option>
-                                {availableCountries.map(c => <option key={c} value={c}>{c}</option>)}
+                                {availableCountries.map(c => (
+                                    <option key={c} value={c}>
+                                        {c} ({countryCounts[c] || 0})
+                                    </option>
+                                ))}
                             </select>
                         </div>
                         <div>
@@ -673,7 +685,11 @@ export default function QualifyPage() {
                                 className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                             >
                                 <option value="all">Todos</option>
-                                {availableSectors.map(s => <option key={s} value={s}>{s}</option>)}
+                                {availableSectors.map(s => (
+                                    <option key={s} value={s}>
+                                        {s} ({sectorCounts[s] || 0})
+                                    </option>
+                                ))}
                             </select>
                         </div>
                         <div className="flex items-end">
@@ -1042,65 +1058,91 @@ export default function QualifyPage() {
                                     <p className="text-xs text-gray-300 mt-1">Cualifica leads para añadirlos aquí</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-gray-50">
-                                    {qualifiedLeads.map((lead, idx) => (
-                                        <div key={lead.qualified_id} className="px-5 py-3 hover:bg-gray-50 transition-colors group">
-                                            <div className="flex items-start gap-3">
-                                                <span className="text-[10px] font-bold text-gray-300 w-5 text-right shrink-0 mt-1">
-                                                    {idx + 1}
-                                                </span>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <p className="text-sm font-bold text-gray-900 truncate">
-                                                            {lead.company_name}
-                                                        </p>
-                                                        {enrichingIds.has(lead.lead_id) && (
-                                                            <Sparkles size={12} className="text-indigo-500 animate-spin shrink-0" />
+                                <>
+                                    <div className="divide-y divide-gray-50">
+                                        {qualifiedLeads
+                                            .slice(qualifiedPage * QUALIFIED_PAGE_SIZE, (qualifiedPage + 1) * QUALIFIED_PAGE_SIZE)
+                                            .map((lead, idx) => (
+                                            <div key={lead.qualified_id} className="px-5 py-3 hover:bg-gray-50 transition-colors group">
+                                                <div className="flex items-start gap-3">
+                                                    <span className="text-[10px] font-bold text-gray-300 w-5 text-right shrink-0 mt-1">
+                                                        {qualifiedPage * QUALIFIED_PAGE_SIZE + idx + 1}
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <p className="text-sm font-bold text-gray-900 truncate">
+                                                                {lead.company_name}
+                                                            </p>
+                                                            {enrichingIds.has(lead.lead_id) && (
+                                                                <Sparkles size={12} className="text-indigo-500 animate-spin shrink-0" />
+                                                            )}
+                                                        </div>
+                                                        {lead.domain && (
+                                                            <p className="text-[11px] text-emerald-600 truncate flex items-center gap-1 mt-0.5">
+                                                                <Globe size={9} className="shrink-0" />
+                                                                {lead.domain}
+                                                            </p>
                                                         )}
+                                                        <div className="flex flex-col gap-0.5 mt-1">
+                                                            {lead.email && (
+                                                                <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">
+                                                                    <Mail size={9} className="shrink-0" />
+                                                                    {lead.email.split(':')[0]?.trim()}
+                                                                </p>
+                                                            )}
+                                                            {lead.phone && (
+                                                                <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">
+                                                                    <Phone size={9} className="shrink-0" />
+                                                                    {lead.phone.split(':')[0]?.trim()}
+                                                                </p>
+                                                            )}
+                                                            {lead.categories && (
+                                                                <p className="text-[10px] text-gray-400 truncate flex items-center gap-1">
+                                                                    <Building2 size={9} className="shrink-0" />
+                                                                    {lead.categories}
+                                                                </p>
+                                                            )}
+                                                            {lead.qualify_notes && (
+                                                                <p className="text-[10px] text-emerald-500 truncate flex items-center gap-1 mt-0.5">
+                                                                    <StickyNote size={9} className="shrink-0" />
+                                                                    {lead.qualify_notes}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    {lead.domain && (
-                                                        <p className="text-[11px] text-emerald-600 truncate flex items-center gap-1 mt-0.5">
-                                                            <Globe size={9} className="shrink-0" />
-                                                            {lead.domain}
-                                                        </p>
-                                                    )}
-                                                    <div className="flex flex-col gap-0.5 mt-1">
-                                                        {lead.email && (
-                                                            <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">
-                                                                <Mail size={9} className="shrink-0" />
-                                                                {lead.email.split(':')[0]?.trim()}
-                                                            </p>
-                                                        )}
-                                                        {lead.phone && (
-                                                            <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">
-                                                                <Phone size={9} className="shrink-0" />
-                                                                {lead.phone.split(':')[0]?.trim()}
-                                                            </p>
-                                                        )}
-                                                        {lead.categories && (
-                                                            <p className="text-[10px] text-gray-400 truncate flex items-center gap-1">
-                                                                <Building2 size={9} className="shrink-0" />
-                                                                {lead.categories}
-                                                            </p>
-                                                        )}
-                                                        {lead.qualify_notes && (
-                                                            <p className="text-[10px] text-emerald-500 truncate flex items-center gap-1 mt-0.5">
-                                                                <StickyNote size={9} className="shrink-0" />
-                                                                {lead.qualify_notes}
-                                                            </p>
-                                                        )}
-                                                    </div>
+                                                    <button
+                                                        onClick={() => removeQualified(lead.qualified_id)}
+                                                        className="p-1.5 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-all mt-0.5"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    onClick={() => removeQualified(lead.qualified_id)}
-                                                    className="p-1.5 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-all mt-0.5"
-                                                >
-                                                    <X size={12} />
-                                                </button>
                                             </div>
+                                        ))}
+                                    </div>
+                                    {/* Pagination controls */}
+                                    {qualifiedLeads.length > QUALIFIED_PAGE_SIZE && (
+                                        <div className="flex items-center justify-between px-5 py-2 border-t border-gray-50">
+                                            <button
+                                                onClick={() => setQualifiedPage(p => Math.max(0, p - 1))}
+                                                disabled={qualifiedPage === 0}
+                                                className="text-xs font-semibold text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            >
+                                                ← Anterior
+                                            </button>
+                                            <span className="text-[10px] text-gray-400">
+                                                {qualifiedPage * QUALIFIED_PAGE_SIZE + 1}-{Math.min((qualifiedPage + 1) * QUALIFIED_PAGE_SIZE, qualifiedLeads.length)} de {qualifiedLeads.length}
+                                            </span>
+                                            <button
+                                                onClick={() => setQualifiedPage(p => p + 1)}
+                                                disabled={(qualifiedPage + 1) * QUALIFIED_PAGE_SIZE >= qualifiedLeads.length}
+                                                className="text-xs font-semibold text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            >
+                                                Siguiente →
+                                            </button>
                                         </div>
-                                    ))}
-                                </div>
+                                    )}
+                                </>
                             )}
                         </div>
 
