@@ -242,53 +242,25 @@ export default function QualifyPage() {
         }
     }, [processedIds])
 
-    const fetchLeads = async (overrideProcessedIds?: Set<string>) => {
+    const fetchLeads = async (_overrideProcessedIds?: Set<string>) => {
         setLoading(true)
-        // Use override if provided (during init), otherwise use current state
-        const idsToUse = overrideProcessedIds || processedIds
         try {
-            let query = supabase
-                .from('leads')
-                .select('id, company_name, contact_name, contact_role, email, phone, status, domain, city, country, plan, shopify_status, categories, notes, owner_id, created_at')
-                .eq('status', 'new')
-                .not('domain', 'is', null)
-                .neq('domain', '')
+            // Use server-side API to fetch leads, which handles exclusion
+            // of processed IDs via SQL subquery (avoids PostgREST URL length limit
+            // that breaks when 300+ UUIDs are passed as query params)
+            const params = new URLSearchParams({
+                plan: planFilter,
+                country: countryFilter,
+                sector: sectorFilter,
+                excludePassword: String(excludePasswordProtected),
+                limit: '200'
+            })
 
-            if (planFilter === 'Shopify Plus') {
-                query = query.eq('plan', 'Shopify Plus')
-            } else if (planFilter === 'Shopify Standard') {
-                query = query.or('plan.is.null,plan.eq.,plan.eq.Shopify Standard')
-            }
+            const res = await fetch(`/api/qualify/leads?${params}`)
+            if (!res.ok) throw new Error('Failed to fetch leads')
 
-            if (countryFilter !== 'all') {
-                query = query.eq('country', countryFilter)
-            }
-
-            if (sectorFilter !== 'all') {
-                query = query.eq('categories', sectorFilter)
-            }
-
-            if (excludePasswordProtected) {
-                query = query.neq('shopify_status', 'Password Protected')
-            }
-
-            // Exclude already processed leads (qualified + discarded) at DB level
-            const idsToExclude = Array.from(idsToUse)
-            if (idsToExclude.length > 0) {
-                query = query.not('id', 'in', `(${idsToExclude.join(',')})`)
-            }
-
-            const { data, error } = await query
-                .order('created_at', { ascending: true })
-                .limit(200)
-
-            if (error) throw error
-
-            const sorted = (data || []).sort((a, b) =>
-                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            )
-
-            setLeads(sorted as Lead[])
+            const data = await res.json()
+            setLeads((data.leads || []) as Lead[])
             setCurrentIndex(0)
         } catch (error) {
             console.error('Error fetching leads:', error)
