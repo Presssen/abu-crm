@@ -45,19 +45,33 @@ export async function GET(request: NextRequest) {
         const db = createAdminClient(supabaseUrl, supabaseKey)
 
         // 1. Fetch ALL processed lead IDs (lightweight query, just IDs)
-        let processedQuery = db
-            .from('qualified_leads')
-            .select('lead_id')
-            .limit(50000)
+        // NOTE: Supabase PostgREST caps at 1000 rows per request, so we paginate
+        const PAGE_SIZE = 1000
+        const processedIds = new Set<string>()
+        let offset = 0
+        let hasMore = true
 
-        if (!isAdmin) {
-            processedQuery = processedQuery.eq('user_id', user.id)
+        while (hasMore) {
+            let processedQuery = db
+                .from('qualified_leads')
+                .select('lead_id')
+                .range(offset, offset + PAGE_SIZE - 1)
+
+            if (!isAdmin) {
+                processedQuery = processedQuery.eq('user_id', user.id)
+            }
+
+            const { data: batch, error: processedError } = await processedQuery
+            if (processedError) throw processedError
+
+            const rows = batch || []
+            for (const r of rows) {
+                processedIds.add(r.lead_id)
+            }
+
+            hasMore = rows.length === PAGE_SIZE
+            offset += PAGE_SIZE
         }
-
-        const { data: processed, error: processedError } = await processedQuery
-        if (processedError) throw processedError
-
-        const processedIds = new Set((processed || []).map((r: any) => r.lead_id))
 
         // 2. Build query for leads
         let query = db
@@ -85,19 +99,31 @@ export async function GET(request: NextRequest) {
             query = query.neq('shopify_status', 'Password Protected')
         }
 
-        // 3. Fetch leads — request more than needed to account for server-side filtering
-        // With the admin client there's no 1000-row default limit like the browser client
-        const fetchLimit = limit + processedIds.size + 200
-        const { data: allLeads, error: leadsError } = await query
-            .order('created_at', { ascending: true })
-            .limit(Math.min(fetchLimit, 10000))
+        // 3. Fetch leads with pagination — PostgREST also caps lead queries at 1000 rows,
+        // so we paginate until we have enough unprocessed leads
+        const LEADS_PAGE = 1000
+        const filtered: any[] = []
+        let leadsOffset = 0
+        let leadsExhausted = false
 
-        if (leadsError) throw leadsError
+        while (filtered.length < limit && !leadsExhausted) {
+            const { data: batch, error: leadsError } = await query
+                .order('created_at', { ascending: true })
+                .range(leadsOffset, leadsOffset + LEADS_PAGE - 1)
 
-        // 4. Filter out processed leads in memory (server-side, no URL length issues)
-        const filtered = (allLeads || [])
-            .filter((lead: any) => !processedIds.has(lead.id))
-            .slice(0, limit)
+            if (leadsError) throw leadsError
+
+            const rows = batch || []
+            for (const lead of rows) {
+                if (!processedIds.has(lead.id)) {
+                    filtered.push(lead)
+                    if (filtered.length >= limit) break
+                }
+            }
+
+            leadsExhausted = rows.length < LEADS_PAGE
+            leadsOffset += LEADS_PAGE
+        }
 
         return NextResponse.json({ leads: filtered, count: filtered.length })
     } catch (error: any) {

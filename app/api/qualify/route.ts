@@ -25,43 +25,56 @@ export async function GET() {
 
         // 1. Get qualified leads with full lead data
         // Admin sees ALL users' qualified leads; regular user sees only their own
-        let qualifiedQuery = supabase
-            .from('qualified_leads')
-            .select(`
-                id,
-                lead_id,
-                user_id,
-                status,
-                notes,
-                created_at,
-                leads:lead_id (
+        // NOTE: Supabase PostgREST caps at 1000 rows per request, so we paginate
+        const QUALIFIED_PAGE_SIZE = 1000
+        let qualifiedData: any[] = []
+        let qOffset = 0
+        let qHasMore = true
+
+        while (qHasMore) {
+            let qualifiedQuery = supabase
+                .from('qualified_leads')
+                .select(`
                     id,
-                    company_name,
-                    domain,
-                    email,
-                    phone,
-                    categories,
+                    lead_id,
+                    user_id,
+                    status,
                     notes,
-                    city,
-                    country,
-                    plan,
-                    shopify_status,
-                    contact_name,
-                    contact_role,
-                    status
-                )
-            `)
-            .eq('status', 'qualified')
-            .order('created_at', { ascending: true })
-            .limit(50000)
+                    created_at,
+                    leads:lead_id (
+                        id,
+                        company_name,
+                        domain,
+                        email,
+                        phone,
+                        categories,
+                        notes,
+                        city,
+                        country,
+                        plan,
+                        shopify_status,
+                        contact_name,
+                        contact_role,
+                        status
+                    )
+                `)
+                .eq('status', 'qualified')
+                .order('created_at', { ascending: true })
+                .range(qOffset, qOffset + QUALIFIED_PAGE_SIZE - 1)
 
-        if (!isAdmin) {
-            qualifiedQuery = qualifiedQuery.eq('user_id', user.id)
+            if (!isAdmin) {
+                qualifiedQuery = qualifiedQuery.eq('user_id', user.id)
+            }
+
+            const { data: batch, error: qualifiedError } = await qualifiedQuery
+            if (qualifiedError) throw qualifiedError
+
+            const rows = batch || []
+            qualifiedData = qualifiedData.concat(rows)
+
+            qHasMore = rows.length === QUALIFIED_PAGE_SIZE
+            qOffset += QUALIFIED_PAGE_SIZE
         }
-
-        const { data: qualifiedData, error: qualifiedError } = await qualifiedQuery
-
-        if (qualifiedError) throw qualifiedError
 
         // If admin, fetch user names for display
         let userNameMap: Record<string, string> = {}
@@ -96,20 +109,35 @@ export async function GET() {
         // 2. Get ALL processed lead IDs (both qualified + discarded) for exclusion
         // Admin: exclude leads processed by ANY user (so nothing qualifed by anyone re-appears)
         // Regular user: only their own
-        let processedQuery = supabase
-            .from('qualified_leads')
-            .select('lead_id')
-            .limit(50000)
+        // NOTE: Supabase PostgREST caps at 1000 rows per request, so we paginate
+        const PAGE_SIZE = 1000
+        const allProcessedIds: string[] = []
+        let offset = 0
+        let hasMore = true
 
-        if (!isAdmin) {
-            processedQuery = processedQuery.eq('user_id', user.id)
+        while (hasMore) {
+            let processedQuery = supabase
+                .from('qualified_leads')
+                .select('lead_id')
+                .range(offset, offset + PAGE_SIZE - 1)
+
+            if (!isAdmin) {
+                processedQuery = processedQuery.eq('user_id', user.id)
+            }
+
+            const { data: batch, error: processedError } = await processedQuery
+            if (processedError) throw processedError
+
+            const rows = batch || []
+            for (const r of rows) {
+                allProcessedIds.push(r.lead_id)
+            }
+
+            hasMore = rows.length === PAGE_SIZE
+            offset += PAGE_SIZE
         }
 
-        const { data: allProcessed, error: processedError } = await processedQuery
-
-        if (processedError) throw processedError
-
-        const processedIds = [...new Set((allProcessed || []).map(r => r.lead_id))]
+        const processedIds = [...new Set(allProcessedIds)]
 
         return NextResponse.json({
             qualified,
