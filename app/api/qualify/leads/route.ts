@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         let processedQuery = db
             .from('qualified_leads')
             .select('lead_id')
+            .limit(50000)
 
         if (!isAdmin) {
             processedQuery = processedQuery.eq('user_id', user.id)

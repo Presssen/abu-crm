@@ -294,10 +294,10 @@ export default function QualifyPage() {
     const handleQualify = useCallback(async () => {
         if (!currentLead) return
 
-        // Check if already qualified
-        const alreadyQualified = qualifiedLeads.some(q => q.lead_id === currentLead.id)
+        // Check if already qualified — silently skip and advance
+        const alreadyQualified = qualifiedLeads.some(q => q.lead_id === currentLead.id) || processedIds.has(currentLead.id)
         if (alreadyQualified) {
-            showSuccess('Este lead ya está en la lista')
+            setProcessedIds(prev => new Set([...prev, currentLead.id]))
             advanceToNext()
             return
         }

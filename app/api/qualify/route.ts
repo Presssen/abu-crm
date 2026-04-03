@@ -53,6 +53,7 @@ export async function GET() {
             `)
             .eq('status', 'qualified')
             .order('created_at', { ascending: true })
+            .limit(50000)
 
         if (!isAdmin) {
             qualifiedQuery = qualifiedQuery.eq('user_id', user.id)
@@ -98,6 +99,7 @@ export async function GET() {
         let processedQuery = supabase
             .from('qualified_leads')
             .select('lead_id')
+            .limit(50000)
 
         if (!isAdmin) {
             processedQuery = processedQuery.eq('user_id', user.id)
