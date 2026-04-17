@@ -25,7 +25,8 @@ import {
     DollarSign,
     MessageSquare,
     FileText,
-    Target
+    Target,
+    MonitorPlay
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -152,6 +153,7 @@ export default function ProtectedLayout({
         { name: 'Meetings', href: '/meetings', icon: Calendar },
         { name: 'Emails', href: '/emails', icon: Mail },
         { name: 'Chat', href: '/chat', icon: MessageSquare },
+        { name: 'Presentación', href: '/presentation', icon: MonitorPlay },
         { name: 'Finances', href: '/finances', icon: DollarSign },
         { name: 'Settings', href: '/settings', icon: Settings },
     ]
@@ -208,13 +210,13 @@ export default function ProtectedLayout({
                     )}>
                         <div className={clsx("flex items-center overflow-hidden transition-all duration-300", isCollapsed ? "justify-center" : "")}>
                             <img
-                                src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"
+                                src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"
                                 alt="ABU Logo"
                                 className={clsx("h-10 w-auto object-contain transition-all", isCollapsed ? "" : "mr-2 shrink-0")}
                             />
                             {!isCollapsed && (
                                 <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent truncate">
-                                    ABU CRM
+                                    AbuApp
                                 </span>
                             )}
                         </div>
@@ -361,12 +363,12 @@ function AppLoadingScreen() {
                 {/* Logo */}
                 <div className="flex items-center justify-center gap-3">
                     <img
-                        src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"
-                        alt="ABU CRM"
+                        src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"
+                        alt="AbuApp"
                         className="h-14 w-auto"
                     />
                     <span className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                        ABU CRM
+                        AbuApp
                     </span>
                 </div>
 

@@ -47,7 +47,7 @@ export default function BlockedPage() {
 
             <div className="mt-8">
                 <img
-                    src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"
+                    src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"
                     alt="ABU Logo"
                     className="h-8 w-auto mx-auto object-contain opacity-50 gray-scale"
                 />

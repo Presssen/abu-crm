@@ -13,12 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ABU CRM",
+  title: "AbuApp",
   description: "Modern CRM for ABU Management",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "ABU CRM",
+    title: "AbuApp",
   },
   icons: {
     apple: [
@@ -26,9 +26,9 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: "ABU CRM",
+    title: "AbuApp",
     description: "Modern CRM for ABU Management",
-    images: ["https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"],
+    images: ["https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"],
   },
 
 };

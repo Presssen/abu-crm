@@ -114,7 +114,7 @@ export default function ApplyPage() {
             }}>
                 <div style={{ maxWidth: '680px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <img
-                        src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/Abu_CRM.png?v=1770135720"
+                        src="https://cdn.shopify.com/s/files/1/0370/2466/1636/files/new-abu-logo.png?v=1768487866"
                         alt="ABU"
                         style={{ height: '32px' }}
                     />
