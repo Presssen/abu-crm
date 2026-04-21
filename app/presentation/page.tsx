@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function PresentationPage() {
   return (
-    <div className="flex-1 overflow-hidden">
+    <div className="w-full h-screen overflow-hidden bg-slate-950">
       <PresentationClient />
     </div>
   )
