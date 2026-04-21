@@ -38,7 +38,7 @@ export async function updateSession(request: NextRequest) {
     const path = request.nextUrl.pathname
 
     // Public routes (including /blocked and API webhooks)
-    const publicPaths = ['/login', '/signup', '/forgot-password', '/auth/callback', '/pending-approval', '/blocked', '/chat-widget', '/apply']
+    const publicPaths = ['/login', '/signup', '/forgot-password', '/auth/callback', '/pending-approval', '/blocked', '/chat-widget', '/apply', '/presentation']
     const isPublicPath = publicPaths.includes(path)
     
     // Allow external webhooks and API callbacks without authentication
