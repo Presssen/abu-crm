@@ -17,7 +17,8 @@ import {
   Maximize,
   Minimize,
   TrendingUp,
-  Target
+  Target,
+  X
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -109,19 +110,177 @@ const Slide2 = () => (
   </div>
 )
 
-const Slide3 = () => (
-  <div className="flex flex-col items-center justify-center h-full w-full animate-in slide-in-from-bottom-12 fade-in duration-700">
-    <div className="inline-block px-4 py-1.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-sm font-bold uppercase tracking-wider mb-6">Catálogo de Widgets</div>
-    <h2 className="text-5xl md:text-6xl font-bold text-white mb-12 text-center">Herramientas de Conversión</h2>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
-       <FeatureCard icon={Network} title="Frequently Bought Together" desc="Agrupa productos que suelen comprarse en conjunto a un clic." delay="delay-100" />
-       <FeatureCard icon={CheckCircle2} title="Add-ons Clásicos" desc="Complementos sugeridos que suman valor práctico al pedido." delay="delay-200" />
-       <FeatureCard icon={Zap} title="Ofertas Post-Checkout" desc="Impacto directo justo después de la compra con alta intencionalidad." delay="delay-300" />
-       <FeatureCard icon={BarChart} title="Bulk Discounts" desc="Descuentos escalonados por volumen para subir las cantidades." delay="delay-400" />
-       <FeatureCard icon={Rocket} title="Barra de Envío Gratis" desc="Motiva al comprador a subir el ticket medio para no pagar portes." delay="delay-500" />
+const Slide3 = () => {
+  const [showAddonsModal, setShowAddonsModal] = useState(false)
+  const [addonsModalView, setAddonsModalView] = useState<'menu' | 'button' | 'checkbox' | 'popup'>('menu')
+  const [activeImageModal, setActiveImageModal] = useState<string | null>(null)
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full w-full animate-in slide-in-from-bottom-12 fade-in duration-700">
+      <div className="inline-block px-4 py-1.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-sm font-bold uppercase tracking-wider mb-6">Catálogo de Widgets</div>
+      <h2 className="text-5xl md:text-6xl font-bold text-white mb-12 text-center">Herramientas de Conversión</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
+         <FeatureCard 
+           icon={Network} 
+           title="Frequently Bought Together" 
+           desc="Agrupa productos que suelen comprarse en conjunto a un clic." 
+           delay="delay-100" 
+           onClick={() => setActiveImageModal("https://cdn.shopify.com/s/files/1/0751/1290/6942/files/Captura_de_pantalla_2026-04-21_a_las_10.33.04.png?v=1776760619")} 
+         />
+         <FeatureCard 
+           icon={CheckCircle2} 
+           title="Add-ons Clásicos" 
+           desc="Complementos sugeridos que suman valor práctico al pedido." 
+           delay="delay-200" 
+           onClick={() => {
+             setAddonsModalView('menu')
+             setShowAddonsModal(true)
+           }}
+         />
+         <FeatureCard 
+           icon={Zap} 
+           title="Ofertas Post-Checkout" 
+           desc="Impacto directo justo después de la compra con alta intencionalidad." 
+           delay="delay-300" 
+           onClick={() => setActiveImageModal("https://cdn.shopify.com/s/files/1/0751/1290/6942/files/Captura_de_pantalla_2026-04-21_a_las_10.35.08.png?v=1776760619")}
+         />
+         <FeatureCard 
+           icon={BarChart} 
+           title="Bulk Discounts" 
+           desc="Descuentos escalonados por volumen para subir las cantidades." 
+           delay="delay-400" 
+           onClick={() => setActiveImageModal("https://cdn.shopify.com/s/files/1/0751/1290/6942/files/Captura_de_pantalla_2026-04-21_a_las_10.33.24.png?v=1776760619")}
+         />
+         <FeatureCard 
+           icon={Rocket} 
+           title="Carrito Lateral" 
+           desc="Motiva al comprador a subir el ticket medio y ofrece incentivos dinámicos." 
+           delay="delay-500" 
+           onClick={() => setActiveImageModal("https://cdn.shopify.com/s/files/1/0751/1290/6942/files/Captura_de_pantalla_2026-04-21_a_las_10.34.05.png?v=1776760619")}
+         />
+      </div>
+
+      {activeImageModal && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300 p-4"
+          onClick={() => setActiveImageModal(null)}
+        >
+          <div 
+            className="relative w-full max-w-6xl max-h-[90vh] flex flex-col items-center justify-center animate-in zoom-in-95 duration-300"
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setActiveImageModal(null)}
+              className="absolute -top-12 right-0 md:-right-12 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full transition-all z-10 hover:scale-110 backdrop-blur-md"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img 
+              src={activeImageModal} 
+              alt="Feature Demo"
+              className="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+            />
+          </div>
+        </div>
+      )}
+
+      {showAddonsModal && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300 p-4"
+          onClick={() => setShowAddonsModal(false)}
+        >
+          <div 
+            className="relative w-full max-w-6xl max-h-[90vh] flex flex-col items-center justify-center animate-in zoom-in-95 duration-300"
+            onClick={e => e.stopPropagation()}
+          >
+            {addonsModalView !== 'menu' && (
+              <button 
+                onClick={() => setAddonsModalView('menu')}
+                className="absolute -top-12 left-0 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full transition-all z-10 hover:scale-105 backdrop-blur-md flex items-center gap-2 font-medium"
+              >
+                <ChevronLeft className="w-5 h-5" /> Volver al menú
+              </button>
+            )}
+            
+            <button 
+              onClick={() => setShowAddonsModal(false)}
+              className="absolute -top-12 right-0 md:-right-12 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full transition-all z-10 hover:scale-110 backdrop-blur-md"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {addonsModalView === 'menu' && (
+              <div className="bg-slate-900 border border-white/10 p-12 rounded-[2rem] flex flex-col gap-6 w-full max-w-xl shadow-2xl items-center text-center">
+                <div className="w-16 h-16 bg-cyan-500/20 rounded-2xl flex items-center justify-center mb-2 border border-cyan-500/30">
+                  <CheckCircle2 className="w-8 h-8 text-cyan-300" />
+                </div>
+                <h3 className="text-3xl font-bold text-white mb-2">Selecciona un Formato</h3>
+                <p className="text-indigo-200/70 text-lg mb-4">¿Cómo quieres visualizar los Add-ons clásicos en la página de producto?</p>
+                
+                <div className="w-full space-y-4">
+                  <button 
+                    onClick={() => setAddonsModalView('button')}
+                    className="w-full bg-white/5 hover:bg-indigo-500/20 border border-white/10 hover:border-indigo-500/50 text-white font-medium py-6 px-8 rounded-2xl text-xl transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(99,102,241,0.2)] flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <Zap className="w-6 h-6 text-indigo-400 group-hover:text-indigo-300" />
+                      <span>Botón de Compra Rápida</span>
+                    </div>
+                    <ChevronRight className="w-6 h-6 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </button>
+                  <button 
+                    onClick={() => setAddonsModalView('checkbox')}
+                    className="w-full bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/50 text-white font-medium py-6 px-8 rounded-2xl text-xl transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(16,185,129,0.2)] flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400 group-hover:text-emerald-300" />
+                      <span>Múltiples Checkboxes</span>
+                    </div>
+                    <ChevronRight className="w-6 h-6 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </button>
+                  <button 
+                    onClick={() => setAddonsModalView('popup')}
+                    className="w-full bg-white/5 hover:bg-pink-500/20 border border-white/10 hover:border-pink-500/50 text-white font-medium py-6 px-8 rounded-2xl text-xl transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(236,72,153,0.2)] flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <Maximize className="w-6 h-6 text-pink-400 group-hover:text-pink-300" />
+                      <span>Modo Pop-Up</span>
+                    </div>
+                    <ChevronRight className="w-6 h-6 opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {addonsModalView === 'button' && (
+              <img 
+                src="https://cdn.shopify.com/s/files/1/0751/1290/6942/files/Captura_de_pantalla_2026-04-21_a_las_10.33.18.png?v=1776760619" 
+                alt="Add-ons Boton de compra" 
+                className="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+              />
+            )}
+
+            {addonsModalView === 'checkbox' && (
+              <img 
+                src="https://cdn.shopify.com/s/files/1/0751/1290/6942/files/Captura_de_pantalla_2026-04-21_a_las_10.33.34.png?v=1776760619" 
+                alt="Add-ons Checkbox" 
+                className="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+              />
+            )}
+
+            {addonsModalView === 'popup' && (
+              <img 
+                src="https://cdn.shopify.com/s/files/1/0751/1290/6942/files/Captura_de_pantalla_2026-04-21_a_las_10.33.46.png?v=1776760619" 
+                alt="Add-ons Pop-Up" 
+                className="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-)
+  )
+}
 
 const Slide4 = () => (
   <div className="flex flex-col items-center justify-center h-full w-full animate-in zoom-in-95 fade-in duration-700">
@@ -280,8 +439,11 @@ const Slide6 = () => (
   </div>
 )
 
-const FeatureCard = ({ icon: Icon, title, desc, delay }: any) => (
-  <div className={clsx("bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 hover:bg-white/10 transition-all duration-300", delay)}>
+const FeatureCard = ({ icon: Icon, title, desc, delay, onClick }: any) => (
+  <div 
+    onClick={onClick}
+    className={clsx("bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 hover:bg-white/10 transition-all duration-300", delay, onClick ? "cursor-pointer hover:border-indigo-400 hover:shadow-[0_0_30px_rgba(99,102,241,0.2)]" : "")}
+  >
     <div className="w-14 h-14 bg-indigo-500/20 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/30">
         <Icon className="w-7 h-7 text-indigo-300" />
     </div>
